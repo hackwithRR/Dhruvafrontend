@@ -17,28 +17,32 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
 
-  // Sync theme with localStorage
   useEffect(() => {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  // --- CORE AUTH LOGIC (BASED ON YOUR WORKING VERSION) ---
+  // --- REUSABLE SYNC FUNCTION ---
+  const getFullUserData = async (user) => {
+    if (!user) return null;
+    try {
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+      // Prioritize Auth photoURL (Google PFP) but merge Firestore data (gender/board)
+      return { 
+        ...user, 
+        ...(userDoc.exists() ? userDoc.data() : {}),
+        // Force the PFP to be the Auth one if the Firestore one is missing
+        photoURL: user.photoURL || (userDoc.exists() ? userDoc.data().photoURL : null)
+      };
+    } catch (e) {
+      return user; // Fallback to just Auth user if Firestore fails
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // 1. Set the user immediately (just like your old version)
-        setCurrentUser(user);
-        
-        // 2. Try to get extra info (gender, board) from Firestore in the background
-        try {
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists()) {
-            // Merge the data so Chat.jsx can see data.gender/data.board
-            setCurrentUser({ ...user, ...userDoc.data() });
-          }
-        } catch (err) {
-          console.error("Firestore background fetch failed:", err);
-        }
+        const mergedUser = await getFullUserData(user);
+        setCurrentUser(mergedUser);
       } else {
         setCurrentUser(null);
       }
@@ -47,49 +51,42 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // --- REGISTER (ENHANCED WITH PHOTOURL) ---
   const register = async (email, password, name, avatarUrl) => {
     const res = await createUserWithEmailAndPassword(auth, email, password);
-    // Update Auth Profile
     await updateProfile(res.user, { 
-        displayName: name, 
-        photoURL: avatarUrl || `https://ui-avatars.com/api/?name=${name}` 
+      displayName: name, 
+      photoURL: avatarUrl 
     });
-    // Update local state immediately
-    setCurrentUser({ ...res.user, displayName: name, photoURL: avatarUrl });
+    const merged = await getFullUserData(res.user);
+    setCurrentUser(merged);
     return res;
   };
 
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
 
-  // --- GOOGLE LOGIN (CLEAN VERSION) ---
+  // --- GOOGLE LOGIN (SIMPLE & STABLE) ---
   const googleLogin = async () => {
     try {
-      const result = await signInWithPopup(auth, provider);
-      // Firebase automatically handles PFP for Google. 
-      // We set local state so it reflects immediately.
-      setCurrentUser(result.user);
-      return result;
+      const res = await signInWithPopup(auth, provider);
+      const merged = await getFullUserData(res.user);
+      setCurrentUser(merged);
+      return res;
     } catch (error) {
-      console.error("Google login failed:", error);
+      console.error("Google login error:", error);
       throw error;
     }
   };
 
   const logout = () => signOut(auth);
 
-  // --- RELOAD USER (FOR PROFILE UPDATES) ---
   const reloadUser = async () => {
     if (auth.currentUser) {
       try {
         await auth.currentUser.reload();
-        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-        const extraData = userDoc.exists() ? userDoc.data() : {};
-        
-        // Spread both to ensure Navbar (Auth data) and Chat (Firestore data) stay in sync
-        setCurrentUser({ ...auth.currentUser, ...extraData });
+        const merged = await getFullUserData(auth.currentUser);
+        setCurrentUser(merged);
       } catch (error) {
-        console.error("Failed to refresh user session:", error);
+        console.error("Reload failed:", error);
       }
     }
   };
