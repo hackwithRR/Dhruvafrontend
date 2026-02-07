@@ -2,19 +2,19 @@ import React, { useEffect, useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
-import { useNavigate } from "react-router-dom"; // Added for redirect
+import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import { 
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, 
-    FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, 
+    FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, 
     FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, 
-    FaBookOpen, FaGraduationCap, FaRocket, FaChevronDown, FaMicrophone, FaUserCog 
+    FaBookOpen, FaGraduationCap, FaUserCog, FaMicrophone 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { doc, getDoc, setDoc, updateDoc, collection, query, getDocs, orderBy } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, getDocs, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,6 +23,7 @@ import 'katex/dist/katex.min.css';
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
+// --- CONSTANTS ---
 const CHAPTER_MAP = {
     CBSE: {
         "8": {
@@ -42,7 +43,8 @@ const CHAPTER_MAP = {
 
 const formatContent = (text) => text.trim();
 
-// --- PROFILE REDIRECT POPUP ---
+// --- COMPONENTS ---
+
 const ProfilePrompt = ({ currentTheme }) => {
     const navigate = useNavigate();
     return (
@@ -52,8 +54,8 @@ const ProfilePrompt = ({ currentTheme }) => {
                     <FaUserCog className="text-white text-2xl" />
                 </div>
                 <h2 className="text-xl font-black mb-2 italic">Setup Profile</h2>
-                <p className="text-xs opacity-60 mb-6 leading-relaxed font-bold uppercase tracking-tighter">Please complete your profile details (Board, Class, Gender) to unlock the AI models and get personalized results.</p>
-                <button onClick={() => navigate("/profile")} className="w-full py-4 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-500 transition-all">
+                <p className="text-xs opacity-60 mb-6 leading-relaxed font-bold uppercase tracking-tighter">Please complete your profile details (Board, Class, Gender) to unlock personalized AI results.</p>
+                <button onClick={() => navigate("/profile")} className="w-full py-4 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20">
                     GO TO PROFILE
                 </button>
             </motion.div>
@@ -61,7 +63,6 @@ const ProfilePrompt = ({ currentTheme }) => {
     );
 };
 
-// --- TYPEWRITER & TIMER ---
 const Typewriter = ({ text, onComplete, scrollRef }) => {
     const [displayedText, setDisplayedText] = useState("");
     const [cursor, setCursor] = useState(true);
@@ -114,6 +115,7 @@ const StudyTimer = ({ currentTheme }) => {
     );
 };
 
+// --- MAIN COMPONENT ---
 export default function Chat() {
     const { currentUser, logout, theme, setTheme } = useAuth();
     const [messages, setMessages] = useState([]);
@@ -140,16 +142,17 @@ export default function Chat() {
     const canvasRef = useRef(null);
     const fileInputRef = useRef(null);
 
+    // UNIFIED THEME MAPPING (Matches Navbar)
     const themes = {
-        dark: { container: "bg-[#050505] text-white", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-indigo-600 shadow-lg shadow-indigo-500/20", input: "bg-white/[0.03] border-white/10 text-white", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-r border-white/10" },
-        light: { container: "bg-[#F8FAFF] text-[#1E293B]", aiBubble: "bg-white/70 backdrop-blur-md border border-slate-200 shadow-sm", userBubble: "bg-indigo-600 text-white shadow-lg", input: "bg-white border-slate-200 text-[#1E293B]", button: "bg-indigo-600", sidebar: "bg-white border-r border-slate-200" },
-        cosmic: { container: "bg-[#0B0118] text-white", aiBubble: "bg-purple-900/10 border-purple-500/20 backdrop-blur-md shadow-2xl shadow-purple-500/5", userBubble: "bg-gradient-to-br from-purple-600 to-blue-600", input: "bg-purple-950/20 border-purple-500/20", button: "bg-purple-600", sidebar: "bg-[#0B0118] border-r border-purple-900/40" },
-        emerald: { container: "bg-[#020d08] text-emerald-50", aiBubble: "bg-emerald-900/20 border-emerald-500/20", userBubble: "bg-gradient-to-br from-emerald-600 to-teal-700", input: "bg-[#041a10] border-emerald-500/30", button: "bg-emerald-500", sidebar: "bg-[#010805] border-r border-emerald-900/30" },
-        sunset: { container: "bg-[#1a0a05] text-orange-50", aiBubble: "bg-orange-900/10 border-orange-500/20", userBubble: "bg-gradient-to-br from-orange-600 to-red-600", input: "bg-white/5 border-orange-500/20", button: "bg-orange-600", sidebar: "bg-[#120703] border-r border-orange-900/20" },
-        cyber: { container: "bg-black text-[#00ff9f]", aiBubble: "bg-black border-[#00ff9f]/30", userBubble: "bg-[#00ff9f] text-black font-black", input: "bg-black border-[#00ff9f]/50 text-[#00ff9f]", button: "bg-[#00ff9f]", sidebar: "bg-black border-r border-[#00ff9f]/20" },
-        ocean: { container: "bg-[#000428] text-blue-50", aiBubble: "bg-blue-900/10 border-blue-400/20 backdrop-blur-md", userBubble: "bg-gradient-to-br from-blue-500 to-cyan-500", input: "bg-white/5 border-blue-400/20", button: "bg-blue-400", sidebar: "bg-[#000428] border-r border-blue-900/30" },
-        royal: { container: "bg-[#0f172a] text-slate-100", aiBubble: "bg-slate-800/50 border-yellow-500/10", userBubble: "bg-gradient-to-br from-amber-600 to-yellow-600", input: "bg-slate-900 border-yellow-500/10", button: "bg-amber-600", sidebar: "bg-[#0a101f] border-r border-yellow-900/20" },
-        electric: { container: "bg-[#000] text-white", aiBubble: "bg-white/5 border-white/10 backdrop-blur-xl", userBubble: "bg-gradient-to-r from-red-500 to-orange-500", input: "bg-white/5 border-white/10", button: "bg-orange-500", sidebar: "bg-black border-r border-white/5" }
+        dark: { container: "bg-[#050505] text-white", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-indigo-600 shadow-lg", input: "bg-white/[0.03] border-white/10 text-white", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-r border-white/10" },
+        light: { container: "bg-[#F8FAFF] text-[#1E293B]", aiBubble: "bg-white border border-slate-200 shadow-sm", userBubble: "bg-indigo-600 text-white", input: "bg-white border-slate-200 text-[#1E293B]", button: "bg-indigo-600", sidebar: "bg-white border-r border-slate-200" },
+        cosmic: { container: "bg-[#0B0118] text-white", aiBubble: "bg-purple-900/10 border border-purple-500/20", userBubble: "bg-purple-600", input: "bg-purple-950/20 border-purple-500/20", button: "bg-purple-600", sidebar: "bg-[#0B0118] border-r border-purple-900/40" },
+        emerald: { container: "bg-[#020d08] text-emerald-50", aiBubble: "bg-emerald-900/20 border-emerald-500/20", userBubble: "bg-emerald-600", input: "bg-[#041a10] border-emerald-500/30", button: "bg-emerald-500", sidebar: "bg-[#010805] border-r border-emerald-900/30" },
+        sunset: { container: "bg-[#1a0a05] text-orange-50", aiBubble: "bg-orange-900/10 border-orange-500/20", userBubble: "bg-orange-600", input: "bg-white/5 border-orange-500/20", button: "bg-orange-600", sidebar: "bg-[#120703] border-r border-orange-900/20" },
+        cyber: { container: "bg-black text-[#00ff9f]", aiBubble: "bg-black border border-[#00ff9f]/30", userBubble: "bg-[#00ff9f] text-black font-black", input: "bg-black border-[#00ff9f]/50 text-[#00ff9f]", button: "bg-[#00ff9f]", sidebar: "bg-black border-r border-[#00ff9f]/20" },
+        ocean: { container: "bg-[#000428] text-blue-50", aiBubble: "bg-blue-900/10 border-blue-400/20", userBubble: "bg-blue-500", input: "bg-white/5 border-blue-400/20", button: "bg-blue-400", sidebar: "bg-[#000428] border-r border-blue-900/30" },
+        royal: { container: "bg-[#0f172a] text-slate-100", aiBubble: "bg-slate-800/50 border-yellow-500/10", userBubble: "bg-amber-600", input: "bg-slate-900 border-yellow-500/10", button: "bg-amber-600", sidebar: "bg-[#0a101f] border-r border-yellow-900/20" },
+        electric: { container: "bg-[#000] text-white", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-orange-500", input: "bg-white/5 border-white/10", button: "bg-orange-500", sidebar: "bg-black border-r border-white/5" }
     };
 
     const currentTheme = themes[theme] || themes.dark;
@@ -167,7 +170,6 @@ export default function Chat() {
                     gender: data.gender || "",
                     language: data.language || "English" 
                 });
-                // Check if profile is incomplete
                 if (!data.board || (!data.class && !data.classLevel) || !data.gender) {
                     setShowOnboarding(true);
                 }
@@ -196,10 +198,6 @@ export default function Chat() {
         window.speechSynthesis.cancel(); 
         const cleanText = text.replace(/[*#_~]/g, "").replace(/\[.*?\]/g, "");
         const utterance = new SpeechSynthesisUtterance(cleanText);
-        const voices = window.speechSynthesis.getVoices();
-        const maleVoice = voices.find(v => (v.name.toLowerCase().includes("male") || v.name.toLowerCase().includes("ravi")) && (v.lang.includes("en-IN") || v.lang.includes("en-GB"))) || voices.find(v => v.lang.includes("en-IN"));
-        utterance.voice = maleVoice;
-        utterance.pitch = 0.9;
         utterance.onend = () => { if (isLiveMode) setTimeout(() => startVoiceMode(), 600); };
         window.speechSynthesis.speak(utterance);
     };
@@ -268,11 +266,12 @@ export default function Chat() {
                 {showOnboarding && <ProfilePrompt currentTheme={currentTheme} />}
             </AnimatePresence>
 
+            {/* Sidebar with Theme integration */}
             <AnimatePresence>
                 {showSidebar && (
                     <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 overflow-hidden ${currentTheme.sidebar}`}>
                         <div className="flex justify-between items-center mb-10"><span className="text-[10px] font-black uppercase opacity-40">History</span><button onClick={() => setShowSidebar(false)}><FaTimes /></button></div>
-                        <button onClick={() => { setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false); }} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg"><FaPlus /> New Session</button>
+                        <button onClick={() => { setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false); }} className={`w-full py-4 mb-6 rounded-2xl text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg ${currentTheme.button}`}><FaPlus /> New Session</button>
                         <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
                             {sessions.map((s) => (<div key={s.id} onClick={() => loadSession(s.id)} className={`p-4 rounded-2xl cursor-pointer transition-all ${currentSessionId === s.id ? 'bg-indigo-500/15 text-indigo-500 border border-indigo-500/20' : 'opacity-60'}`}><div className="text-[10px] font-black uppercase truncate">{s.title || "Untitled Chat"}</div></div>))}
                         </div>
@@ -284,12 +283,14 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
                 <StudyTimer currentTheme={currentTheme} />
 
+                {/* Mode Toggles */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 overflow-x-auto no-scrollbar">
                     <div className="flex gap-2 p-1.5 rounded-[1.5rem] bg-white/5 border border-white/10 w-max mx-auto">
-                        {modes.map((m) => (<button key={m.id} onClick={() => setMode(m.id)} className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${mode === m.id ? 'bg-indigo-600 text-white shadow-lg' : 'opacity-40'}`}>{m.icon} {m.label}</button>))}
+                        {modes.map((m) => (<button key={m.id} onClick={() => setMode(m.id)} className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${mode === m.id ? `${currentTheme.button} text-white shadow-lg` : 'opacity-40'}`}>{m.icon} {m.label}</button>))}
                     </div>
                 </div>
 
+                {/* Subject Selector */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
                     <button onClick={() => setShowSidebar(!showSidebar)} className={`p-4 rounded-2xl border ${currentTheme.aiBubble} border-white/10 shadow-xl`}><FaHistory size={16} /></button>
                     <motion.div layout className={`flex-1 flex items-center gap-2 p-2 rounded-[2rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500/40 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10 shadow-2xl`}`}>
@@ -302,17 +303,22 @@ export default function Chat() {
                     </motion.div>
                 </div>
 
+                {/* Chat Container */}
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar relative">
                     <div className="max-w-3xl mx-auto space-y-12 pb-20">
                         {messages.length === 0 && <div className="text-center py-20 opacity-20"><FaGraduationCap size={48} className="mx-auto mb-4" /><p className="font-bold text-sm uppercase tracking-widest">Select subject to begin</p></div>}
                         {messages.map((msg, i) => (
                             <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                                <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
+                                <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none shadow-xl` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
                                     {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 w-full object-cover" alt="upload" />}
-                                    {msg.role === "ai" && i === messages.length - 1 && !isSending ? (<Typewriter text={msg.content} scrollRef={chatContainerRef} onComplete={() => messagesEndRef.current?.scrollIntoView()} />) : (
-                                        <div className="prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{formatContent(msg.content)}</ReactMarkdown></div>
+                                    {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
+                                        <Typewriter text={msg.content} scrollRef={chatContainerRef} onComplete={() => messagesEndRef.current?.scrollIntoView()} />
+                                    ) : (
+                                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{formatContent(msg.content)}</ReactMarkdown>
+                                        </div>
                                     )}
-                                    {msg.ytLink && (<div className="mt-6 pt-4 border-t border-white/10"><a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-600 rounded-2xl text-xs font-bold border border-red-500/20"><FaYoutube size={18} /> Watch Video Guide</a></div>)}
+                                    {msg.ytLink && (<div className="mt-6 pt-4 border-t border-white/10"><a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-600 rounded-2xl text-xs font-bold border border-red-500/20 hover:bg-red-600 hover:text-white transition-all"><FaYoutube size={18} /> Watch Video Guide</a></div>)}
                                 </div>
                             </div>
                         ))}
@@ -320,27 +326,29 @@ export default function Chat() {
                     </div>
                 </div>
 
+                {/* Input Area */}
                 <div className="p-4 md:p-10 shrink-0">
                     <div className="max-w-3xl mx-auto relative">
                         <AnimatePresence>{selectedFile && (<motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="absolute bottom-full left-0 mb-4 p-2 rounded-2xl bg-indigo-600 flex items-center gap-3"><img src={URL.createObjectURL(selectedFile)} className="w-12 h-12 rounded-lg object-cover" alt="preview" /><button onClick={() => setSelectedFile(null)} className="p-2 text-white/60"><FaTimes /></button></motion.div>)}</AnimatePresence>
-                        <div className={`flex items-center p-1 md:p-2 rounded-[2.8rem] border transition-all ${currentTheme.input} ${isListening ? 'ring-2 ring-indigo-500 bg-indigo-500/5' : ''}`}>
+                        <div className={`flex items-center p-1 md:p-2 rounded-[2.8rem] border transition-all ${currentTheme.input} ${isListening ? 'ring-2 ring-indigo-500 bg-indigo-500/5 shadow-[0_0_20px_rgba(79,70,229,0.2)]' : ''}`}>
                             <input value={input} onChange={e => setInput(e.target.value)} placeholder={isListening ? "Listening..." : "Ask your doubt..."} className="flex-1 bg-transparent px-4 md:px-6 py-4 outline-none font-bold text-xs md:text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex items-center gap-1 md:gap-2 px-1">
                                 <button onClick={() => { setIsLiveMode(!isLiveMode); if(!isLiveMode) startVoiceMode(); else window.speechSynthesis.cancel(); }} className={`p-3 md:p-4 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 text-white shadow-lg' : 'opacity-30 hover:opacity-100'}`}><FaMicrophone size={16} /></button>
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} accept="image/*" />
                                 <button onClick={() => fileInputRef.current.click()} className="p-2 md:p-3 opacity-30 hover:opacity-100"><FaImage size={16} /></button>
                                 <button onClick={openCamera} className="p-2 md:p-3 opacity-30 hover:opacity-100"><FaCamera size={16} /></button>
-                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-4 md:p-5 rounded-full ${currentTheme.button} flex`}>{isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane className="text-white" size={14} />}</button>
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-4 md:p-5 rounded-full ${currentTheme.button} flex shadow-lg`}>{isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane className="text-white" size={14} />}</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                {/* Camera Overlay */}
                 <AnimatePresence>
                     {isCameraOpen && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
                             <div className="w-full flex justify-between p-4 text-white"><button onClick={closeCamera} className="p-4 bg-white/5 rounded-full"><FaTimes size={20} /></button><button onClick={() => setCameraFacing(f => f === 'user' ? 'environment' : 'user')} className="p-4 bg-white/5 rounded-full"><FaUndo /></button></div>
-                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/20" />
+                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/20 shadow-2xl" />
                             <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-95"><div className="w-16 h-16 bg-white rounded-full" /></button>
                             <canvas ref={canvasRef} className="hidden" />
                         </motion.div>
