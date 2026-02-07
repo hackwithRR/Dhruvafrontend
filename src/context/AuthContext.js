@@ -15,6 +15,17 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // --- THEME STATE LOGIC ---
+  // We initialize from localStorage so the theme persists after page refreshes
+  const [theme, setThemeState] = useState(() => {
+    return localStorage.getItem("dhruva-theme") || "dark";
+  });
+
+  const setTheme = (newTheme) => {
+    setThemeState(newTheme);
+    localStorage.setItem("dhruva-theme", newTheme);
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
@@ -54,7 +65,9 @@ export const AuthProvider = ({ children }) => {
       login, 
       logout, 
       googleLogin, 
-      reloadUser 
+      reloadUser,
+      theme,    // Global theme state
+      setTheme  // Function to change theme globally
     }}>
       {!loading && children}
     </AuthContext.Provider>
