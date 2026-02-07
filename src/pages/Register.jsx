@@ -1,21 +1,20 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { motion, AnimatePresence } from "framer-motion";
-import { FaUser, FaEnvelope, FaLock, FaCheck, FaMars, FaVenus, FaGenderless, FaGoogle, FaLightbulb, FaRocket, FaRobot } from "react-icons/fa";
+import { FaUser, FaEnvelope, FaLock, FaCheck, FaMars, FaVenus, FaGenderless, FaGoogle, FaRobot } from "react-icons/fa";
 
-// Ensure Katex CSS is available for any math rendering
 import 'katex/dist/katex.min.css';
 
 export default function Register() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [gender, setGender] = useState("other");
+    const [gender, setGender] = useState("other"); // Default state
     const [selectedAvatar, setSelectedAvatar] = useState(1);
     const [isVerified, setIsVerified] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -57,21 +56,32 @@ export default function Register() {
         e.preventDefault();
         if (loading) return;
         setLoading(true);
+
+        // Capture current state values into constants to avoid closure issues
+        const currentGender = gender;
+        const currentName = name;
+        const currentEmail = email;
+
         try {
             const avatarUrl = avatars.find(a => a.id === selectedAvatar).url;
-            const userCredential = await register(email, password, name, avatarUrl, gender);
-
+            
+            // 1. Create Auth User
+            const userCredential = await register(currentEmail, password, currentName, avatarUrl, currentGender);
+            
+            // 2. Immediate Firestore Sync
+            // We use the UID directly from the response to ensure the document maps to the user
             await setDoc(doc(db, "users", userCredential.user.uid), {
                 uid: userCredential.user.uid,
-                name,
-                email,
+                name: currentName,
+                email: currentEmail,
                 pfp: avatarUrl,
-                gender,
+                gender: currentGender, // This saves 'male', 'female', or 'other'
                 board: "CBSE",
                 classLevel: "10",
-                createdAt: new Date()
+                createdAt: serverTimestamp()
             }, { merge: true });
 
+            // 3. Success Sequence
             await logout();
             setIsVerified(true);
         } catch (err) {
@@ -82,6 +92,7 @@ export default function Register() {
 
     return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 md:p-8 bg-[#05000a] overflow-x-hidden relative selection:bg-fuchsia-500/40">
+            {/* Background Glow */}
             <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
                 <div
                     className="absolute inset-0 transition-opacity duration-300 opacity-60"
@@ -97,6 +108,8 @@ export default function Register() {
                 className="relative z-10 w-full max-w-6xl"
             >
                 <div className="grid grid-cols-1 lg:grid-cols-12 bg-black/50 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] md:rounded-[4rem] overflow-hidden shadow-2xl">
+                    
+                    {/* Left Panel */}
                     <div className="lg:col-span-5 p-8 md:p-16 bg-gradient-to-br from-purple-900/40 to-transparent flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/5">
                         <div>
                             <div className="flex items-center gap-3 text-fuchsia-400 mb-6">
@@ -128,6 +141,7 @@ export default function Register() {
                         </div>
                     </div>
 
+                    {/* Right Panel (Form) */}
                     <form onSubmit={handleRegister} className="lg:col-span-7 p-8 md:p-16 lg:p-20 bg-white/[0.01] flex flex-col gap-8 md:gap-10">
                         <div className="space-y-6">
                             <div className="relative group">
@@ -153,6 +167,7 @@ export default function Register() {
                             </div>
                         </div>
 
+                        {/* Gender Selection */}
                         <div className="space-y-4">
                             <p className="text-[10px] text-white/40 uppercase font-black tracking-widest ml-1">Identity Parameter</p>
                             <div className="grid grid-cols-3 gap-3">
@@ -199,6 +214,7 @@ export default function Register() {
                 </div>
             </motion.div>
 
+            {/* Success Modal */}
             <AnimatePresence>
                 {isVerified && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-3xl p-6">
