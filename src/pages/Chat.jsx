@@ -7,13 +7,13 @@ import {
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, 
     FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, 
     FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, 
-    FaBookOpen, FaGraduationCap, FaRocket, FaChevronDown, FaMicrophone 
+    FaBookOpen, FaGraduationCap, FaRocket, FaChevronDown, FaMicrophone, FaCheckCircle 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { doc, getDoc, setDoc, collection, query, getDocs, orderBy } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, query, getDocs, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,30 +41,68 @@ const CHAPTER_MAP = {
 
 const formatContent = (text) => text.trim();
 
-// --- ONBOARDING COMPONENT ---
-const OnboardingModal = ({ onComplete, currentTheme }) => (
-    <motion.div 
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6"
-    >
-        <motion.div 
-            initial={{ scale: 0.8 }} animate={{ scale: 1 }}
-            className={`max-w-md w-full p-10 rounded-[3rem] border-2 border-white/20 shadow-2xl text-center relative overflow-hidden ${currentTheme.aiBubble}`}
-        >
-            <div className="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-purple-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl">
-                <FaRocket className="text-white text-3xl animate-bounce" />
-            </div>
-            <h2 className="text-3xl font-black mb-4 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent italic">Ayo, Let's Level Up! 🚀</h2>
-            <p className="text-base font-medium opacity-80 mb-8 leading-relaxed">To give you that Main Character energy, we need your Board, Class, and Gender. No setup = no personalized vibes.</p>
-            <div className="space-y-3">
-                <button onClick={() => window.location.href = '/profile'} className="w-full py-5 bg-white text-black font-black rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-3 hover:bg-indigo-50 shadow-xl">FIX PROFILE <FaArrowDown className="animate-bounce" /></button>
-                <button onClick={onComplete} className="w-full py-4 text-xs font-bold opacity-40 hover:opacity-100 transition-all uppercase tracking-widest">OKAY, I'LL VIBE LATER</button>
-            </div>
-        </motion.div>
-    </motion.div>
-);
+// --- UPDATED ONBOARDING: EDIT PROFILE DIRECTLY ---
+const OnboardingModal = ({ currentUser, onComplete, currentTheme }) => {
+    const [loading, setLoading] = useState(false);
+    const [profile, setProfile] = useState({ board: "CBSE", classLevel: "10", gender: "Male" });
 
-// --- TYPEWRITER COMPONENT ---
+    const handleSave = async () => {
+        setLoading(true);
+        try {
+            await updateDoc(doc(db, "users", currentUser.uid), {
+                ...profile,
+                onboarded: true
+            });
+            onComplete(profile);
+        } catch (e) {
+            toast.error("Error saving profile");
+        }
+        setLoading(false);
+    };
+
+    return (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-xl flex items-center justify-center p-6">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className={`max-w-md w-full p-8 rounded-[3rem] border-2 border-white/20 shadow-2xl text-center ${currentTheme.aiBubble}`}>
+                <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-indigo-500/20">
+                    <FaRocket className="text-white text-2xl animate-bounce" />
+                </div>
+                <h2 className="text-2xl font-black mb-2 italic">Complete Profile</h2>
+                <p className="text-xs font-bold opacity-50 mb-6 uppercase tracking-tighter">Setup your vibe to start studying</p>
+                
+                <div className="space-y-4 text-left">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-black opacity-40 ml-2">BOARD</label>
+                            <select onChange={e => setProfile({...profile, board: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm">
+                                <option value="CBSE">CBSE</option>
+                                <option value="ICSE">ICSE</option>
+                            </select>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-black opacity-40 ml-2">CLASS</label>
+                            <select onChange={e => setProfile({...profile, classLevel: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm">
+                                {["8","9","10","11","12"].map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-black opacity-40 ml-2">GENDER</label>
+                        <select onChange={e => setProfile({...profile, gender: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm">
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button onClick={handleSave} disabled={loading} className="w-full mt-8 py-5 bg-indigo-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-xl">
+                    {loading ? <FaSyncAlt className="animate-spin" /> : <><FaCheckCircle /> SAVE & START</>}
+                </button>
+            </motion.div>
+        </motion.div>
+    );
+};
+
+// --- TYPEWRITER & TIMER (Unchanged) ---
 const Typewriter = ({ text, onComplete, scrollRef }) => {
     const [displayedText, setDisplayedText] = useState("");
     const [cursor, setCursor] = useState(true);
@@ -86,7 +124,6 @@ const Typewriter = ({ text, onComplete, scrollRef }) => {
     );
 };
 
-// --- STUDY TIMER ---
 const StudyTimer = ({ currentTheme }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isActive, setIsActive] = useState(false);
@@ -126,7 +163,7 @@ export default function Chat() {
     const [input, setInput] = useState("");
     const [mode, setMode] = useState("Explain");
     const [isSending, setIsSending] = useState(false);
-    const [userData, setUserData] = useState({ board: "", class: "", language: "English" });
+    const [userData, setUserData] = useState({ board: "", class: "", gender: "", language: "English" });
     const [isLocked, setIsLocked] = useState(false);
     const [subjectInput, setSubjectInput] = useState("");
     const [chapterInput, setChapterInput] = useState("");
@@ -158,7 +195,12 @@ export default function Chat() {
             const userDoc = await getDoc(doc(db, "users", currentUser.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data();
-                setUserData({ board: data.board || "", class: data.classLevel || data.class || "", language: data.language || "English" });
+                setUserData({ 
+                    board: data.board || "", 
+                    class: data.classLevel || data.class || "", 
+                    gender: data.gender || "",
+                    language: data.language || "English" 
+                });
                 if (!data.board || (!data.class && !data.classLevel) || !data.gender) setShowOnboarding(true);
             } else setShowOnboarding(true);
             fetchSessions();
@@ -179,19 +221,35 @@ export default function Chat() {
         setShowSidebar(false);
     };
 
-    // --- VOICE & LIVE TUTOR LOGIC ---
+    // --- UPDATED: VOICE LOOP & MALE PERSONALITY ---
     const speakText = (text) => {
+        window.speechSynthesis.cancel(); 
         const cleanText = text.replace(/[*#_~]/g, "").replace(/\[.*?\]/g, "");
         const utterance = new SpeechSynthesisUtterance(cleanText);
         const voices = window.speechSynthesis.getVoices();
-        utterance.voice = voices.find(v => v.lang.includes("en-IN")) || voices[0];
-        utterance.onend = () => { if (isLiveMode) setTimeout(() => startVoiceMode(), 500); };
+        
+        // Attempt to find a deep Male Indian Voice
+        const maleVoice = voices.find(v => 
+            (v.name.toLowerCase().includes("male") || v.name.toLowerCase().includes("ravi") || v.name.toLowerCase().includes("rishi")) &&
+            (v.lang.includes("en-IN") || v.lang.includes("en-GB"))
+        ) || voices.find(v => v.lang.includes("en-IN"));
+
+        utterance.voice = maleVoice;
+        utterance.pitch = 0.9; // Lower pitch for masculine tone
+        utterance.rate = 1.0;
+
+        utterance.onend = () => { 
+            if (isLiveMode) {
+                // Wait briefly so AI doesn't listen to its own echo
+                setTimeout(() => startVoiceMode(), 600); 
+            }
+        };
         window.speechSynthesis.speak(utterance);
     };
 
     const startVoiceMode = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return toast.error("Not supported");
+        if (!SpeechRecognition) return toast.error("Voice not supported");
         const recognition = new SpeechRecognition();
         recognition.lang = 'en-IN';
         setIsListening(true);
@@ -200,7 +258,7 @@ export default function Chat() {
             const t = e.results[0][0].transcript;
             setInput(t);
             setIsListening(false);
-            sendMessage(t);
+            sendMessage(t); // Trigger AI response
         };
         recognition.onerror = () => { setIsListening(false); setIsLiveMode(false); };
     };
@@ -234,14 +292,20 @@ export default function Chat() {
             const aiMsg = { role: "ai", content: res.data.reply, ytLink, timestamp: Date.now() };
             const finalMessages = [...newMessages, aiMsg];
             setMessages(finalMessages);
+            
+            // Trigger Voice if in Live Mode or if user used Microphone
             if (isLiveMode || voiceInput) speakText(res.data.reply);
 
             await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: finalMessages, lastUpdate: Date.now(), title: subjectInput ? `${subjectInput.toUpperCase()}: ${mappedChapter}` : "Study Session" }, { merge: true });
             fetchSessions();
-        } catch (e) { toast.error("Connection failed"); setIsLiveMode(false); }
+        } catch (e) { 
+            toast.error("Connection failed"); 
+            setIsLiveMode(false); 
+        }
         setIsSending(false);
     };
 
+    // --- CAMERA & FILE LOGIC ---
     const closeCamera = () => { videoRef.current?.srcObject?.getTracks().forEach(t => t.stop()); setIsCameraOpen(false); };
     const openCamera = async () => { setIsCameraOpen(true); try { const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacing } }); if (videoRef.current) videoRef.current.srcObject = s; } catch (e) { setIsCameraOpen(false); } };
     const capturePhoto = () => { const c = canvasRef.current; const v = videoRef.current; c.width = v.videoWidth; c.height = v.videoHeight; c.getContext("2d").drawImage(v, 0, 0); c.toBlob(b => { setSelectedFile(new File([b], "cap.jpg", { type: "image/jpeg" })); closeCamera(); }, "image/jpeg", 0.8); };
@@ -249,7 +313,16 @@ export default function Chat() {
     return (
         <div className={`flex h-screen w-full overflow-hidden transition-all duration-700 ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" limit={1} />
-            <AnimatePresence>{showOnboarding && <OnboardingModal onComplete={() => setShowOnboarding(false)} currentTheme={currentTheme} />}</AnimatePresence>
+            
+            <AnimatePresence>
+                {showOnboarding && (
+                    <OnboardingModal 
+                        currentUser={currentUser}
+                        onComplete={(data) => { setUserData(data); setShowOnboarding(false); }} 
+                        currentTheme={currentTheme} 
+                    />
+                )}
+            </AnimatePresence>
 
             <AnimatePresence>
                 {showSidebar && (
@@ -285,8 +358,8 @@ export default function Chat() {
                     </motion.div>
                 </div>
 
-                <div ref={chatContainerRef} onScroll={() => { if (chatContainerRef.current) { const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current; setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 100); } }} className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll relative">
-                    <div className="max-w-3xl mx-auto space-y-12">
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll relative">
+                    <div className="max-w-3xl mx-auto space-y-12 pb-20">
                         {messages.length === 0 && <div className="text-center py-20 opacity-20"><FaGraduationCap size={48} className="mx-auto mb-4" /><p className="font-bold text-sm">Select a subject to start.</p></div>}
                         {messages.map((msg, i) => (
                             <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
@@ -303,13 +376,13 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* --- MOBILE OPTIMIZED INPUT --- */}
+                {/* --- INPUT AREA --- */}
                 <div className="p-4 md:p-10 shrink-0">
                     <div className="max-w-3xl mx-auto relative">
                         <AnimatePresence>{selectedFile && (<motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="absolute bottom-full left-0 mb-4 p-2 rounded-2xl bg-indigo-600 flex items-center gap-3"><img src={URL.createObjectURL(selectedFile)} className="w-12 h-12 rounded-lg object-cover" alt="preview" /><button onClick={() => setSelectedFile(null)} className="p-2 text-white/60"><FaTimes /></button></motion.div>)}</AnimatePresence>
                         <div className={`flex items-center p-1 md:p-2 rounded-[2.8rem] border transition-all ${currentTheme.input} ${isListening ? 'ring-2 ring-indigo-500 bg-indigo-500/5' : ''}`}>
                             {isLiveMode && <div className="pl-4"><span className="flex h-2 w-2 rounded-full bg-red-500 animate-ping"></span></div>}
-                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={isListening ? "Listening..." : isLiveMode ? "Live Chat..." : "Ask Dhruva..."} className="flex-1 bg-transparent px-4 md:px-6 py-4 outline-none font-bold text-xs md:text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
+                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={isListening ? "Listening..." : isLiveMode ? "Live Tutor..." : "Ask Dhruva..."} className="flex-1 bg-transparent px-4 md:px-6 py-4 outline-none font-bold text-xs md:text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex items-center gap-1 md:gap-2 px-1">
                                 {isLiveMode && <button onClick={() => { setIsLiveMode(false); window.speechSynthesis.cancel(); }} className="p-2 md:p-3 text-red-500 bg-red-500/10 rounded-full"><FaStop size={12} /></button>}
                                 <button onClick={() => { setIsLiveMode(!isLiveMode); if(!isLiveMode) startVoiceMode(); else window.speechSynthesis.cancel(); }} className={`p-3 md:p-4 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 text-white shadow-lg' : 'opacity-30 hover:opacity-100'}`}><FaMicrophone size={16} className={isListening ? "animate-bounce" : ""} /></button>
