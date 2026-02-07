@@ -213,11 +213,7 @@ export default function Chat() {
     const loadSession = async (sid) => {
         setCurrentSessionId(sid);
         const sDoc = await getDoc(doc(db, `users/${currentUser.uid}/sessions`, sid));
-        if (sDoc.exists()) {
-            const data = sDoc.data();
-            setMessages(data.messages || []);
-            // Optional: extract subject/chapter from title if you want to restore bar state
-        }
+        if (sDoc.exists()) setMessages(sDoc.data().messages || []);
         setShowSidebar(false);
     };
 
@@ -284,23 +280,26 @@ export default function Chat() {
                 res = await axios.post(`${API_BASE}/chat`, payload);
             }
 
-            const queryParts = [userData.board, userData.class, subjectInput, chapterInput, text.slice(0, 40)].filter(Boolean);
-            const searchQuery = `${queryParts.join(" ")} full explanation`;
+            // --- SELECTIVE YOUTUBE LOGIC ---
+            // Only provide a link if it's an educational inquiry and mode is Explain or Doubt
+            let ytLink = null;
+            if ((mode === "Explain" || mode === "Doubt") && (subjectInput || text.length > 10)) {
+                const queryParts = [userData.board, userData.class, subjectInput, chapterInput, text.slice(0, 40)].filter(Boolean);
+                ytLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(queryParts.join(" ") + " lesson")}`;
+            }
 
             const aiMsg = { 
                 role: "ai", 
                 content: res.data.reply, 
-                ytLink: `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`,
+                ytLink: ytLink,
                 timestamp: Date.now() 
             };
             
             const finalMessages = [...newMessages, aiMsg];
             setMessages(finalMessages);
 
-            // Automatic Session Naming Logic
-            const sessionTitle = subjectInput 
-                ? `${subjectInput.toUpperCase()} - ${chapterInput || 'LESSON'}` 
-                : (text.slice(0, 25) || "New Study Session");
+            // AUTO SESSION NAMING
+            const sessionTitle = subjectInput ? `${subjectInput.toUpperCase()}: ${chapterInput || 'Session'}` : (text.slice(0, 25) || "New Study Chat");
 
             await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
                 messages: finalMessages,
@@ -360,7 +359,6 @@ export default function Chat() {
             <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
                 
-                {/* DRAGGABLE TIMER */}
                 <StudyTimer currentTheme={currentTheme} />
 
                 {/* --- MODERN SESSION BAR --- */}
@@ -378,14 +376,12 @@ export default function Chat() {
                         layout
                         className={`flex-1 flex flex-col md:flex-row items-center gap-2 p-2 rounded-[2rem] border transition-all duration-500 relative overflow-hidden ${isLocked ? 'border-emerald-500/40 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10 shadow-2xl`}`}
                     >
-                        {/* Auto-Naming State Indicator */}
                         <div className="absolute top-0 left-1/2 -translate-x-1/2">
                              <div className={`text-[6px] font-black uppercase tracking-[0.2em] px-3 py-0.5 rounded-b-lg ${isLocked ? 'bg-emerald-500 text-white' : 'bg-indigo-500/20 text-indigo-500'}`}>
                                 {isLocked ? "Session Locked" : "Setup Session"}
                              </div>
                         </div>
 
-                        {/* INPUTS GROUP */}
                         <div className="flex items-center w-full flex-1 gap-3 px-4 py-2 mt-1">
                             <div className="flex-1 flex flex-col">
                                 <label className={`text-[8px] font-bold uppercase tracking-wider mb-0.5 ${isLocked ? 'text-emerald-500' : 'text-indigo-500/60'}`}>Subject</label>
@@ -398,4 +394,129 @@ export default function Chat() {
                                 />
                             </div>
                             
-                            <div className="h-8 w-
+                            <div className="h-8 w-[1px] bg-current opacity-5" />
+
+                            <div className="flex-1 flex flex-col">
+                                <label className={`text-[8px] font-bold uppercase tracking-wider mb-0.5 ${isLocked ? 'text-emerald-500' : 'text-indigo-500/60'}`}>Chapter</label>
+                                <input 
+                                    disabled={isLocked} 
+                                    value={chapterInput} 
+                                    onChange={e => setChapterInput(e.target.value)} 
+                                    placeholder="CH-01" 
+                                    className={`bg-transparent text-sm font-bold outline-none placeholder:opacity-20 ${isLocked ? 'text-emerald-500/90' : 'text-current'}`} 
+                                />
+                            </div>
+
+                            <motion.button 
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
+                                onClick={() => setIsLocked(!isLocked)} 
+                                className={`p-3.5 rounded-2xl transition-all duration-500 shadow-lg ${isLocked ? "bg-emerald-500 text-white shadow-emerald-500/40" : "bg-white/5 text-indigo-500 border border-indigo-500/20 hover:bg-indigo-500 hover:text-white"}`}
+                            >
+                                {isLocked ? <FaLock size={14} /> : <FaUnlock size={14} />}
+                            </motion.button>
+                        </div>
+
+                        <div className={`flex p-1.5 rounded-[1.5rem] relative w-full md:w-auto ${theme === 'light' ? 'bg-indigo-50/50' : 'bg-black/40'}`}>
+                            <LayoutGroup>
+                                {["Explain", "Doubt", "Quiz"].map(m => (
+                                    <button key={m} onClick={() => setMode(m)} className={`flex-1 md:flex-none relative z-10 px-6 py-2.5 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${mode === m ? (theme === 'light' ? 'text-indigo-600' : 'text-white') : "opacity-40 hover:opacity-100"}`}>
+                                        <span className="relative z-20">{m}</span>
+                                        {mode === m && (
+                                            <motion.div layoutId="mode-pill" className={`absolute inset-0 rounded-xl shadow-xl ${theme === 'light' ? 'bg-white' : 'bg-white/10 border border-white/10 backdrop-blur-md'}`} transition={{ type: "spring", bounce: 0.25, duration: 0.5 }} />
+                                        )}
+                                    </button>
+                                ))}
+                            </LayoutGroup>
+                        </div>
+                    </motion.div>
+                </div>
+
+                {/* CHAT AREA */}
+                <div onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-8 custom-y-scroll scroll-smooth">
+                    <div className="max-w-3xl mx-auto space-y-12">
+                        {messages.map((msg, i) => (
+                            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                                <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
+                                    {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 w-full object-cover" alt="upload" />}
+                                    <div className={`prose prose-sm ${theme === 'light' ? 'prose-slate' : 'prose-invert'} text-sm leading-relaxed font-medium`}>
+                                        {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
+                                            <Typewriter text={msg.content} onComplete={scrollToBottom} />
+                                        ) : (
+                                            <ReactMarkdown 
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    p: ({node, ...props}) => <p className="mb-4 last:mb-0 leading-relaxed" {...props} />,
+                                                    ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-4" {...props} />,
+                                                    ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-4" {...props} />,
+                                                }}
+                                            >
+                                                {formatContent(msg.content)}
+                                            </ReactMarkdown>
+                                        )}
+                                    </div>
+                                    {msg.role === "ai" && msg.ytLink && (
+                                        <div className="mt-6 pt-4 border-t border-indigo-500/10">
+                                            <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Visual Guide:</p>
+                                            <a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-600 rounded-2xl text-xs font-bold hover:bg-red-600/20 transition-all border border-red-500/20 shadow-sm">
+                                                <FaYoutube size={18} /> Watch Video Guide 📺
+                                            </a>
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        ))}
+                        {isSending && <div className={`text-[10px] font-black uppercase opacity-30 animate-pulse px-4 ml-2 ${theme === 'light' ? 'text-indigo-600' : ''}`}>Dhruva is typing... ✨</div>}
+                        <div ref={messagesEndRef} className="h-4" />
+                    </div>
+                </div>
+
+                <AnimatePresence>
+                    {showScrollBtn && (
+                        <motion.button initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} onClick={scrollToBottom} className="absolute bottom-32 right-8 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-500 transition-all z-50">
+                            <FaArrowDown />
+                        </motion.button>
+                    )}
+                </AnimatePresence>
+
+                <div className="p-4 md:p-10 shrink-0">
+                    <div className="max-w-3xl mx-auto relative">
+                        <AnimatePresence>
+                            {selectedFile && (
+                                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="absolute bottom-full mb-6 left-4">
+                                    <img src={URL.createObjectURL(selectedFile)} className="w-24 h-24 object-cover rounded-[2rem] border-2 border-indigo-500 shadow-2xl" alt="preview" />
+                                    <button onClick={() => setSelectedFile(null)} className="absolute -top-2 -right-2 bg-red-500 p-2 rounded-full text-white"><FaTimes size={10} /></button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                        <div className={`flex items-center p-2 rounded-[2.8rem] border transition-all ${currentTheme.input}`}>
+                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Ask anything in ${userData.language}...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
+                            <div className="flex items-center gap-2 px-2">
+                                <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} />
+                                <button onClick={() => fileInputRef.current.click()} className={`p-3 opacity-30 hover:opacity-100 transition-all ${theme === 'light' ? 'text-indigo-600' : ''}`}><FaImage /></button>
+                                <button onClick={openCamera} className={`p-3 opacity-30 hover:opacity-100 transition-all ${theme === 'light' ? 'text-indigo-600' : ''}`}><FaCamera /></button>
+                                <button onClick={sendMessage} disabled={isSending} className={`p-5 rounded-full active:scale-90 transition-all ${currentTheme.button}`}>
+                                    {isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane className="text-white" size={14} />}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <AnimatePresence>
+                    {isCameraOpen && (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
+                            <div className="w-full flex justify-between p-4 text-white">
+                                <button onClick={closeCamera} className="p-4 bg-white/5 rounded-full"><FaTimes size={20} /></button>
+                                <button onClick={() => setCameraFacing(f => f === 'user' ? 'environment' : 'user')} className="p-4 bg-white/5 rounded-full"><FaUndo /></button>
+                            </div>
+                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/10" />
+                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-95"><div className="w-16 h-16 bg-white rounded-full" /></button>
+                            <canvas ref={canvasRef} className="hidden" />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </div>
+        </div>
+    );
+}
