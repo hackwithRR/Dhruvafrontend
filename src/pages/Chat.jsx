@@ -2,12 +2,13 @@ import React, { useEffect, useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
+import { useNavigate } from "react-router-dom"; // Added for redirect
 import { toast, ToastContainer } from "react-toastify";
 import { 
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, 
     FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, 
     FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, 
-    FaBookOpen, FaGraduationCap, FaRocket, FaChevronDown, FaMicrophone, FaCheckCircle 
+    FaBookOpen, FaGraduationCap, FaRocket, FaChevronDown, FaMicrophone, FaUserCog 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -41,59 +42,19 @@ const CHAPTER_MAP = {
 
 const formatContent = (text) => text.trim();
 
-// --- ONBOARDING MODAL ---
-const OnboardingModal = ({ currentUser, onComplete, currentTheme }) => {
-    const [loading, setLoading] = useState(false);
-    const [profile, setProfile] = useState({ board: "CBSE", classLevel: "10", gender: "Male" });
-
-    const handleSave = async () => {
-        setLoading(true);
-        try {
-            await updateDoc(doc(db, "users", currentUser.uid), {
-                ...profile,
-                onboarded: true
-            });
-            onComplete(profile);
-        } catch (e) {
-            toast.error("Error saving profile");
-        }
-        setLoading(false);
-    };
-
+// --- PROFILE REDIRECT POPUP ---
+const ProfilePrompt = ({ currentTheme }) => {
+    const navigate = useNavigate();
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-xl flex items-center justify-center p-6">
-            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className={`max-w-md w-full p-8 rounded-[3rem] border-2 border-white/20 shadow-2xl text-center ${currentTheme.aiBubble}`}>
-                <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-indigo-500/20">
-                    <FaRocket className="text-white text-2xl animate-bounce" />
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[1000] bg-black/90 backdrop-blur-md flex items-center justify-center p-6">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className={`max-w-sm w-full p-8 rounded-[2.5rem] border border-white/20 text-center shadow-2xl ${currentTheme.aiBubble}`}>
+                <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/30">
+                    <FaUserCog className="text-white text-2xl" />
                 </div>
-                <h2 className="text-2xl font-black mb-2 italic">Complete Profile</h2>
-                <p className="text-xs font-bold opacity-50 mb-6 uppercase tracking-tighter">Setup your vibe to start studying</p>
-                <div className="space-y-4 text-left">
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-black opacity-40 ml-2">BOARD</label>
-                            <select onChange={e => setProfile({...profile, board: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm">
-                                <option value="CBSE">CBSE</option>
-                                <option value="ICSE">ICSE</option>
-                            </select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-[10px] font-black opacity-40 ml-2">CLASS</label>
-                            <select onChange={e => setProfile({...profile, classLevel: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm text-black">
-                                {["8","9","10","11","12"].map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-black opacity-40 ml-2">GENDER</label>
-                        <select onChange={e => setProfile({...profile, gender: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm text-black">
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                        </select>
-                    </div>
-                </div>
-                <button onClick={handleSave} disabled={loading} className="w-full mt-8 py-5 bg-indigo-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-xl">
-                    {loading ? <FaSyncAlt className="animate-spin" /> : <><FaCheckCircle /> SAVE & START</>}
+                <h2 className="text-xl font-black mb-2 italic">Setup Profile</h2>
+                <p className="text-xs opacity-60 mb-6 leading-relaxed font-bold uppercase tracking-tighter">Please complete your profile details (Board, Class, Gender) to unlock the AI models and get personalized results.</p>
+                <button onClick={() => navigate("/profile")} className="w-full py-4 bg-indigo-600 text-white font-black rounded-xl hover:bg-indigo-500 transition-all">
+                    GO TO PROFILE
                 </button>
             </motion.div>
         </motion.div>
@@ -179,10 +140,9 @@ export default function Chat() {
     const canvasRef = useRef(null);
     const fileInputRef = useRef(null);
 
-    // --- ENHANCED THEME ENGINE ---
     const themes = {
         dark: { container: "bg-[#050505] text-white", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-indigo-600 shadow-lg shadow-indigo-500/20", input: "bg-white/[0.03] border-white/10 text-white", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-r border-white/10" },
-        light: { container: "bg-[#F8FAFF] text-[#1E293B]", aiBubble: "bg-white/70 backdrop-blur-md border border-white shadow-sm", userBubble: "bg-indigo-600 text-white shadow-lg", input: "bg-white/80 border-white text-[#1E293B]", button: "bg-indigo-600", sidebar: "bg-white/60 backdrop-blur-xl border-r border-white/20" },
+        light: { container: "bg-[#F8FAFF] text-[#1E293B]", aiBubble: "bg-white/70 backdrop-blur-md border border-slate-200 shadow-sm", userBubble: "bg-indigo-600 text-white shadow-lg", input: "bg-white border-slate-200 text-[#1E293B]", button: "bg-indigo-600", sidebar: "bg-white border-r border-slate-200" },
         cosmic: { container: "bg-[#0B0118] text-white", aiBubble: "bg-purple-900/10 border-purple-500/20 backdrop-blur-md shadow-2xl shadow-purple-500/5", userBubble: "bg-gradient-to-br from-purple-600 to-blue-600", input: "bg-purple-950/20 border-purple-500/20", button: "bg-purple-600", sidebar: "bg-[#0B0118] border-r border-purple-900/40" },
         emerald: { container: "bg-[#020d08] text-emerald-50", aiBubble: "bg-emerald-900/20 border-emerald-500/20", userBubble: "bg-gradient-to-br from-emerald-600 to-teal-700", input: "bg-[#041a10] border-emerald-500/30", button: "bg-emerald-500", sidebar: "bg-[#010805] border-r border-emerald-900/30" },
         sunset: { container: "bg-[#1a0a05] text-orange-50", aiBubble: "bg-orange-900/10 border-orange-500/20", userBubble: "bg-gradient-to-br from-orange-600 to-red-600", input: "bg-white/5 border-orange-500/20", button: "bg-orange-600", sidebar: "bg-[#120703] border-r border-orange-900/20" },
@@ -207,8 +167,13 @@ export default function Chat() {
                     gender: data.gender || "",
                     language: data.language || "English" 
                 });
-                if (!data.board || (!data.class && !data.classLevel) || !data.gender) setShowOnboarding(true);
-            } else setShowOnboarding(true);
+                // Check if profile is incomplete
+                if (!data.board || (!data.class && !data.classLevel) || !data.gender) {
+                    setShowOnboarding(true);
+                }
+            } else {
+                setShowOnboarding(true);
+            }
             fetchSessions();
         };
         initData();
@@ -300,7 +265,7 @@ export default function Chat() {
             <ToastContainer theme="dark" position="top-center" limit={1} />
             
             <AnimatePresence>
-                {showOnboarding && <OnboardingModal currentUser={currentUser} onComplete={(data) => { setUserData(data); setShowOnboarding(false); }} currentTheme={currentTheme} />}
+                {showOnboarding && <ProfilePrompt currentTheme={currentTheme} />}
             </AnimatePresence>
 
             <AnimatePresence>
@@ -365,7 +330,7 @@ export default function Chat() {
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} accept="image/*" />
                                 <button onClick={() => fileInputRef.current.click()} className="p-2 md:p-3 opacity-30 hover:opacity-100"><FaImage size={16} /></button>
                                 <button onClick={openCamera} className="p-2 md:p-3 opacity-30 hover:opacity-100"><FaCamera size={16} /></button>
-                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-4 md:p-5 rounded-full ${currentTheme.button} hidden sm:flex`}>{isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane className="text-white" size={14} />}</button>
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-4 md:p-5 rounded-full ${currentTheme.button} flex`}>{isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane className="text-white" size={14} />}</button>
                             </div>
                         </div>
                     </div>
