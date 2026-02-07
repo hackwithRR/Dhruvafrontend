@@ -6,16 +6,15 @@ import { useNavigate } from "react-router-dom";
 import { toast, ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { motion, AnimatePresence } from "framer-motion";
-import { FaUser, FaEnvelope, FaLock, FaCheck, FaMars, FaVenus, FaGenderless, FaGoogle, FaGraduationCap, FaLightbulb, FaRocket, FaRobot } from "react-icons/fa";
+import { FaUser, FaEnvelope, FaLock, FaCheck, FaMars, FaVenus, FaGenderless, FaGoogle, FaLightbulb, FaRocket, FaRobot } from "react-icons/fa";
 
-// --- ADDED FOR DEPLOYMENT ---
 const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 export default function Register() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [gender, setGender] = useState("other");
+    const [gender, setGender] = useState("other"); // Default value
     const [selectedAvatar, setSelectedAvatar] = useState(1);
     const [isVerified, setIsVerified] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -54,25 +53,36 @@ export default function Register() {
         e.preventDefault();
         if (loading) return;
         setLoading(true);
+        
         try {
             const avatarUrl = avatars.find(a => a.id === selectedAvatar).url;
-            // The 'register' function inside AuthContext should use API_BASE
+            
+            // 1. Create User in Firebase Auth via Context
+            // Ensure your AuthContext.register function accepts gender!
             const userCredential = await register(email, password, name, avatarUrl, gender);
 
+            // 2. Explicitly write to Firestore
+            // We use the UID from the newly created auth user
             await setDoc(doc(db, "users", userCredential.user.uid), {
                 uid: userCredential.user.uid,
-                name,
-                email,
+                name: name,
+                email: email,
                 pfp: avatarUrl,
-                gender,
+                gender: gender, // This ensures the chosen gender is saved
                 board: "CBSE",
                 classLevel: "10",
                 createdAt: new Date()
             }, { merge: true });
 
-            await logout();
+            // 3. Success state
             setIsVerified(true);
+            
+            // Optional: You might want to delay logout slightly or handle session 
+            // differently if the Profile page needs to read this immediately.
+            await logout(); 
+
         } catch (err) {
+            console.error("Registration Error:", err);
             toast.error(err.message || "Registration failed. Please try again.");
             setLoading(false);
         }
@@ -80,7 +90,6 @@ export default function Register() {
 
     return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 md:p-8 bg-[#05000a] overflow-x-hidden relative selection:bg-fuchsia-500/40">
-
             <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
                 <div
                     className="absolute inset-0 transition-opacity duration-300 opacity-60"
@@ -96,7 +105,6 @@ export default function Register() {
                 className="relative z-10 w-full max-w-6xl"
             >
                 <div className="grid grid-cols-1 lg:grid-cols-12 bg-black/50 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] md:rounded-[4rem] overflow-hidden shadow-2xl">
-
                     <div className="lg:col-span-5 p-8 md:p-16 bg-gradient-to-br from-purple-900/40 to-transparent flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/5">
                         <div>
                             <div className="flex items-center gap-3 text-fuchsia-400 mb-6">
@@ -104,25 +112,11 @@ export default function Register() {
                                 <span className="text-[10px] font-black tracking-[0.4em] uppercase">AI Education Partner</span>
                             </div>
                             <h1 className="text-6xl md:text-8xl font-[1000] text-white italic tracking-tighter leading-none mb-6">DHRUVA</h1>
-
                             <div className="space-y-4 mb-8">
-                                <p className="text-white/80 text-lg font-bold leading-tight">
-                                    Your personal student-friendly AI.
-                                </p>
+                                <p className="text-white/80 text-lg font-bold leading-tight">Your personal student-friendly AI.</p>
                                 <p className="text-white/50 text-sm md:text-base font-medium max-w-xs leading-relaxed italic">
-                                    Dhruva simplifies complex topics, tracks your progress, and acts as a 24/7 mentor to help you excel in your studies with ease.
+                                    Dhruva simplifies complex topics, tracks your progress, and acts as a 24/7 mentor.
                                 </p>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-4 text-white/40">
-                                    <div className="w-8 h-8 rounded-lg bg-fuchsia-500/10 flex items-center justify-center text-xs text-fuchsia-400"><FaLightbulb /></div>
-                                    <span className="text-[10px] font-bold tracking-widest uppercase">Smart Explanations</span>
-                                </div>
-                                <div className="flex items-center gap-4 text-white/40">
-                                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center text-xs text-purple-400"><FaRocket /></div>
-                                    <span className="text-[10px] font-bold tracking-widest uppercase">Boost Productivity</span>
-                                </div>
                             </div>
                         </div>
 
@@ -143,7 +137,6 @@ export default function Register() {
                     </div>
 
                     <form onSubmit={handleRegister} className="lg:col-span-7 p-8 md:p-16 lg:p-20 bg-white/[0.01] flex flex-col gap-8 md:gap-10">
-
                         <div className="space-y-6">
                             <div className="relative group">
                                 <FaUser className="absolute left-0 top-1/2 -translate-y-1/2 text-white/30 group-focus-within:text-purple-400 transition-colors" />
@@ -226,6 +219,10 @@ export default function Register() {
                         </motion.div>
                     </motion.div>
                 )}
+            </AnimatePresence>
+        </div>
+    );
+}
             </AnimatePresence>
         </div>
     );
