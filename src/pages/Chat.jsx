@@ -13,6 +13,14 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
+// Helper to clean AI formatting and ensure proper spacing
+const formatContent = (text) => {
+    return text
+        .replace(/\$\$/g, '') // Remove raw LaTeX delimiters if they appear as text
+        .replace(/\n\s*\n/g, '\n\n') // Ensure double newlines for paragraph spacing
+        .trim();
+};
+
 // --- TYPEWRITER COMPONENT ---
 const Typewriter = ({ text, onComplete }) => {
     const [displayedText, setDisplayedText] = useState("");
@@ -34,7 +42,17 @@ const Typewriter = ({ text, onComplete }) => {
 
     return (
         <div className="relative">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayedText}</ReactMarkdown>
+            <ReactMarkdown 
+                remarkPlugins={[remarkGfm]}
+                components={{
+                    p: ({node, ...props}) => <p className="mb-4 last:mb-0 leading-relaxed" {...props} />,
+                    ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-4" {...props} />,
+                    ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-4" {...props} />,
+                    li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                }}
+            >
+                {formatContent(displayedText)}
+            </ReactMarkdown>
             {cursor && <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.5 }} className="inline-block w-1 h-5 bg-indigo-500 ml-1" />}
         </div>
     );
@@ -70,12 +88,11 @@ export default function Chat() {
 
     const themes = {
         dark: { container: "bg-[#050505] text-white", nav: "bg-white/5 border-white/10 backdrop-blur-md", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-indigo-600 shadow-lg shadow-indigo-500/20", input: "bg-white/[0.03] border-white/10 text-white", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-r border-white/10" },
-        light: { container: "bg-[#F0F7FF] text-[#1E293B]", nav: "bg-white/80 border-blue-100 backdrop-blur-md shadow-sm", aiBubble: "bg-white border border-blue-50 shadow-md shadow-blue-900/5", userBubble: "bg-[#2563EB] text-white shadow-lg shadow-blue-500/30", input: "bg-white border-blue-100 text-[#1E293B] shadow-inner", button: "bg-[#2563EB]", sidebar: "bg-white border-r border-blue-100" },
+        light: { container: "bg-[#F0F7FF] text-[#1E293B]", nav: "bg-white/80 border-blue-100 backdrop-blur-md shadow-sm", aiBubble: "bg-white border border-blue-100 shadow-md shadow-blue-900/5", userBubble: "bg-[#2563EB] text-white shadow-lg shadow-blue-500/30", input: "bg-white border-blue-100 text-[#1E293B] shadow-inner", button: "bg-[#2563EB]", sidebar: "bg-white border-r border-blue-100" },
         electric: { container: "bg-[#0F172A] text-white", nav: "bg-indigo-600/10 border-indigo-500/20", aiBubble: "bg-white/10 border border-indigo-500/30", userBubble: "bg-gradient-to-r from-purple-600 to-indigo-600", input: "bg-white/5 border-indigo-500/20 text-white", button: "bg-gradient-to-r from-pink-500 to-violet-600", sidebar: "bg-[#0F172A] border-r border-indigo-500/20" }
     };
     const currentTheme = themes[theme] || themes.dark;
 
-    // --- INITIAL FETCH: USER DATA & SESSIONS ---
     useEffect(() => {
         if (!currentUser) return;
         const initData = async () => {
@@ -122,7 +139,6 @@ export default function Chat() {
         } catch (err) { toast.error("Failed to delete session"); }
     };
 
-    // --- SCROLL LOGIC ---
     const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     
     useEffect(() => { scrollToBottom(); }, [messages, isSending]);
@@ -145,7 +161,18 @@ export default function Chat() {
         setMessages(newMessages);
 
         try {
-            const payload = { userId: currentUser.uid, message: text || "Explain this image", mode, subject: subjectInput || "General", chapter: chapterInput || "General", language: userData.language, classLevel: userData.class };
+            // Enhanced payload to encourage fun replies and emojis
+            const payload = { 
+                userId: currentUser.uid, 
+                message: text || "Explain this image", 
+                mode, 
+                subject: subjectInput || "General", 
+                chapter: chapterInput || "General", 
+                language: userData.language, 
+                classLevel: userData.class,
+                instructions: "Use emojis, be engaging, and use proper spacing between paragraphs."
+            };
+            
             let res;
             if (file) {
                 const formData = new FormData();
@@ -157,9 +184,9 @@ export default function Chat() {
                 res = await axios.post(`${API_BASE}/chat`, payload);
             }
 
-            // REFINED YOUTUBE SEARCH: [Class] [Subject] [Chapter] [Context]
-            const queryParts = [userData.class, subjectInput, chapterInput, text.slice(0, 30)].filter(Boolean);
-            const searchQuery = `${queryParts.join(" ")} explanation concept video`;
+            // REFINED YOUTUBE SEARCH: [Board] [Class] [Subject] [Chapter] [Concept]
+            const queryParts = [userData.board, userData.class, subjectInput, chapterInput, text.slice(0, 40)].filter(Boolean);
+            const searchQuery = `${queryParts.join(" ")} full explanation`;
 
             const aiMsg = { 
                 role: "ai", 
@@ -171,7 +198,6 @@ export default function Chat() {
             const finalMessages = [...newMessages, aiMsg];
             setMessages(finalMessages);
 
-            // Update Firebase Session
             await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
                 messages: finalMessages,
                 lastUpdate: Date.now(),
@@ -192,20 +218,19 @@ export default function Chat() {
             <ToastContainer theme="dark" position="top-center" limit={1} />
             <style>{`.custom-y-scroll::-webkit-scrollbar { width: 4px; } .custom-y-scroll::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.2); border-radius: 10px; }`}</style>
 
-            {/* SIDEBAR */}
             <AnimatePresence>
                 {showSidebar && (
                     <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 overflow-hidden ${currentTheme.sidebar}`}>
                         <div className="flex justify-between items-center mb-10">
                             <span className="text-[10px] font-black tracking-widest uppercase opacity-40">Chat History</span>
-                            <button onClick={() => setShowSidebar(false)} className="lg:hidden text-white/50"><FaTimes /></button>
+                            <button onClick={() => setShowSidebar(false)} className={`${theme === 'light' ? 'text-black/50' : 'text-white/50'}`}><FaTimes /></button>
                         </div>
                         <button onClick={startNewSession} className="w-full py-4 mb-4 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2">
                             <FaPlus /> New Session
                         </button>
                         <div className="flex-1 overflow-y-auto space-y-2 custom-y-scroll">
                             {sessions.map((s) => (
-                                <div key={s.id} onClick={() => loadSession(s.id)} className={`group relative w-full text-left p-4 rounded-xl cursor-pointer transition-all ${currentSessionId === s.id ? 'bg-white/10 text-white border border-white/10' : 'text-white/30 hover:bg-white/5'}`}>
+                                <div key={s.id} onClick={() => loadSession(s.id)} className={`group relative w-full text-left p-4 rounded-xl cursor-pointer transition-all ${currentSessionId === s.id ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20' : 'opacity-60 hover:opacity-100 hover:bg-white/5'}`}>
                                     <div className="text-[10px] font-bold uppercase truncate pr-6">{s.title || "Untitled Chat"}</div>
                                     <div className="text-[8px] opacity-40 mt-1">{new Date(s.lastUpdate).toLocaleDateString()}</div>
                                     <button onClick={(e) => deleteSession(e, s.id)} className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:text-red-400 transition-all">
@@ -223,7 +248,11 @@ export default function Chat() {
 
                 {/* TOP BAR */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
-                    <button onClick={() => setShowSidebar(!showSidebar)} className="p-4 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white"><FaHistory size={14} /></button>
+                    {/* Theme-Adaptive History Button */}
+                    <button onClick={() => setShowSidebar(!showSidebar)} className={`p-4 rounded-2xl border transition-all ${currentTheme.aiBubble} hover:scale-105 active:scale-95 shadow-sm`}>
+                        <FaHistory size={14} className={theme === 'light' ? 'text-blue-600' : 'text-indigo-400'} />
+                    </button>
+                    
                     <div className={`flex-1 flex flex-col md:flex-row gap-2 p-2 rounded-2xl border transition-all ${isLocked ? 'border-green-500/50 bg-green-500/5' : currentTheme.nav}`}>
                         <div className="flex flex-1 items-center gap-2 px-2">
                             <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject..." className={`flex-1 bg-transparent text-[10px] font-black uppercase outline-none ${isLocked ? 'text-green-500' : 'opacity-60'}`} />
@@ -247,25 +276,34 @@ export default function Chat() {
                             <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                                 <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
                                     {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 w-full object-cover" alt="upload" />}
-                                    <div className={`prose prose-sm ${theme === 'light' ? 'prose-slate' : 'prose-invert'} text-sm leading-relaxed font-medium space-y-4`}>
+                                    <div className={`prose prose-sm ${theme === 'light' ? 'prose-slate' : 'prose-invert'} text-sm leading-relaxed font-medium`}>
                                         {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
                                             <Typewriter text={msg.content} onComplete={scrollToBottom} />
                                         ) : (
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                                            <ReactMarkdown 
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    p: ({node, ...props}) => <p className="mb-4 last:mb-0 leading-relaxed" {...props} />,
+                                                    ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-4" {...props} />,
+                                                    ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-4" {...props} />,
+                                                }}
+                                            >
+                                                {formatContent(msg.content)}
+                                            </ReactMarkdown>
                                         )}
                                     </div>
                                     {msg.role === "ai" && msg.ytLink && (
                                         <div className="mt-6 pt-4 border-t border-white/10">
-                                            <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Targeted Visual Learning:</p>
-                                            <a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-500 rounded-2xl text-xs font-bold hover:bg-red-600/20 transition-all border border-red-500/20">
-                                                <FaYoutube size={18} /> Learn {chapterInput || "Topic"} on YouTube
+                                            <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Visual Concept Guide:</p>
+                                            <a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-500 rounded-2xl text-xs font-bold hover:bg-red-600/20 transition-all border border-red-500/20 shadow-sm">
+                                                <FaYoutube size={18} /> Learn {chapterInput || "Topic"} on YouTube 📺
                                             </a>
                                         </div>
                                     )}
                                 </div>
                             </motion.div>
                         ))}
-                        {isSending && <div className="text-[10px] font-black uppercase opacity-30 animate-pulse px-4">Dhruva is thinking...</div>}
+                        {isSending && <div className="text-[10px] font-black uppercase opacity-30 animate-pulse px-4 ml-2">Dhruva is typing... ✨</div>}
                         <div ref={messagesEndRef} className="h-4" />
                     </div>
                 </div>
@@ -279,7 +317,6 @@ export default function Chat() {
                     )}
                 </AnimatePresence>
 
-                {/* INPUT BAR */}
                 <div className="p-4 md:p-10 shrink-0">
                     <div className="max-w-3xl mx-auto relative">
                         <AnimatePresence>
@@ -291,7 +328,7 @@ export default function Chat() {
                             )}
                         </AnimatePresence>
                         <div className={`flex items-center p-2 rounded-[2.8rem] border shadow-2xl transition-all ${currentTheme.input}`}>
-                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Ask in ${userData.language}...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
+                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Ask anything in ${userData.language}...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex items-center gap-2 px-2">
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} />
                                 <button onClick={() => fileInputRef.current.click()} className="p-3 opacity-30 hover:opacity-100 transition-all"><FaImage /></button>
@@ -304,7 +341,6 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* CAMERA MODAL */}
                 <AnimatePresence>
                     {isCameraOpen && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
