@@ -7,7 +7,7 @@ import {
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, 
     FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, 
     FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, 
-    FaBookOpen, FaGraduationCap, FaMicrophone 
+    FaBookOpen, FaGraduationCap, FaMicrophone, FaUserEdit, FaArrowRight 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -17,6 +17,7 @@ import { doc, getDoc, setDoc, collection, query, getDocs, orderBy } from "fireba
 import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
 import 'katex/dist/katex.min.css';
 
@@ -34,6 +35,56 @@ const CHAPTER_MAP = {
 const formatContent = (text) => text.trim();
 
 // --- SUB-COMPONENTS ---
+
+const OnboardingModal = ({ isOpen, onClose, theme }) => {
+    const navigate = useNavigate();
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <motion.div 
+                        initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.9, opacity: 0, y: 20 }}
+                        className={`relative w-full max-w-md overflow-hidden rounded-[2.5rem] border p-8 shadow-2xl ${
+                            theme === 'dark' ? 'bg-[#0A0A0A] border-white/10 text-white' : 'bg-white border-slate-100 text-slate-900'
+                        }`}
+                    >
+                        {/* Decorative Background Glow */}
+                        <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-indigo-600/20 blur-3xl" />
+                        
+                        <div className="relative z-10 flex flex-col items-center text-center">
+                            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-indigo-600 shadow-lg shadow-indigo-600/40">
+                                <FaGraduationCap className="text-4xl text-white" />
+                            </div>
+                            
+                            <h2 className="mb-2 text-2xl font-black tracking-tight">Welcome to Dhruva!</h2>
+                            <p className="mb-8 text-sm font-medium opacity-60">
+                                To give you the best study experience, we need to know your board and class. Let's set up your profile!
+                            </p>
+
+                            <div className="flex w-full flex-col gap-3">
+                                <button 
+                                    onClick={() => navigate("/profile")}
+                                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-sm font-black uppercase tracking-wider text-white transition-all hover:bg-indigo-700 active:scale-95"
+                                >
+                                    Complete Profile <FaArrowRight size={12} />
+                                </button>
+                                <button 
+                                    onClick={onClose}
+                                    className="w-full py-3 text-xs font-bold opacity-40 hover:opacity-100 transition-opacity"
+                                >
+                                    I'll do it later
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
+    );
+};
+
 const Typewriter = ({ text, onComplete, scrollRef }) => {
     const [displayedText, setDisplayedText] = useState("");
     useEffect(() => {
@@ -78,7 +129,7 @@ const StudyTimer = ({ currentTheme }) => {
     const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
 
     return (
-        <motion.div drag dragMomentum={false} className="fixed z-[100] right-4 bottom-28 lg:bottom-10 cursor-pointer">
+        <motion.div drag dragMomentum={false} className="fixed z-[100] right-4 bottom-32 lg:bottom-10 cursor-pointer">
             <motion.div animate={{ width: isOpen ? "220px" : "56px", height: isOpen ? "260px" : "56px" }} className={`rounded-[1.8rem] border backdrop-blur-3xl shadow-2xl flex flex-col items-center justify-center ${currentTheme.aiBubble} border-white/20 overflow-hidden`}>
                 {!isOpen ? (
                     <button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-500">
@@ -145,7 +196,6 @@ export default function Chat() {
         }
     };
     const currentTheme = themes[theme] || themes.dark;
-    const modesList = [{ id: "Explain", icon: <FaBookOpen />, label: "Explain" }, { id: "Doubt", icon: <FaQuestion />, label: "Doubt" }, { id: "Quiz", icon: <FaGraduationCap />, label: "Quiz" }, { id: "Summary", icon: <FaLightbulb />, label: "Summary" }];
 
     useEffect(() => {
         if (!currentUser) return;
@@ -235,19 +285,8 @@ export default function Chat() {
         <div className={`flex h-screen w-full overflow-hidden transition-all duration-500 ${currentTheme.container}`}>
             <ToastContainer theme={theme === "dark" ? "dark" : "light"} position="top-center" />
             
-            <AnimatePresence>
-                {showOnboarding && (
-                    <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }} className="fixed top-20 left-1/2 -translate-x-1/2 z-[500] w-[92%] max-w-lg">
-                        <div className={`p-4 rounded-3xl border backdrop-blur-xl flex items-center justify-between gap-3 shadow-2xl ${theme === 'dark' ? 'bg-indigo-600/20 border-indigo-500/30' : 'bg-white border-indigo-100'}`}>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-indigo-600 rounded-xl text-white"><FaGraduationCap size={16}/></div>
-                                <p className={`text-[10px] font-bold leading-tight ${theme === 'dark' ? 'text-white/80' : 'text-slate-700'}`}>Setup <span className="text-indigo-500 underline font-black">Profile</span> to get personalized help.</p>
-                            </div>
-                            <button onClick={() => setShowOnboarding(false)} className="p-2 opacity-50"><FaTimes size={14} /></button>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+            {/* Onboarding Modal */}
+            <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} theme={theme} />
 
             {/* Sidebar Overlay for Mobile */}
             <AnimatePresence>
@@ -298,7 +337,7 @@ export default function Chat() {
                 </div>
 
                 {/* --- RESPONSIVE BOTTOM BAR --- */}
-                <div className="absolute bottom-0 left-0 w-full p-4 md:p-8 bg-gradient-to-t from-[#050505] via-[#050505]/90 to-transparent pointer-events-none">
+                <div className="absolute bottom-0 left-0 w-full p-4 md:p-8 bg-gradient-to-t from-black via-black/90 to-transparent md:from-transparent pointer-events-none">
                     <div className="max-w-3xl mx-auto pointer-events-auto">
                         <div className={`flex flex-col md:flex-row items-stretch md:items-center gap-2 p-1.5 md:p-2 rounded-[2rem] md:rounded-[3rem] border transition-all duration-300 ${currentTheme.input} ${isListening ? 'ring-2 ring-indigo-500' : 'border-white/10 shadow-2xl'}`}>
                             
