@@ -6,8 +6,8 @@ import { toast, ToastContainer } from "react-toastify";
 import { 
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, 
     FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, 
-    FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, 
-    FaBookOpen, FaGraduationCap, FaMicrophone, FaUserEdit, FaArrowRight 
+    FaClock, FaLightbulb, FaQuestion, 
+    FaBookOpen, FaGraduationCap, FaMicrophone, FaArrowRight, FaSparkles, FaUserEdit
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -36,45 +36,47 @@ const formatContent = (text) => text.trim();
 
 // --- SUB-COMPONENTS ---
 
+/**
+ * Premium Centered Onboarding Modal
+ */
 const OnboardingModal = ({ isOpen, onClose, theme }) => {
     const navigate = useNavigate();
     return (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                <div className="fixed inset-0 z-[999] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
                     <motion.div 
                         initial={{ scale: 0.9, opacity: 0, y: 20 }}
                         animate={{ scale: 1, opacity: 1, y: 0 }}
                         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                        className={`relative w-full max-w-md overflow-hidden rounded-[2.5rem] border p-8 shadow-2xl ${
+                        className={`relative w-full max-w-sm overflow-hidden rounded-[3rem] border p-8 shadow-2xl ${
                             theme === 'dark' ? 'bg-[#0A0A0A] border-white/10 text-white' : 'bg-white border-slate-100 text-slate-900'
                         }`}
                     >
-                        {/* Decorative Background Glow */}
-                        <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-indigo-600/20 blur-3xl" />
+                        <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-indigo-600/20 blur-3xl" />
                         
                         <div className="relative z-10 flex flex-col items-center text-center">
-                            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-indigo-600 shadow-lg shadow-indigo-600/40">
-                                <FaGraduationCap className="text-4xl text-white" />
+                            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[2rem] bg-indigo-600 shadow-xl shadow-indigo-600/40">
+                                <FaUserEdit className="text-3xl text-white" />
                             </div>
                             
-                            <h2 className="mb-2 text-2xl font-black tracking-tight">Welcome to Dhruva!</h2>
-                            <p className="mb-8 text-sm font-medium opacity-60">
-                                To give you the best study experience, we need to know your board and class. Let's set up your profile!
+                            <h2 className="mb-3 text-2xl font-black tracking-tight">Complete Profile</h2>
+                            <p className="mb-8 text-sm font-medium opacity-60 leading-relaxed">
+                                Let Dhruva know your Board and Class to provide accurate, syllabus-aligned answers.
                             </p>
 
                             <div className="flex w-full flex-col gap-3">
                                 <button 
                                     onClick={() => navigate("/profile")}
-                                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-sm font-black uppercase tracking-wider text-white transition-all hover:bg-indigo-700 active:scale-95"
+                                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-sm font-black uppercase tracking-widest text-white transition-all hover:bg-indigo-700 active:scale-95 shadow-lg shadow-indigo-600/20"
                                 >
-                                    Complete Profile <FaArrowRight size={12} />
+                                    Go to Profile <FaArrowRight size={12} />
                                 </button>
                                 <button 
                                     onClick={onClose}
-                                    className="w-full py-3 text-xs font-bold opacity-40 hover:opacity-100 transition-opacity"
+                                    className="w-full py-3 text-[10px] font-black uppercase tracking-widest opacity-30 hover:opacity-100 transition-opacity"
                                 >
-                                    I'll do it later
+                                    Maybe Later
                                 </button>
                             </div>
                         </div>
@@ -82,6 +84,50 @@ const OnboardingModal = ({ isOpen, onClose, theme }) => {
                 </div>
             )}
         </AnimatePresence>
+    );
+};
+
+/**
+ * First-time User Guidance Grid (Empty State)
+ */
+const EmptyStateGuidance = ({ setInput, setSubjectInput, theme }) => {
+    const suggestions = [
+        { icon: <FaQuestion />, title: "Solve Doubt", text: "Explain Newton's Third Law", sub: "Physics" },
+        { icon: <FaBookOpen />, title: "Summarize", text: "Summary of French Revolution", sub: "History" },
+        { icon: <FaGraduationCap />, title: "Quick Quiz", text: "Test me on Trigonometry", sub: "Maths" },
+        { icon: <FaLightbulb />, title: "Concept", text: "How do plants breathe?", sub: "Biology" }
+    ];
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4"
+        >
+            <div className="w-16 h-16 bg-indigo-600/10 rounded-3xl flex items-center justify-center mb-6">
+                <FaSparkles className="text-indigo-500 text-2xl animate-pulse" />
+            </div>
+            <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight">Start Learning</h1>
+            <p className="text-xs md:text-sm font-bold opacity-40 mb-10">Pick a topic or type your own question below</p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
+                {suggestions.map((s, i) => (
+                    <button 
+                        key={i} 
+                        onClick={() => { setInput(s.text); setSubjectInput(s.sub); }}
+                        className={`flex items-center gap-4 p-5 rounded-[2rem] border transition-all text-left group ${
+                            theme === 'dark' ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-white border-slate-100 shadow-sm hover:shadow-md'
+                        }`}
+                    >
+                        <div className="p-3 rounded-2xl bg-indigo-600 text-white group-hover:scale-110 transition-transform">{s.icon}</div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase opacity-40 tracking-tighter">{s.title}</p>
+                            <p className="text-sm font-bold truncate w-40 md:w-auto">{s.text}</p>
+                        </div>
+                    </button>
+                ))}
+            </div>
+        </motion.div>
     );
 };
 
@@ -152,6 +198,8 @@ const StudyTimer = ({ currentTheme }) => {
         </motion.div>
     );
 };
+
+// --- MAIN COMPONENT ---
 
 export default function Chat() {
     const { currentUser, logout, theme, setTheme } = useAuth();
@@ -285,10 +333,10 @@ export default function Chat() {
         <div className={`flex h-screen w-full overflow-hidden transition-all duration-500 ${currentTheme.container}`}>
             <ToastContainer theme={theme === "dark" ? "dark" : "light"} position="top-center" />
             
-            {/* Onboarding Modal */}
+            {/* Centered Modal */}
             <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} theme={theme} />
 
-            {/* Sidebar Overlay for Mobile */}
+            {/* Sidebar for Mobile */}
             <AnimatePresence>
                 {showSidebar && (
                     <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[600] w-72 h-full flex flex-col p-6 shadow-2xl ${currentTheme.sidebar}`}>
@@ -319,19 +367,23 @@ export default function Chat() {
                 {/* Messages Container */}
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-6 no-scrollbar">
                     <div className="max-w-3xl mx-auto space-y-8 pb-32">
-                        {messages.map((msg, i) => (
-                            <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                                <div className={`max-w-[90%] p-5 rounded-3xl ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none shadow-xl shadow-indigo-500/10` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
-                                    {msg.image && <img src={msg.image} alt="upload" className="rounded-xl mb-3 max-h-48 w-full object-cover" />}
-                                    {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
-                                        <Typewriter text={msg.content} scrollRef={chatContainerRef} onComplete={() => messagesEndRef.current?.scrollIntoView()} />
-                                    ) : (
-                                        <div className="prose prose-sm dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown></div>
-                                    )}
-                                    {msg.ytLink && <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 rounded-xl text-[9px] font-black border border-red-500/20"><FaYoutube/> VIDEO GUIDE</a>}
+                        {messages.length === 0 ? (
+                            <EmptyStateGuidance theme={theme} setInput={setInput} setSubjectInput={setSubjectInput} />
+                        ) : (
+                            messages.map((msg, i) => (
+                                <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                                    <div className={`max-w-[90%] p-5 rounded-3xl ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none shadow-xl shadow-indigo-500/10` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
+                                        {msg.image && <img src={msg.image} alt="upload" className="rounded-xl mb-3 max-h-48 w-full object-cover" />}
+                                        {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
+                                            <Typewriter text={msg.content} scrollRef={chatContainerRef} onComplete={() => messagesEndRef.current?.scrollIntoView()} />
+                                        ) : (
+                                            <div className="prose prose-sm dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown></div>
+                                        )}
+                                        {msg.ytLink && <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 rounded-xl text-[9px] font-black border border-red-500/20"><FaYoutube/> VIDEO GUIDE</a>}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            ))
+                        )}
                         <div ref={messagesEndRef} />
                     </div>
                 </div>
@@ -341,7 +393,6 @@ export default function Chat() {
                     <div className="max-w-3xl mx-auto pointer-events-auto">
                         <div className={`flex flex-col md:flex-row items-stretch md:items-center gap-2 p-1.5 md:p-2 rounded-[2rem] md:rounded-[3rem] border transition-all duration-300 ${currentTheme.input} ${isListening ? 'ring-2 ring-indigo-500' : 'border-white/10 shadow-2xl'}`}>
                             
-                            {/* Input Field Area */}
                             <div className="flex items-center flex-1 px-4 py-2 md:py-0">
                                 <input 
                                     value={input} 
@@ -352,7 +403,6 @@ export default function Chat() {
                                 />
                             </div>
 
-                            {/* Action Buttons Area */}
                             <div className="flex items-center justify-between md:justify-end gap-1 px-2 pb-2 md:pb-0 md:pr-1">
                                 <div className="flex items-center gap-1">
                                     <button onClick={startVoiceMode} className={`p-3 md:p-4 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white/5 opacity-50 hover:opacity-100'}`}><FaMicrophone size={16}/></button>
