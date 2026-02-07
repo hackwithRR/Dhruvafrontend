@@ -87,9 +87,18 @@ export default function Chat() {
     const fileInputRef = useRef(null);
 
     const themes = {
-        dark: { container: "bg-[#050505] text-white", nav: "bg-white/5 border-white/10 backdrop-blur-md", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-indigo-600 shadow-lg shadow-indigo-500/20", input: "bg-white/[0.03] border-white/10 text-white", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-r border-white/10" },
-        light: { container: "bg-[#F0F7FF] text-[#1E293B]", nav: "bg-white/80 border-blue-100 backdrop-blur-md shadow-sm", aiBubble: "bg-white border border-blue-200 shadow-md shadow-blue-900/5", userBubble: "bg-[#2563EB] text-white shadow-lg shadow-blue-500/30", input: "bg-white border-blue-100 text-[#1E293B] shadow-inner", button: "bg-[#2563EB]", sidebar: "bg-white border-r border-blue-100" },
-        electric: { container: "bg-[#0F172A] text-white", nav: "bg-indigo-600/10 border-indigo-500/20", aiBubble: "bg-white/10 border border-indigo-500/30", userBubble: "bg-gradient-to-r from-purple-600 to-indigo-600", input: "bg-white/5 border-indigo-500/20 text-white", button: "bg-gradient-to-r from-pink-500 to-violet-600", sidebar: "bg-[#0F172A] border-r border-indigo-500/20" }
+        dark: { container: "bg-[#050505] text-white", nav: "bg-white/5 border-white/10 backdrop-blur-md", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-indigo-600 shadow-lg shadow-indigo-500/20", input: "bg-white/[0.03] border-white/10 text-white", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-r border-white/10", glow: "shadow-none" },
+        light: { 
+            container: "bg-gradient-to-br from-[#F8FAFF] via-[#F0F4FF] to-[#E0E7FF] text-[#1E293B]", 
+            nav: "bg-white/40 border-white/40 backdrop-blur-xl shadow-[0_8px_32px_rgba(31,38,135,0.07)]", 
+            aiBubble: "bg-white/70 backdrop-blur-md border border-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]", 
+            userBubble: "bg-gradient-to-tr from-indigo-600 to-blue-500 text-white shadow-[0_10px_25px_rgba(79,70,229,0.4)]", 
+            input: "bg-white/80 backdrop-blur-2xl border-white shadow-[0_20px_50px_rgba(31,38,135,0.1)] text-[#1E293B]", 
+            button: "bg-gradient-to-r from-indigo-600 to-blue-600 hover:shadow-[0_0_20px_rgba(79,70,229,0.5)]", 
+            sidebar: "bg-white/60 backdrop-blur-xl border-r border-white/20",
+            glow: "shadow-[0_0_40px_rgba(255,255,255,0.8)]"
+        },
+        electric: { container: "bg-[#0F172A] text-white", nav: "bg-indigo-600/10 border-indigo-500/20", aiBubble: "bg-white/10 border border-indigo-500/30", userBubble: "bg-gradient-to-r from-purple-600 to-indigo-600", input: "bg-white/5 border-indigo-500/20 text-white", button: "bg-gradient-to-r from-pink-500 to-violet-600", sidebar: "bg-[#0F172A] border-r border-indigo-500/20", glow: "shadow-none" }
     };
     const currentTheme = themes[theme] || themes.dark;
 
@@ -223,12 +232,12 @@ export default function Chat() {
                             <span className="text-[10px] font-black tracking-widest uppercase opacity-40">Chat History</span>
                             <button onClick={() => setShowSidebar(false)} className={`${theme === 'light' ? 'text-black/50' : 'text-white/50'}`}><FaTimes /></button>
                         </div>
-                        <button onClick={startNewSession} className="w-full py-4 mb-4 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2">
+                        <button onClick={startNewSession} className="w-full py-4 mb-4 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
                             <FaPlus /> New Session
                         </button>
                         <div className="flex-1 overflow-y-auto space-y-2 custom-y-scroll">
                             {sessions.map((s) => (
-                                <div key={s.id} onClick={() => loadSession(s.id)} className={`group relative w-full text-left p-4 rounded-xl cursor-pointer transition-all ${currentSessionId === s.id ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20' : 'opacity-60 hover:opacity-100 hover:bg-white/5'}`}>
+                                <div key={s.id} onClick={() => loadSession(s.id)} className={`group relative w-full text-left p-4 rounded-xl cursor-pointer transition-all ${currentSessionId === s.id ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20' : 'opacity-60 hover:opacity-100 hover:bg-black/5'}`}>
                                     <div className="text-[10px] font-bold uppercase truncate pr-6">{s.title || "Untitled Chat"}</div>
                                     <div className="text-[8px] opacity-40 mt-1">{new Date(s.lastUpdate).toLocaleDateString()}</div>
                                     <button onClick={(e) => deleteSession(e, s.id)} className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:text-red-400 transition-all">
@@ -247,10 +256,10 @@ export default function Chat() {
                 {/* --- SUPER COOL ADAPTIVE TOP BAR --- */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
                     <button onClick={() => setShowSidebar(!showSidebar)} className={`p-4 rounded-2xl border transition-all ${currentTheme.aiBubble} hover:scale-105 active:scale-95 shadow-sm`}>
-                        <FaHistory size={14} className={theme === 'light' ? 'text-blue-600' : 'text-indigo-400'} />
+                        <FaHistory size={14} className={theme === 'light' ? 'text-indigo-600' : 'text-indigo-400'} />
                     </button>
                     
-                    <div className={`flex-1 flex flex-col md:flex-row items-center gap-2 p-1.5 rounded-[1.5rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.1)] bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10`}`}>
+                    <div className={`flex-1 flex flex-col md:flex-row items-center gap-2 p-1.5 rounded-[1.5rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)] bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10`}`}>
                         
                         {/* INPUTS GROUP */}
                         <div className="flex items-center w-full md:w-auto flex-1 gap-2 px-3 py-1">
@@ -272,13 +281,13 @@ export default function Chat() {
                         </div>
 
                         {/* MODE SLIDER */}
-                        <div className="flex bg-black/10 dark:bg-black/40 p-1 rounded-xl relative w-full md:w-auto">
+                        <div className="flex bg-black/5 dark:bg-black/40 p-1 rounded-xl relative w-full md:w-auto">
                             <LayoutGroup>
                                 {["Explain", "Doubt", "Quiz"].map(m => (
-                                    <button key={m} onClick={() => setMode(m)} className={`relative z-10 px-5 py-2 text-[9px] font-black uppercase transition-all duration-300 ${mode === m ? (theme === 'light' ? 'text-blue-600' : 'text-white') : "opacity-40 hover:opacity-100"}`}>
+                                    <button key={m} onClick={() => setMode(m)} className={`relative z-10 px-5 py-2 text-[9px] font-black uppercase transition-all duration-300 ${mode === m ? (theme === 'light' ? 'text-indigo-600' : 'text-white') : "opacity-40 hover:opacity-100"}`}>
                                         {m}
                                         {mode === m && (
-                                            <motion.div layoutId="mode-pill" className={`absolute inset-0 rounded-lg shadow-sm ${theme === 'light' ? 'bg-white' : 'bg-white/10 border border-white/10'}`} transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} />
+                                            <motion.div layoutId="mode-pill" className={`absolute inset-0 rounded-lg shadow-sm ${theme === 'light' ? 'bg-white shadow-indigo-200/50 shadow-md' : 'bg-white/10 border border-white/10'}`} transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} />
                                         )}
                                     </button>
                                 ))}
@@ -311,9 +320,9 @@ export default function Chat() {
                                         )}
                                     </div>
                                     {msg.role === "ai" && msg.ytLink && (
-                                        <div className="mt-6 pt-4 border-t border-white/10">
+                                        <div className="mt-6 pt-4 border-t border-indigo-500/10">
                                             <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Visual Concept Guide:</p>
-                                            <a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-500 rounded-2xl text-xs font-bold hover:bg-red-600/20 transition-all border border-red-500/20 shadow-sm">
+                                            <a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-600 rounded-2xl text-xs font-bold hover:bg-red-600/20 transition-all border border-red-500/20 shadow-sm">
                                                 <FaYoutube size={18} /> Learn {chapterInput || "Topic"} on YouTube 📺
                                             </a>
                                         </div>
@@ -321,7 +330,7 @@ export default function Chat() {
                                 </div>
                             </motion.div>
                         ))}
-                        {isSending && <div className="text-[10px] font-black uppercase opacity-30 animate-pulse px-4 ml-2">Dhruva is typing... ✨</div>}
+                        {isSending && <div className={`text-[10px] font-black uppercase opacity-30 animate-pulse px-4 ml-2 ${theme === 'light' ? 'text-indigo-600' : ''}`}>Dhruva is typing... ✨</div>}
                         <div ref={messagesEndRef} className="h-4" />
                     </div>
                 </div>
@@ -344,12 +353,12 @@ export default function Chat() {
                                 </motion.div>
                             )}
                         </AnimatePresence>
-                        <div className={`flex items-center p-2 rounded-[2.8rem] border shadow-2xl transition-all ${currentTheme.input}`}>
+                        <div className={`flex items-center p-2 rounded-[2.8rem] border transition-all ${currentTheme.input}`}>
                             <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Ask anything in ${userData.language}...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex items-center gap-2 px-2">
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} />
-                                <button onClick={() => fileInputRef.current.click()} className="p-3 opacity-30 hover:opacity-100 transition-all"><FaImage /></button>
-                                <button onClick={openCamera} className="p-3 opacity-30 hover:opacity-100 transition-all"><FaCamera /></button>
+                                <button onClick={() => fileInputRef.current.click()} className={`p-3 opacity-30 hover:opacity-100 transition-all ${theme === 'light' ? 'text-indigo-600' : ''}`}><FaImage /></button>
+                                <button onClick={openCamera} className={`p-3 opacity-30 hover:opacity-100 transition-all ${theme === 'light' ? 'text-indigo-600' : ''}`}><FaCamera /></button>
                                 <button onClick={sendMessage} disabled={isSending} className={`p-5 rounded-full active:scale-90 transition-all ${currentTheme.button}`}>
                                     {isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane className="text-white" size={14} />}
                                 </button>
