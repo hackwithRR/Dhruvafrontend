@@ -105,6 +105,7 @@ const StudyTimer = ({ currentTheme, onSessionComplete }) => {
 // --- MAIN CHAT ENGINE ---
 export default function Chat() {
     const { currentUser, logout, theme, setTheme } = useAuth();
+   // --- STATE MANAGEMENT ---
     const [messages, setMessages] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [currentSessionId, setCurrentSessionId] = useState(Date.now().toString());
@@ -116,6 +117,10 @@ export default function Chat() {
     const [showAchievement, setShowAchievement] = useState(null);
     const [isListening, setIsListening] = useState(false);
     const [isLiveMode, setIsLiveMode] = useState(false);
+    
+    // Fixed: Added missing state for Subject and Chapter
+    const [subjectInput, setSubjectInput] = useState("");
+    const [chapterInput, setChapterInput] = useState("");
 
     const chatContainerRef = useRef(null);
     const messagesEndRef = useRef(null);
