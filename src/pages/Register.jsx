@@ -8,13 +8,14 @@ import 'react-toastify/dist/ReactToastify.css';
 import { motion, AnimatePresence } from "framer-motion";
 import { FaUser, FaEnvelope, FaLock, FaCheck, FaMars, FaVenus, FaGenderless, FaGoogle, FaLightbulb, FaRocket, FaRobot } from "react-icons/fa";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+// Ensure Katex CSS is available for any math rendering
+import 'katex/dist/katex.min.css';
 
 export default function Register() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [gender, setGender] = useState("other"); // Default value
+    const [gender, setGender] = useState("other");
     const [selectedAvatar, setSelectedAvatar] = useState(1);
     const [isVerified, setIsVerified] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -35,9 +36,12 @@ export default function Register() {
         let interval;
         if (isVerified) {
             timer = setTimeout(() => navigate("/login"), 8000);
-            interval = setInterval(() => setCountdown(c => c > 0 ? c - 1 : 0), 1000);
+            interval = setInterval(() => setCountdown(c => (c > 0 ? c - 1 : 0)), 1000);
         }
-        return () => { clearTimeout(timer); clearInterval(interval); };
+        return () => { 
+            clearTimeout(timer); 
+            clearInterval(interval); 
+        };
     }, [isVerified, navigate]);
 
     const avatars = [
@@ -53,36 +57,24 @@ export default function Register() {
         e.preventDefault();
         if (loading) return;
         setLoading(true);
-        
         try {
             const avatarUrl = avatars.find(a => a.id === selectedAvatar).url;
-            
-            // 1. Create User in Firebase Auth via Context
-            // Ensure your AuthContext.register function accepts gender!
             const userCredential = await register(email, password, name, avatarUrl, gender);
 
-            // 2. Explicitly write to Firestore
-            // We use the UID from the newly created auth user
             await setDoc(doc(db, "users", userCredential.user.uid), {
                 uid: userCredential.user.uid,
-                name: name,
-                email: email,
+                name,
+                email,
                 pfp: avatarUrl,
-                gender: gender, // This ensures the chosen gender is saved
+                gender,
                 board: "CBSE",
                 classLevel: "10",
                 createdAt: new Date()
             }, { merge: true });
 
-            // 3. Success state
+            await logout();
             setIsVerified(true);
-            
-            // Optional: You might want to delay logout slightly or handle session 
-            // differently if the Profile page needs to read this immediately.
-            await logout(); 
-
         } catch (err) {
-            console.error("Registration Error:", err);
             toast.error(err.message || "Registration failed. Please try again.");
             setLoading(false);
         }
@@ -219,10 +211,6 @@ export default function Register() {
                         </motion.div>
                     </motion.div>
                 )}
-            </AnimatePresence>
-        </div>
-    );
-}
             </AnimatePresence>
         </div>
     );
