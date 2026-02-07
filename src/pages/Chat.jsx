@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
-import { FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, FaImage, FaPlus, FaHistory, FaUnlock, FaChevronDown, FaYoutube, FaArrowDown, FaTrash } from "react-icons/fa";
+import { FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, FaTrash, FaClock, FaPlay, FaPause, FaStop } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { doc, getDoc, updateDoc, arrayUnion, setDoc, collection, query, where, getDocs, orderBy, limit, deleteDoc } from "firebase/firestore";
@@ -13,15 +13,98 @@ import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-// Helper to clean AI formatting and ensure proper spacing
 const formatContent = (text) => {
-    return text
-        .replace(/\$\$/g, '') 
-        .replace(/\n\s*\n/g, '\n\n') 
-        .trim();
+    return text.replace(/\$\$/g, '').replace(/\n\s*\n/g, '\n\n').trim();
 };
 
-// --- TYPEWRITER COMPONENT ---
+// --- STUDY TIMER COMPONENT ---
+const StudyTimer = ({ theme, currentTheme }) => {
+    const [timeLeft, setTimeLeft] = useState(0);
+    const [isActive, setIsActive] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
+    const timerRef = useRef(null);
+
+    const playAlarm = () => {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "beep";
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 2);
+    };
+
+    useEffect(() => {
+        if (isActive && timeLeft > 0) {
+            timerRef.current = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+        } else if (timeLeft === 0 && isActive) {
+            playAlarm();
+            setIsActive(false);
+            toast.info("Session Complete! Take a break. ☕");
+        }
+        return () => clearInterval(timerRef.current);
+    }, [isActive, timeLeft]);
+
+    const startTimer = (mins) => {
+        setTimeLeft(mins * 60);
+        setIsActive(true);
+    };
+
+    const formatTime = (seconds) => {
+        const m = Math.floor(seconds / 60);
+        const s = seconds % 60;
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    };
+
+    return (
+        <div className="fixed bottom-32 left-6 z-[100]">
+            <motion.div 
+                animate={{ width: isOpen ? "240px" : "60px", height: isOpen ? "280px" : "60px" }}
+                className={`overflow-hidden rounded-[2rem] border backdrop-blur-2xl shadow-2xl flex flex-col ${currentTheme.aiBubble} border-white/20`}
+            >
+                {!isOpen ? (
+                    <button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-500">
+                        <FaClock size={24} className="animate-pulse" />
+                    </button>
+                ) : (
+                    <div className="p-5 flex flex-col h-full">
+                        <div className="flex justify-between items-center mb-4">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Focus Timer</span>
+                            <button onClick={() => setIsOpen(false)}><FaTimes size={12} /></button>
+                        </div>
+                        
+                        <div className="flex-1 flex flex-col items-center justify-center">
+                            <h2 className="text-4xl font-black mb-6 font-mono tracking-tighter">
+                                {formatTime(timeLeft)}
+                            </h2>
+                            
+                            {timeLeft === 0 ? (
+                                <div className="grid grid-cols-2 gap-2 w-full">
+                                    {[15, 30, 45, 60].map(m => (
+                                        <button key={m} onClick={() => startTimer(m)} className="py-2 rounded-xl bg-white/5 hover:bg-indigo-500 hover:text-white transition-all text-[10px] font-bold">
+                                            {m}m
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="flex gap-4">
+                                    <button onClick={() => setIsActive(!isActive)} className="p-4 rounded-full bg-indigo-500 text-white">
+                                        {isActive ? <FaPause /> : <FaPlay />}
+                                    </button>
+                                    <button onClick={() => {setTimeLeft(0); setIsActive(false)}} className="p-4 rounded-full bg-red-500/20 text-red-500">
+                                        <FaStop />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </motion.div>
+        </div>
+    );
+};
+
 const Typewriter = ({ text, onComplete }) => {
     const [displayedText, setDisplayedText] = useState("");
     const [cursor, setCursor] = useState(true);
@@ -232,18 +315,28 @@ export default function Chat() {
                             <span className="text-[10px] font-black tracking-widest uppercase opacity-40">Chat History</span>
                             <button onClick={() => setShowSidebar(false)} className={`${theme === 'light' ? 'text-black/50' : 'text-white/50'}`}><FaTimes /></button>
                         </div>
-                        <button onClick={startNewSession} className="w-full py-4 mb-4 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20">
+                        <motion.button 
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={startNewSession} 
+                            className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
+                        >
                             <FaPlus /> New Session
-                        </button>
-                        <div className="flex-1 overflow-y-auto space-y-2 custom-y-scroll">
+                        </motion.button>
+                        <div className="flex-1 overflow-y-auto space-y-3 custom-y-scroll">
                             {sessions.map((s) => (
-                                <div key={s.id} onClick={() => loadSession(s.id)} className={`group relative w-full text-left p-4 rounded-xl cursor-pointer transition-all ${currentSessionId === s.id ? 'bg-indigo-500/10 text-indigo-500 border border-indigo-500/20' : 'opacity-60 hover:opacity-100 hover:bg-black/5'}`}>
-                                    <div className="text-[10px] font-bold uppercase truncate pr-6">{s.title || "Untitled Chat"}</div>
-                                    <div className="text-[8px] opacity-40 mt-1">{new Date(s.lastUpdate).toLocaleDateString()}</div>
-                                    <button onClick={(e) => deleteSession(e, s.id)} className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:text-red-400 transition-all">
+                                <motion.div 
+                                    layout
+                                    key={s.id} 
+                                    onClick={() => loadSession(s.id)} 
+                                    className={`group relative w-full text-left p-4 rounded-2xl cursor-pointer transition-all ${currentSessionId === s.id ? 'bg-indigo-500/15 text-indigo-500 border border-indigo-500/20' : 'opacity-60 hover:opacity-100 hover:bg-black/5'}`}
+                                >
+                                    <div className="text-[10px] font-black uppercase truncate pr-8 tracking-tight">{s.title || "Untitled Chat"}</div>
+                                    <div className="text-[8px] opacity-40 mt-1 font-bold">{new Date(s.lastUpdate).toLocaleDateString()}</div>
+                                    <button onClick={(e) => deleteSession(e, s.id)} className="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-2 text-red-500 hover:scale-125 transition-all">
                                         <FaTrash size={10} />
                                     </button>
-                                </div>
+                                </motion.div>
                             ))}
                         </div>
                     </motion.div>
@@ -252,48 +345,51 @@ export default function Chat() {
 
             <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
+                <StudyTimer theme={theme} currentTheme={currentTheme} />
 
                 {/* --- SUPER COOL ADAPTIVE TOP BAR --- */}
-                <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
-                    <button onClick={() => setShowSidebar(!showSidebar)} className={`p-4 rounded-2xl border transition-all ${currentTheme.aiBubble} hover:scale-105 active:scale-95 shadow-sm`}>
+                <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                    <button onClick={() => setShowSidebar(!showSidebar)} className={`hidden md:block p-4 rounded-2xl border transition-all ${currentTheme.aiBubble} hover:scale-105 active:scale-95 shadow-sm`}>
                         <FaHistory size={14} className={theme === 'light' ? 'text-indigo-600' : 'text-indigo-400'} />
                     </button>
                     
-                    <div className={`flex-1 flex flex-col md:flex-row items-center gap-2 p-1.5 rounded-[1.5rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)] bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10`}`}>
-                        
+                    <motion.div 
+                        layout
+                        className={`flex-1 flex flex-col md:flex-row items-center gap-2 p-1.5 rounded-[1.8rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500/50 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10`}`}
+                    >
                         {/* INPUTS GROUP */}
-                        <div className="flex items-center w-full md:w-auto flex-1 gap-2 px-3 py-1">
-                            <div className="flex-1 flex flex-col">
+                        <div className="flex items-center w-full flex-1 gap-2 px-3 py-1">
+                            <div className="flex-1 flex flex-col min-w-[80px]">
                                 <span className={`text-[7px] font-black uppercase tracking-tighter ${isLocked ? 'text-emerald-500' : 'opacity-40'}`}>Subject</span>
                                 <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="E.g. Biology" className={`bg-transparent text-[11px] font-bold uppercase outline-none placeholder:opacity-30 ${isLocked ? 'text-emerald-500/80' : 'text-current'}`} />
                             </div>
                             
-                            <div className="h-6 w-[1px] bg-current opacity-10 hidden md:block" />
+                            <div className="h-6 w-[1px] bg-current opacity-10" />
 
-                            <div className="w-24 flex flex-col">
+                            <div className="flex-1 flex flex-col min-w-[80px]">
                                 <span className={`text-[7px] font-black uppercase tracking-tighter ${isLocked ? 'text-emerald-500' : 'opacity-40'}`}>Chapter</span>
                                 <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="CH-01" className={`bg-transparent text-[11px] font-bold uppercase outline-none placeholder:opacity-30 ${isLocked ? 'text-emerald-500/80' : 'text-current'}`} />
                             </div>
 
-                            <button onClick={() => setIsLocked(!isLocked)} className={`p-3 rounded-xl transition-all duration-300 ${isLocked ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 rotate-0" : "bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/20 hover:text-current hover:bg-black/10"}`}>
+                            <button onClick={() => setIsLocked(!isLocked)} className={`p-3 rounded-xl transition-all duration-300 ${isLocked ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" : "bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/20 hover:text-current hover:bg-black/10"}`}>
                                 {isLocked ? <FaLock size={12} /> : <FaUnlock size={12} />}
                             </button>
                         </div>
 
-                        {/* MODE SLIDER */}
-                        <div className="flex bg-black/5 dark:bg-black/40 p-1 rounded-xl relative w-full md:w-auto">
+                        {/* MODE SLIDER - Mobile Optimized */}
+                        <div className="flex bg-black/5 dark:bg-black/40 p-1 rounded-2xl relative w-full md:w-auto">
                             <LayoutGroup>
                                 {["Explain", "Doubt", "Quiz"].map(m => (
-                                    <button key={m} onClick={() => setMode(m)} className={`relative z-10 px-5 py-2 text-[9px] font-black uppercase transition-all duration-300 ${mode === m ? (theme === 'light' ? 'text-indigo-600' : 'text-white') : "opacity-40 hover:opacity-100"}`}>
+                                    <button key={m} onClick={() => setMode(m)} className={`flex-1 md:flex-none relative z-10 px-6 py-2.5 text-[9px] font-black uppercase transition-all duration-300 ${mode === m ? (theme === 'light' ? 'text-indigo-600' : 'text-white') : "opacity-40 hover:opacity-100"}`}>
                                         {m}
                                         {mode === m && (
-                                            <motion.div layoutId="mode-pill" className={`absolute inset-0 rounded-lg shadow-sm ${theme === 'light' ? 'bg-white shadow-indigo-200/50 shadow-md' : 'bg-white/10 border border-white/10'}`} transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} />
+                                            <motion.div layoutId="mode-pill" className={`absolute inset-0 rounded-xl shadow-sm ${theme === 'light' ? 'bg-white shadow-indigo-200/50 shadow-md' : 'bg-white/10 border border-white/10'}`} transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} />
                                         )}
                                     </button>
                                 ))}
                             </LayoutGroup>
                         </div>
-                    </div>
+                    </motion.div>
                 </div>
 
                 {/* CHAT AREA */}
