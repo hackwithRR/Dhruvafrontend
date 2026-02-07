@@ -8,13 +8,14 @@ import {
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, 
     FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, 
     FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, 
-    FaBookOpen, FaGraduationCap, FaUserCog, FaMicrophone 
+    FaBookOpen, FaGraduationCap, FaUserCog, FaMicrophone,
+    FaBolt, FaChartLine 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { doc, getDoc, setDoc, collection, query, getDocs, orderBy } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, getDocs, orderBy, updateDoc, increment } from "firebase/firestore";
 import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,6 +24,7 @@ import 'katex/dist/katex.min.css';
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
+// --- CONSTANTS ---
 const CHAPTER_MAP = {
     CBSE: {
         "8": {
@@ -42,6 +44,26 @@ const CHAPTER_MAP = {
 
 const formatContent = (text) => text.trim();
 
+// --- NEW HELPER COMPONENT: ACTION CHIPS ---
+const ActionChips = ({ mode, onChipClick }) => {
+    const chips = {
+        Explain: ["Give an Example", "Simpler Version", "Key Terms"],
+        Doubt: ["Solve another", "Concept behind this", "Check my answer"],
+        Quiz: ["Harder question", "Hint please", "Explain Answer"],
+        Summary: ["Make it a table", "3 Bullet points", "Flashcard style"]
+    };
+    return (
+        <div className="flex flex-wrap gap-2 mt-4 animate-in fade-in slide-in-from-bottom-2">
+            {chips[mode]?.map((chip) => (
+                <button key={chip} onClick={() => onChipClick(chip)} className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-[10px] font-bold uppercase hover:bg-indigo-600 hover:border-indigo-500 transition-all flex items-center gap-2">
+                    <FaBolt className="text-yellow-400" /> {chip}
+                </button>
+            ))}
+        </div>
+    );
+};
+
+// --- COMPONENTS ---
 const ProfilePrompt = ({ currentTheme }) => {
     const navigate = useNavigate();
     return (
@@ -81,15 +103,21 @@ const Typewriter = ({ text, onComplete, scrollRef }) => {
     );
 };
 
-const StudyTimer = ({ currentTheme }) => {
+const StudyTimer = ({ currentTheme, onSessionComplete }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isActive, setIsActive] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
+    const [initialTime, setInitialTime] = useState(0);
     const timerRef = useRef(null);
     const playAlarm = () => { const ctx = new (window.AudioContext || window.webkitAudioContext)(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 1.5); };
     useEffect(() => {
         if (isActive && timeLeft > 0) { timerRef.current = setInterval(() => setTimeLeft(prev => prev - 1), 1000); }
-        else if (timeLeft === 0 && isActive) { playAlarm(); setIsActive(false); toast.info("Session Complete! ☕"); }
+        else if (timeLeft === 0 && isActive) { 
+            playAlarm(); 
+            setIsActive(false); 
+            toast.info("Session Complete! ☕"); 
+            if (onSessionComplete) onSessionComplete(Math.floor(initialTime / 60));
+        }
         return () => clearInterval(timerRef.current);
     }, [isActive, timeLeft]);
     const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
@@ -101,7 +129,7 @@ const StudyTimer = ({ currentTheme }) => {
                         <div className="flex justify-between items-center mb-4"><span className="text-[10px] font-black uppercase opacity-50">Timer</span><button onClick={() => setIsOpen(false)}><FaTimes size={12} /></button></div>
                         <div className="flex-1 flex flex-col items-center justify-center">
                             <h2 className="text-4xl font-black mb-6 font-mono">{formatTime(timeLeft)}</h2>
-                            {timeLeft === 0 ? (<div className="grid grid-cols-2 gap-2 w-full">{[15, 25, 45, 60].map(m => (<button key={m} onClick={() => { setTimeLeft(m * 60); setIsActive(true); }} className="py-2 rounded-xl bg-white/5 hover:bg-indigo-500 text-[10px] font-bold transition-all">{m}m</button>))}</div>) : (
+                            {timeLeft === 0 ? (<div className="grid grid-cols-2 gap-2 w-full">{[15, 25, 45, 60].map(m => (<button key={m} onClick={() => { setTimeLeft(m * 60); setInitialTime(m * 60); setIsActive(true); }} className="py-2 rounded-xl bg-white/5 hover:bg-indigo-500 text-[10px] font-bold transition-all">{m}m</button>))}</div>) : (
                                 <div className="flex gap-4"><button onClick={() => setIsActive(!isActive)} className="p-4 rounded-full bg-indigo-500 text-white">{isActive ? <FaPause /> : <FaPlay />}</button><button onClick={() => { setTimeLeft(0); setIsActive(false); }} className="p-4 rounded-full bg-red-500/20 text-red-500"><FaStop /></button></div>
                             )}
                         </div>
@@ -112,6 +140,7 @@ const StudyTimer = ({ currentTheme }) => {
     );
 };
 
+// --- MAIN COMPONENT ---
 export default function Chat() {
     const { currentUser, logout, theme, setTheme } = useAuth();
     const [messages, setMessages] = useState([]);
@@ -153,57 +182,47 @@ export default function Chat() {
     const currentTheme = themes[theme] || themes.dark;
     const modes = [{ id: "Explain", icon: <FaBookOpen />, label: "Explain" }, { id: "Doubt", icon: <FaQuestion />, label: "Doubt" }, { id: "Quiz", icon: <FaGraduationCap />, label: "Quiz" }, { id: "Summary", icon: <FaLightbulb />, label: "Summary" }];
 
-    // --- VOICE CONFIGURATION ---
+    // --- VOICE LOGIC ---
     const speakText = (text) => {
-        window.speechSynthesis.cancel();
+        window.speechSynthesis.cancel(); 
         const cleanText = text.replace(/[*#_~]/g, "").replace(/\[.*?\]/g, "");
         const utterance = new SpeechSynthesisUtterance(cleanText);
-        
         const voices = window.speechSynthesis.getVoices();
-        // Priority: Indian Male (Rishi, Microsoft Hemant, etc.) -> Indian English -> Any Indian
-        const indianVoice = voices.find(v => (v.lang.includes("en-IN") || v.lang.includes("hi-IN")) && (v.name.toLowerCase().includes("rishi") || v.name.toLowerCase().includes("male"))) 
-                         || voices.find(v => v.lang.includes("en-IN"))
-                         || voices.find(v => v.lang.includes("IN"));
-        
-        if (indianVoice) utterance.voice = indianVoice;
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-
-        utterance.onend = () => {
-            if (isLiveMode) {
-                setTimeout(() => startVoiceMode(), 400); // Continuous loop trigger
-            }
-        };
+        const indianMale = voices.find(v => (v.lang.includes("en-IN") || v.lang.includes("hi-IN")) && (v.name.toLowerCase().includes("rishi") || v.name.toLowerCase().includes("male"))) || voices.find(v => v.lang.includes("en-IN"));
+        if (indianMale) utterance.voice = indianMale;
+        utterance.onend = () => { if (isLiveMode) setTimeout(() => startVoiceMode(), 500); };
         window.speechSynthesis.speak(utterance);
     };
 
     const startVoiceMode = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) return toast.error("Voice not supported");
-        
         const recognition = new SpeechRecognition();
         recognition.lang = 'en-IN';
-        recognition.interimResults = false;
-        
         setIsListening(true);
         recognition.start();
-
         recognition.onresult = (e) => {
             const t = e.results[0][0].transcript;
             setInput(t);
             setIsListening(false);
             sendMessage(t);
         };
-
-        recognition.onerror = (err) => {
-            setIsListening(false);
-            // If user stays silent, restart listening if in Live Mode
-            if (isLiveMode && (err.error === 'no-speech')) {
-                startVoiceMode();
-            } else if (err.error !== 'no-speech') {
-                setIsLiveMode(false);
-            }
+        recognition.onerror = (err) => { 
+            setIsListening(false); 
+            if (isLiveMode && err.error === 'no-speech') startVoiceMode(); 
+            else if (err.error !== 'no-speech') setIsLiveMode(false);
         };
+    };
+
+    // --- DATA HANDLING ---
+    const trackStudyProgress = async (minutes) => {
+        if (!currentUser) return;
+        try {
+            await updateDoc(doc(db, "users", currentUser.uid), {
+                "stats.totalMinutes": increment(minutes),
+                "stats.lastActive": Date.now()
+            });
+        } catch (e) { console.error("Stats update failed", e); }
     };
 
     useEffect(() => {
@@ -218,16 +237,11 @@ export default function Chat() {
                     gender: data.gender || "",
                     language: data.language || "English" 
                 });
-                if (!data.board || (!data.class && !data.classLevel) || !data.gender) {
-                    setShowOnboarding(true);
-                }
-            } else {
-                setShowOnboarding(true);
-            }
+                if (!data.board || (!data.class && !data.classLevel) || !data.gender) setShowOnboarding(true);
+            } else setShowOnboarding(true);
             fetchSessions();
         };
         initData();
-        // Pre-load voices for speech synthesis
         window.speechSynthesis.getVoices();
     }, [currentUser]);
 
@@ -273,16 +287,10 @@ export default function Chat() {
             const aiMsg = { role: "ai", content: res.data.reply, ytLink, timestamp: Date.now() };
             const finalMessages = [...newMessages, aiMsg];
             setMessages(finalMessages);
-            
-            // Trigger Voice Response
             if (isLiveMode || voiceInput) speakText(res.data.reply);
-            
             await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: finalMessages, lastUpdate: Date.now(), title: subjectInput ? `${subjectInput.toUpperCase()}: ${mappedChapter}` : "Study Session" }, { merge: true });
             fetchSessions();
-        } catch (e) { 
-            toast.error("Connection failed"); 
-            setIsLiveMode(false); 
-        }
+        } catch (e) { toast.error("Connection failed"); setIsLiveMode(false); }
         setIsSending(false);
     };
 
@@ -293,10 +301,7 @@ export default function Chat() {
     return (
         <div className={`flex h-screen w-full overflow-hidden transition-all duration-700 ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" limit={1} />
-            
-            <AnimatePresence>
-                {showOnboarding && <ProfilePrompt currentTheme={currentTheme} />}
-            </AnimatePresence>
+            <AnimatePresence>{showOnboarding && <ProfilePrompt currentTheme={currentTheme} />}</AnimatePresence>
 
             <AnimatePresence>
                 {showSidebar && (
@@ -312,7 +317,7 @@ export default function Chat() {
 
             <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
-                <StudyTimer currentTheme={currentTheme} />
+                <StudyTimer currentTheme={currentTheme} onSessionComplete={trackStudyProgress} />
 
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 overflow-x-auto no-scrollbar">
                     <div className="flex gap-2 p-1.5 rounded-[1.5rem] bg-white/5 border border-white/10 w-max mx-auto">
@@ -335,12 +340,25 @@ export default function Chat() {
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar relative">
                     <div className="max-w-3xl mx-auto space-y-12 pb-20">
                         {messages.length === 0 && <div className="text-center py-20 opacity-20"><FaGraduationCap size={48} className="mx-auto mb-4" /><p className="font-bold text-sm uppercase tracking-widest">Select subject to begin</p></div>}
+                        
+                        {/* STUDY DASHBOARD CHIP (NEW) */}
+                        {messages.length > 0 && (
+                            <div className="p-4 rounded-2xl flex items-center justify-between bg-white/5 border border-white/5">
+                                <div className="flex items-center gap-3 text-xs font-bold"><FaChartLine className="text-indigo-400" /> Study Mode: <span className="text-indigo-400 uppercase">{mode}</span></div>
+                                <div className="text-[10px] font-black opacity-40 uppercase">Tracking Session Live</div>
+                            </div>
+                        )}
+
                         {messages.map((msg, i) => (
                             <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                                 <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none shadow-xl` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
                                     {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 w-full object-cover" alt="upload" />}
                                     {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
-                                        <Typewriter text={msg.content} scrollRef={chatContainerRef} onComplete={() => messagesEndRef.current?.scrollIntoView()} />
+                                        <>
+                                            <Typewriter text={msg.content} scrollRef={chatContainerRef} onComplete={() => messagesEndRef.current?.scrollIntoView()} />
+                                            {/* ACTION CHIPS INJECTED HERE */}
+                                            <ActionChips mode={mode} onChipClick={(text) => { setInput(text); sendMessage(text); }} />
+                                        </>
                                     ) : (
                                         <div className="prose prose-sm dark:prose-invert max-w-none">
                                             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{formatContent(msg.content)}</ReactMarkdown>
@@ -361,9 +379,9 @@ export default function Chat() {
                             <input value={input} onChange={e => setInput(e.target.value)} placeholder={isListening ? "Listening..." : "Ask your doubt..."} className="flex-1 bg-transparent px-4 md:px-6 py-4 outline-none font-bold text-xs md:text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex items-center gap-1 md:gap-2 px-1">
                                 <button onClick={() => { 
-                                    const nextState = !isLiveMode;
-                                    setIsLiveMode(nextState);
-                                    if(nextState) startVoiceMode();
+                                    const next = !isLiveMode;
+                                    setIsLiveMode(next); 
+                                    if(next) startVoiceMode(); 
                                     else { window.speechSynthesis.cancel(); setIsListening(false); }
                                 }} className={`p-3 md:p-4 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 text-white shadow-lg scale-110' : 'opacity-30 hover:opacity-100'}`}><FaMicrophone size={16} /></button>
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} accept="image/*" />
