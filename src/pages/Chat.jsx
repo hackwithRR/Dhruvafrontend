@@ -3,37 +3,97 @@ import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
-import { FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, FaTrash, FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, FaBookOpen, FaGraduationCap } from "react-icons/fa";
+import { FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, FaTrash, FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, FaBookOpen, FaGraduationCap, FaRocket } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
 import { doc, getDoc, updateDoc, arrayUnion, setDoc, collection, query, where, getDocs, orderBy, limit, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 
+// Import KaTeX CSS for math rendering
+import 'katex/dist/katex.min.css';
+
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-// --- SYLLABUS DATA FOR INTELLIGENT MAPPING ---
+// --- SYLLABUS DATA ---
 const CHAPTER_MAP = {
-  CBSE: {
-    "8": {
-      MATHEMATICS: { "1": "Rational Numbers", "2": "Linear Equations in One Variable", "3": "Understanding Quadrilaterals", "4": "Practical Geometry", "5": "Data Handling", "6": "Squares and Square Roots", "7": "Cubes and Cube Roots", "8": "Comparing Quantities", "9": "Algebraic Expressions and Identities", "10": "Visualising Solid Shapes", "11": "Mensuration", "12": "Exponents and Powers", "13": "Direct and Inverse Proportions", "14": "Factorisation", "15": "Introduction to Graphs", "16": "Playing with Numbers" },
-      SCIENCE: { "1": "Crop Production and Management", "2": "Microorganisms: Friend and Foe", "3": "Synthetic Fibres and Plastics", "4": "Materials: Metals and Non-Metals", "5": "Coal and Petroleum", "6": "Combustion and Flame", "7": "Conservation of Plants and Animals", "8": "Cell – Structure and Functions", "9": "Reproduction in Animals", "10": "Reaching the Age of Adolescence", "11": "Force and Pressure", "12": "Friction", "13": "Sound", "14": "Chemical Effects of Electric Current", "15": "Some Natural Phenomena", "16": "Light", "17": "Stars and the Solar System", "18": "Pollution of Air and Water" }
-    },
-    "9": {
-        MATHEMATICS: { "1": "Number Systems", "2": "Polynomials", "3": "Coordinate Geometry", "4": "Linear Equations in Two Variables", "5": "Introduction to Euclid’s Geometry", "6": "Lines and Angles", "7": "Triangles", "8": "Quadrilaterals", "9": "Areas of Parallelograms and Triangles", "10": "Circles", "11": "Constructions", "12": "Heron’s Formula", "13": "Surface Areas and Volumes", "14": "Statistics", "15": "Probability" },
-        SCIENCE: { "1": "Matter in Our Surroundings", "2": "Is Matter Around Us Pure", "3": "Atoms and Molecules", "4": "Structure of the Atom", "5": "The Fundamental Unit of Life", "6": "Tissues", "7": "Diversity in Living Organisms", "8": "Motion", "9": "Force and Laws of Motion", "10": "Gravitation", "11": "Work and Energy", "12": "Sound", "13": "Why Do We Fall Ill", "14": "Natural Resources", "15": "Improvement in Food Resources" }
-    },
-    "10": {
-      MATHEMATICS: { "1": "Real Numbers", "2": "Polynomials", "3": "Pair of Linear Equations in Two Variables", "4": "Quadratic Equations", "5": "Arithmetic Progressions", "6": "Triangles", "7": "Coordinate Geometry", "8": "Introduction to Trigonometry", "9": "Some Applications of Trigonometry", "10": "Circles", "11": "Constructions", "12": "Areas Related to Circles", "13": "Surface Areas and Volumes", "14": "Statistics", "15": "Probability" },
-      SCIENCE: { "1": "Chemical Reactions and Equations", "2": "Acids, Bases and Salts", "3": "Metals and Non-metals", "4": "Carbon and its Compounds", "5": "Life Processes", "6": "Control and Coordination", "7": "How Do Organisms Reproduce", "8": "Heredity and Evolution", "9": "Light – Reflection and Refraction", "10": "The Human Eye and the Colourful World", "11": "Electricity", "12": "Magnetic Effects of Electric Current", "13": "Our Environment", "14": "Sources of Energy" }
+    CBSE: {
+        "8": {
+            MATHEMATICS: { "1": "Rational Numbers", "2": "Linear Equations", "3": "Understanding Quadrilaterals", "11": "Mensuration", "12": "Exponents and Powers", "14": "Factorisation" },
+            SCIENCE: { "1": "Crop Production", "8": "Cell Structure", "11": "Force and Pressure", "13": "Sound", "16": "Light" }
+        },
+        "9": {
+            MATHEMATICS: { "1": "Number Systems", "2": "Polynomials", "7": "Triangles", "13": "Surface Areas" },
+            SCIENCE: { "1": "Matter", "5": "Fundamental Unit of Life", "8": "Motion", "10": "Gravitation" }
+        },
+        "10": {
+            MATHEMATICS: { "1": "Real Numbers", "4": "Quadratic Equations", "8": "Trigonometry" },
+            SCIENCE: { "1": "Chemical Reactions", "6": "Control and Coordination", "10": "Human Eye", "11": "Electricity" }
+        }
     }
-  }
 };
 
-const formatContent = (text) => text.replace(/\$\$/g, '').replace(/\n\s*\n/g, '\n\n').trim();
+const formatContent = (text) => text.trim();
 
-// --- DRAGGABLE STUDY TIMER COMPONENT ---
+// --- ONBOARDING COMPONENT ---
+const OnboardingModal = ({ onComplete, currentTheme }) => (
+    <motion.div 
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
+    >
+        <motion.div 
+            initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
+            className={`max-w-md w-full p-8 rounded-[2.5rem] border border-white/10 shadow-2xl text-center ${currentTheme.aiBubble}`}
+        >
+            <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/40">
+                <FaRocket className="text-white text-3xl" />
+            </div>
+            <h2 className="text-2xl font-black mb-3 tracking-tight">Welcome to Gemini 3</h2>
+            <p className="text-sm opacity-60 mb-8 leading-relaxed">
+                Your AI study companion just got smarter. Now featuring advanced LaTeX math rendering, 
+                interactive tables, and focus timers to help you ace your exams.
+            </p>
+            <button 
+                onClick={onComplete}
+                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all active:scale-95"
+            >
+                Start Learning
+            </button>
+        </motion.div>
+    </motion.div>
+);
+
+// --- UPDATED TYPEWRITER WITH MATH SUPPORT ---
+const Typewriter = ({ text, onComplete }) => {
+    const [displayedText, setDisplayedText] = useState("");
+    const [cursor, setCursor] = useState(true);
+    useEffect(() => {
+        let i = 0;
+        const interval = setInterval(() => {
+            setDisplayedText(text.substring(0, i + 1));
+            i++;
+            if (i >= text.length) { clearInterval(interval); setCursor(false); if (onComplete) onComplete(); }
+        }, 10); 
+        return () => clearInterval(interval);
+    }, [text]);
+
+    return (
+        <div className="relative markdown-container prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown 
+                remarkPlugins={[remarkGfm, remarkMath]} 
+                rehypePlugins={[rehypeKatex]}
+            >
+                {formatContent(displayedText)}
+            </ReactMarkdown>
+            {cursor && <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.5 }} className="inline-block w-1 h-4 bg-indigo-500 ml-1 align-middle" />}
+        </div>
+    );
+};
+
+// --- STUDY TIMER ---
 const StudyTimer = ({ currentTheme }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isActive, setIsActive] = useState(false);
@@ -44,11 +104,8 @@ const StudyTimer = ({ currentTheme }) => {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = "sine";
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 2);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(); osc.stop(ctx.currentTime + 1.5);
     };
 
     useEffect(() => {
@@ -57,16 +114,12 @@ const StudyTimer = ({ currentTheme }) => {
         } else if (timeLeft === 0 && isActive) {
             playAlarm();
             setIsActive(false);
-            toast.info("Session Complete! Take a break. ☕");
+            toast.info("Session Complete! ☕");
         }
         return () => clearInterval(timerRef.current);
     }, [isActive, timeLeft]);
 
-    const startTimer = (mins) => {
-        setTimeLeft(mins * 60);
-        setIsActive(true);
-    };
-
+    const startTimer = (mins) => { setTimeLeft(mins * 60); setIsActive(true); };
     const formatTime = (seconds) => {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
@@ -74,16 +127,8 @@ const StudyTimer = ({ currentTheme }) => {
     };
 
     return (
-        <motion.div 
-            drag 
-            dragMomentum={false} 
-            initial={{ x: 20, y: 400 }} 
-            className="fixed z-[100] cursor-grab active:cursor-grabbing"
-        >
-            <motion.div 
-                animate={{ width: isOpen ? "240px" : "64px", height: isOpen ? "280px" : "64px" }} 
-                className={`overflow-hidden rounded-[2rem] border backdrop-blur-3xl shadow-2xl flex flex-col ${currentTheme.aiBubble} border-white/20`}
-            >
+        <motion.div drag dragMomentum={false} initial={{ x: 20, y: 400 }} className="fixed z-[100] cursor-grab active:cursor-grabbing">
+            <motion.div animate={{ width: isOpen ? "240px" : "64px", height: isOpen ? "280px" : "64px" }} className={`overflow-hidden rounded-[2rem] border backdrop-blur-3xl shadow-2xl flex flex-col ${currentTheme.aiBubble} border-white/20`}>
                 {!isOpen ? (
                     <button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-500">
                         <FaClock size={24} className={isActive ? "animate-spin-slow" : "animate-pulse"} />
@@ -91,15 +136,15 @@ const StudyTimer = ({ currentTheme }) => {
                 ) : (
                     <div className="p-5 flex flex-col h-full">
                         <div className="flex justify-between items-center mb-4">
-                            <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Focus Timer</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Timer</span>
                             <button onClick={() => setIsOpen(false)}><FaTimes size={12} /></button>
                         </div>
                         <div className="flex-1 flex flex-col items-center justify-center">
-                            <h2 className="text-4xl font-black mb-6 font-mono tracking-tighter">{formatTime(timeLeft)}</h2>
+                            <h2 className="text-4xl font-black mb-6 font-mono">{formatTime(timeLeft)}</h2>
                             {timeLeft === 0 ? (
                                 <div className="grid grid-cols-2 gap-2 w-full">
-                                    {[15, 30, 45, 60].map(m => (
-                                        <button key={m} onClick={() => startTimer(m)} className="py-2 rounded-xl bg-white/5 hover:bg-indigo-500 hover:text-white transition-all text-[10px] font-bold">{m}m</button>
+                                    {[15, 25, 45, 60].map(m => (
+                                        <button key={m} onClick={() => startTimer(m)} className="py-2 rounded-xl bg-white/5 hover:bg-indigo-500 text-[10px] font-bold transition-all">{m}m</button>
                                     ))}
                                 </div>
                             ) : (
@@ -113,26 +158,6 @@ const StudyTimer = ({ currentTheme }) => {
                 )}
             </motion.div>
         </motion.div>
-    );
-};
-
-const Typewriter = ({ text, onComplete }) => {
-    const [displayedText, setDisplayedText] = useState("");
-    const [cursor, setCursor] = useState(true);
-    useEffect(() => {
-        let i = 0;
-        const interval = setInterval(() => {
-            setDisplayedText(text.substring(0, i + 1));
-            i++;
-            if (i >= text.length) { clearInterval(interval); setCursor(false); if (onComplete) onComplete(); }
-        }, 15); 
-        return () => clearInterval(interval);
-    }, [text]);
-    return (
-        <div className="relative">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{formatContent(displayedText)}</ReactMarkdown>
-            {cursor && <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.5 }} className="inline-block w-1 h-5 bg-indigo-500 ml-1" />}
-        </div>
     );
 };
 
@@ -150,31 +175,28 @@ export default function Chat() {
     const [subjectInput, setSubjectInput] = useState("");
     const [chapterInput, setChapterInput] = useState("");
     const [showSidebar, setShowSidebar] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [cameraFacing, setCameraFacing] = useState("environment");
 
     const messagesEndRef = useRef(null);
-    const chatContainerRef = useRef(null);
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
     const fileInputRef = useRef(null);
-
-    const modes = [
-        { id: "Explain", icon: <FaBookOpen />, label: "Explain" },
-        { id: "Doubt", icon: <FaQuestion />, label: "Doubt" },
-        { id: "Quiz", icon: <FaGraduationCap />, label: "Quiz" },
-        { id: "Summary", icon: <FaLightbulb />, label: "Summary" }
-    ];
 
     const themes = {
         dark: { container: "bg-[#050505] text-white", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-indigo-600 shadow-lg shadow-indigo-500/20", input: "bg-white/[0.03] border-white/10 text-white", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-r border-white/10" },
         light: { container: "bg-[#F8FAFF] text-[#1E293B]", aiBubble: "bg-white/70 backdrop-blur-md border border-white shadow-sm", userBubble: "bg-indigo-600 text-white shadow-lg", input: "bg-white/80 border-white text-[#1E293B]", button: "bg-indigo-600", sidebar: "bg-white/60 backdrop-blur-xl border-r border-white/20" }
     };
     const currentTheme = themes[theme] || themes.dark;
+    const modes = [ { id: "Explain", icon: <FaBookOpen />, label: "Explain" }, { id: "Doubt", icon: <FaQuestion />, label: "Doubt" }, { id: "Quiz", icon: <FaGraduationCap />, label: "Quiz" }, { id: "Summary", icon: <FaLightbulb />, label: "Summary" } ];
 
     useEffect(() => {
         if (!currentUser) return;
+        // Onboarding Check
+        if (!localStorage.getItem(`onboarded_${currentUser.uid}`)) setShowOnboarding(true);
+
         const initData = async () => {
             const userDoc = await getDoc(doc(db, "users", currentUser.uid));
             if (userDoc.exists()) {
@@ -185,6 +207,11 @@ export default function Chat() {
         };
         initData();
     }, [currentUser]);
+
+    const handleOnboardingComplete = () => {
+        localStorage.setItem(`onboarded_${currentUser.uid}`, 'true');
+        setShowOnboarding(false);
+    };
 
     const fetchSessions = async () => {
         const q = query(collection(db, `users/${currentUser.uid}/sessions`), orderBy("lastUpdate", "desc"));
@@ -209,23 +236,12 @@ export default function Chat() {
 
         const subUpper = subjectInput.toUpperCase();
         const mappedChapter = CHAPTER_MAP[userData.board]?.[userData.class]?.[subUpper]?.[chapterInput] || `Chapter ${chapterInput}`;
-
         const userMsg = { role: "user", content: text || "Analyzing attachment...", image: file ? URL.createObjectURL(file) : null, timestamp: Date.now() };
         const newMessages = [...messages, userMsg];
         setMessages(newMessages);
 
         try {
-            const payload = { 
-                userId: currentUser.uid, 
-                message: text || "Explain this image", 
-                mode, 
-                subject: subjectInput || "General", 
-                chapter: mappedChapter, 
-                language: userData.language, 
-                classLevel: userData.class,
-                instructions: `Student: ${userData.board} Class ${userData.class}. Context: ${subjectInput} - ${mappedChapter}.`
-            };
-            
+            const payload = { userId: currentUser.uid, message: text || "Explain this image", mode, subject: subjectInput || "General", chapter: mappedChapter, language: userData.language, classLevel: userData.class };
             let res;
             if (file) {
                 const formData = new FormData();
@@ -238,7 +254,7 @@ export default function Chat() {
             }
 
             let ytLink = null;
-            if ((mode === "Explain" || mode === "Doubt") && (subjectInput || text.length > 10)) {
+            if ((mode === "Explain" || mode === "Doubt") && subjectInput) {
                 ytLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} class ${userData.class} ${subjectInput} ${mappedChapter}`)}`;
             }
 
@@ -247,33 +263,30 @@ export default function Chat() {
             setMessages(finalMessages);
 
             await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
-                messages: finalMessages,
-                lastUpdate: Date.now(),
-                title: subjectInput ? `${subjectInput.toUpperCase()}: ${mappedChapter}` : "Study Session"
+                messages: finalMessages, lastUpdate: Date.now(), title: subjectInput ? `${subjectInput.toUpperCase()}: ${mappedChapter}` : "Study Session"
             }, { merge: true });
             fetchSessions();
-        } catch (e) { toast.error("Server connection failed"); }
+        } catch (e) { toast.error("Connection failed"); }
         setIsSending(false);
     };
 
-    const closeCamera = () => { if (videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t => t.stop()); setIsCameraOpen(false); };
+    const closeCamera = () => { videoRef.current?.srcObject?.getTracks().forEach(t => t.stop()); setIsCameraOpen(false); };
     const openCamera = async () => { setIsCameraOpen(true); try { const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacing } }); if (videoRef.current) videoRef.current.srcObject = s; } catch (e) { setIsCameraOpen(false); } };
     const capturePhoto = () => { const c = canvasRef.current; const v = videoRef.current; c.width = v.videoWidth; c.height = v.videoHeight; c.getContext("2d").drawImage(v, 0, 0); c.toBlob(b => { setSelectedFile(new File([b], "cap.jpg", { type: "image/jpeg" })); closeCamera(); }, "image/jpeg", 0.8); };
 
     return (
         <div className={`flex h-screen w-full overflow-hidden transition-all duration-700 ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" limit={1} />
+            
+            <AnimatePresence>
+                {showOnboarding && <OnboardingModal onComplete={handleOnboardingComplete} currentTheme={currentTheme} />}
+            </AnimatePresence>
+
             <AnimatePresence>
                 {showSidebar && (
-                    <motion.div 
-                        drag="x" 
-                        dragConstraints={{ left: 0, right: 0 }} 
-                        onDragEnd={(_, info) => info.offset.x < -50 && setShowSidebar(false)}
-                        initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} 
-                        className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 overflow-hidden ${currentTheme.sidebar}`}
-                    >
+                    <motion.div drag="x" dragConstraints={{ left: 0, right: 0 }} onDragEnd={(_, info) => info.offset.x < -50 && setShowSidebar(false)} initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 overflow-hidden ${currentTheme.sidebar}`}>
                         <div className="flex justify-between items-center mb-10">
-                            <span className="text-[10px] font-black tracking-widest uppercase opacity-40">Chat History</span>
+                            <span className="text-[10px] font-black tracking-widest uppercase opacity-40">History</span>
                             <button onClick={() => setShowSidebar(false)}><FaTimes /></button>
                         </div>
                         <button onClick={() => { setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false); }} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg"><FaPlus /> New Session</button>
@@ -293,32 +306,21 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
                 <StudyTimer currentTheme={currentTheme} />
 
-                {/* --- MODES BAR --- */}
+                {/* --- MODES --- */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 overflow-x-auto no-scrollbar">
                     <div className="flex gap-2 p-1.5 rounded-[1.5rem] bg-white/5 border border-white/10 w-max mx-auto">
                         {modes.map((m) => (
-                            <button
-                                key={m.id}
-                                onClick={() => setMode(m.id)}
-                                className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${mode === m.id ? 'bg-indigo-600 text-white shadow-lg' : 'opacity-40 hover:opacity-100'}`}
-                            >
+                            <button key={m.id} onClick={() => setMode(m.id)} className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${mode === m.id ? 'bg-indigo-600 text-white shadow-lg' : 'opacity-40 hover:opacity-100'}`}>
                                 {m.icon} {m.label}
                             </button>
                         ))}
                     </div>
                 </div>
 
-                {/* --- SUBJECT/CHAPTER BAR --- */}
+                {/* --- CONTEXT BAR --- */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
-                    <motion.button 
-                        whileTap={{ scale: 0.95 }} 
-                        onClick={() => setShowSidebar(!showSidebar)} 
-                        className={`flex items-center justify-center p-4 rounded-2xl border transition-all ${currentTheme.aiBubble} border-white/10 shadow-xl z-50`}
-                    >
-                        <FaHistory size={16} />
-                    </motion.button>
-                    
-                    <motion.div layout className={`flex-1 flex items-center gap-2 p-2 rounded-[2rem] border transition-all duration-500 relative overflow-hidden ${isLocked ? 'border-emerald-500/40 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10 shadow-2xl`}`}>
+                    <button onClick={() => setShowSidebar(!showSidebar)} className={`p-4 rounded-2xl border ${currentTheme.aiBubble} border-white/10 shadow-xl`}><FaHistory size={16} /></button>
+                    <motion.div layout className={`flex-1 flex items-center gap-2 p-2 rounded-[2rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500/40 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10 shadow-2xl`}`}>
                         <div className="flex items-center w-full flex-1 gap-3 px-4 py-2">
                             <div className="flex-1 flex flex-col">
                                 <label className="text-[8px] font-bold uppercase opacity-50">Subject</label>
@@ -336,22 +338,28 @@ export default function Chat() {
                     </motion.div>
                 </div>
 
-                {/* --- MESSAGES AREA --- */}
+                {/* --- CHAT AREA --- */}
                 <div className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll scroll-smooth">
                     <div className="max-w-3xl mx-auto space-y-12">
                         {messages.length === 0 && (
                             <div className="text-center py-20 opacity-20">
                                 <FaGraduationCap size={48} className="mx-auto mb-4" />
-                                <p className="font-bold text-sm">Select a subject and start learning.</p>
+                                <p className="font-bold text-sm">Select a subject to start.</p>
                             </div>
                         )}
                         {messages.map((msg, i) => (
                             <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                                 <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
                                     {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 w-full object-cover shadow-xl" alt="upload" />}
-                                    <div className="prose prose-sm dark:prose-invert">
-                                        {msg.role === "ai" && i === messages.length - 1 && !isSending ? <Typewriter text={msg.content} onComplete={() => messagesEndRef.current?.scrollIntoView()} /> : <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>}
-                                    </div>
+                                    {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
+                                        <Typewriter text={msg.content} onComplete={() => messagesEndRef.current?.scrollIntoView()} />
+                                    ) : (
+                                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                                {formatContent(msg.content)}
+                                            </ReactMarkdown>
+                                        </div>
+                                    )}
                                     {msg.ytLink && (
                                         <div className="mt-6 pt-4 border-t border-white/10">
                                             <a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-600 rounded-2xl text-xs font-bold border border-red-500/20 hover:bg-red-600/20 transition-all"><FaYoutube size={18} /> Watch Video Guide</a>
@@ -364,10 +372,9 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* --- INPUT AREA --- */}
+                {/* --- INPUT --- */}
                 <div className="p-4 md:p-10 shrink-0">
                     <div className="max-w-3xl mx-auto relative">
-                        {/* File Previewer */}
                         <AnimatePresence>
                             {selectedFile && (
                                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="absolute bottom-full left-0 mb-4 p-2 rounded-2xl bg-indigo-600 flex items-center gap-3 shadow-2xl">
@@ -376,9 +383,8 @@ export default function Chat() {
                                 </motion.div>
                             )}
                         </AnimatePresence>
-
                         <div className={`flex items-center p-2 rounded-[2.8rem] border transition-all ${currentTheme.input}`}>
-                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Message in ${mode} mode...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
+                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Ask anything in ${mode} mode...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex items-center gap-2 px-2">
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} accept="image/*" />
                                 <button onClick={() => fileInputRef.current.click()} className="p-3 opacity-30 hover:opacity-100"><FaImage /></button>
@@ -391,7 +397,7 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* --- CAMERA OVERLAY --- */}
+                {/* --- CAMERA --- */}
                 <AnimatePresence>
                     {isCameraOpen && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
@@ -400,7 +406,7 @@ export default function Chat() {
                                 <button onClick={() => setCameraFacing(f => f === 'user' ? 'environment' : 'user')} className="p-4 bg-white/5 rounded-full"><FaUndo /></button>
                             </div>
                             <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/20" />
-                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-95 shadow-2xl shadow-white/20"><div className="w-16 h-16 bg-white rounded-full" /></button>
+                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-95"><div className="w-16 h-16 bg-white rounded-full" /></button>
                             <canvas ref={canvasRef} className="hidden" />
                         </motion.div>
                     )}
