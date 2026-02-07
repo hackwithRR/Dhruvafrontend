@@ -1,13 +1,58 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* --- CYBER SCROLLBAR --- */
+.cyber-scrollbar::-webkit-scrollbar {
+  height: 4px; /* Very thin and elegant */
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+.cyber-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02); /* Ghostly track */
+  border-radius: 10px;
+  margin: 0 20px;
+}
+
+.cyber-scrollbar::-webkit-scrollbar-thumb {
+  background: linear-gradient(to right, #7c3aed, #db2777); /* Purple/Pink gradient */
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5); /* Neon Glow */
+}
+
+.cyber-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #a78bfa; /* Brighter on hover */
+}
+
+/* Snap scrolling makes it feel like a high-end slider */
+.snap-x {
+  scroll-snap-type: x mandatory;
+}
+.snap-center {
+  scroll-snap-align: center;
+}
+
+/* Custom Cyber Scrollbar */
+::-webkit-scrollbar {
+  width: 5px; /* Ultra thin */
+}
+
+::-webkit-scrollbar-track {
+  background: #050505; /* Matches your BG */
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(to bottom, #4f46e5, #ec4899); /* Indigo to Pink gradient */
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(79, 70, 229, 0.5);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #6366f1; /* Brighter on hover */
+}
+
+/* Firefox Support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #4f46e5 #050505;
 }

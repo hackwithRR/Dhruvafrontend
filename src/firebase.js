@@ -1,0 +1,20 @@
+import { initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
+
+const firebaseConfig = {
+   apiKey: "AIzaSyBOFHLJwdanETImp6TlPT8U7GdouprQfnc",
+  authDomain: "ai-tutor-b89dd.firebaseapp.com",
+  projectId: "ai-tutor-b89dd",
+  storageBucket: "ai-tutor-b89dd.firebasestorage.app",
+  messagingSenderId: "764592312268",
+  appId: "1:764592312268:web:9f011cb05ebaa984575769"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+export { app, auth, db, storage };
