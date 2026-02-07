@@ -9,15 +9,15 @@ import remarkGfm from "remark-gfm";
 import { doc, getDoc, updateDoc, arrayUnion, setDoc, collection, query, where, getDocs, orderBy, limit, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
 // Helper to clean AI formatting and ensure proper spacing
 const formatContent = (text) => {
     return text
-        .replace(/\$\$/g, '') // Remove raw LaTeX delimiters if they appear as text
-        .replace(/\n\s*\n/g, '\n\n') // Ensure double newlines for paragraph spacing
+        .replace(/\$\$/g, '') 
+        .replace(/\n\s*\n/g, '\n\n') 
         .trim();
 };
 
@@ -88,7 +88,7 @@ export default function Chat() {
 
     const themes = {
         dark: { container: "bg-[#050505] text-white", nav: "bg-white/5 border-white/10 backdrop-blur-md", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-indigo-600 shadow-lg shadow-indigo-500/20", input: "bg-white/[0.03] border-white/10 text-white", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-r border-white/10" },
-        light: { container: "bg-[#F0F7FF] text-[#1E293B]", nav: "bg-white/80 border-blue-100 backdrop-blur-md shadow-sm", aiBubble: "bg-white border border-blue-100 shadow-md shadow-blue-900/5", userBubble: "bg-[#2563EB] text-white shadow-lg shadow-blue-500/30", input: "bg-white border-blue-100 text-[#1E293B] shadow-inner", button: "bg-[#2563EB]", sidebar: "bg-white border-r border-blue-100" },
+        light: { container: "bg-[#F0F7FF] text-[#1E293B]", nav: "bg-white/80 border-blue-100 backdrop-blur-md shadow-sm", aiBubble: "bg-white border border-blue-200 shadow-md shadow-blue-900/5", userBubble: "bg-[#2563EB] text-white shadow-lg shadow-blue-500/30", input: "bg-white border-blue-100 text-[#1E293B] shadow-inner", button: "bg-[#2563EB]", sidebar: "bg-white border-r border-blue-100" },
         electric: { container: "bg-[#0F172A] text-white", nav: "bg-indigo-600/10 border-indigo-500/20", aiBubble: "bg-white/10 border border-indigo-500/30", userBubble: "bg-gradient-to-r from-purple-600 to-indigo-600", input: "bg-white/5 border-indigo-500/20 text-white", button: "bg-gradient-to-r from-pink-500 to-violet-600", sidebar: "bg-[#0F172A] border-r border-indigo-500/20" }
     };
     const currentTheme = themes[theme] || themes.dark;
@@ -161,7 +161,6 @@ export default function Chat() {
         setMessages(newMessages);
 
         try {
-            // Enhanced payload to encourage fun replies and emojis
             const payload = { 
                 userId: currentUser.uid, 
                 message: text || "Explain this image", 
@@ -184,7 +183,6 @@ export default function Chat() {
                 res = await axios.post(`${API_BASE}/chat`, payload);
             }
 
-            // REFINED YOUTUBE SEARCH: [Board] [Class] [Subject] [Chapter] [Concept]
             const queryParts = [userData.board, userData.class, subjectInput, chapterInput, text.slice(0, 40)].filter(Boolean);
             const searchQuery = `${queryParts.join(" ")} full explanation`;
 
@@ -246,25 +244,45 @@ export default function Chat() {
             <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
 
-                {/* TOP BAR */}
+                {/* --- SUPER COOL ADAPTIVE TOP BAR --- */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
-                    {/* Theme-Adaptive History Button */}
                     <button onClick={() => setShowSidebar(!showSidebar)} className={`p-4 rounded-2xl border transition-all ${currentTheme.aiBubble} hover:scale-105 active:scale-95 shadow-sm`}>
                         <FaHistory size={14} className={theme === 'light' ? 'text-blue-600' : 'text-indigo-400'} />
                     </button>
                     
-                    <div className={`flex-1 flex flex-col md:flex-row gap-2 p-2 rounded-2xl border transition-all ${isLocked ? 'border-green-500/50 bg-green-500/5' : currentTheme.nav}`}>
-                        <div className="flex flex-1 items-center gap-2 px-2">
-                            <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject..." className={`flex-1 bg-transparent text-[10px] font-black uppercase outline-none ${isLocked ? 'text-green-500' : 'opacity-60'}`} />
-                            <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Chapter..." className={`w-24 bg-transparent text-[10px] font-black uppercase outline-none ${isLocked ? 'text-green-500' : 'opacity-60'}`} />
-                            <button onClick={() => setIsLocked(!isLocked)} className={`p-2.5 rounded-xl transition-all ${isLocked ? "bg-green-500 text-white" : "bg-white/5 text-white/20"}`}>
+                    <div className={`flex-1 flex flex-col md:flex-row items-center gap-2 p-1.5 rounded-[1.5rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.1)] bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10`}`}>
+                        
+                        {/* INPUTS GROUP */}
+                        <div className="flex items-center w-full md:w-auto flex-1 gap-2 px-3 py-1">
+                            <div className="flex-1 flex flex-col">
+                                <span className={`text-[7px] font-black uppercase tracking-tighter ${isLocked ? 'text-emerald-500' : 'opacity-40'}`}>Subject</span>
+                                <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="E.g. Biology" className={`bg-transparent text-[11px] font-bold uppercase outline-none placeholder:opacity-30 ${isLocked ? 'text-emerald-500/80' : 'text-current'}`} />
+                            </div>
+                            
+                            <div className="h-6 w-[1px] bg-current opacity-10 hidden md:block" />
+
+                            <div className="w-24 flex flex-col">
+                                <span className={`text-[7px] font-black uppercase tracking-tighter ${isLocked ? 'text-emerald-500' : 'opacity-40'}`}>Chapter</span>
+                                <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="CH-01" className={`bg-transparent text-[11px] font-bold uppercase outline-none placeholder:opacity-30 ${isLocked ? 'text-emerald-500/80' : 'text-current'}`} />
+                            </div>
+
+                            <button onClick={() => setIsLocked(!isLocked)} className={`p-3 rounded-xl transition-all duration-300 ${isLocked ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30 rotate-0" : "bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/20 hover:text-current hover:bg-black/10"}`}>
                                 {isLocked ? <FaLock size={12} /> : <FaUnlock size={12} />}
                             </button>
                         </div>
-                        <div className="flex bg-black/20 p-1 rounded-xl gap-1">
-                            {["Explain", "Doubt", "Quiz"].map(m => (
-                                <button key={m} onClick={() => setMode(m)} className={`px-4 py-1.5 text-[9px] font-[1000] uppercase rounded-lg transition-all ${mode === m ? "bg-white text-black" : "opacity-30"}`}>{m}</button>
-                            ))}
+
+                        {/* MODE SLIDER */}
+                        <div className="flex bg-black/10 dark:bg-black/40 p-1 rounded-xl relative w-full md:w-auto">
+                            <LayoutGroup>
+                                {["Explain", "Doubt", "Quiz"].map(m => (
+                                    <button key={m} onClick={() => setMode(m)} className={`relative z-10 px-5 py-2 text-[9px] font-black uppercase transition-all duration-300 ${mode === m ? (theme === 'light' ? 'text-blue-600' : 'text-white') : "opacity-40 hover:opacity-100"}`}>
+                                        {m}
+                                        {mode === m && (
+                                            <motion.div layoutId="mode-pill" className={`absolute inset-0 rounded-lg shadow-sm ${theme === 'light' ? 'bg-white' : 'bg-white/10 border border-white/10'}`} transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} />
+                                        )}
+                                    </button>
+                                ))}
+                            </LayoutGroup>
                         </div>
                     </div>
                 </div>
@@ -308,7 +326,6 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* SCROLL TO BOTTOM BUTTON */}
                 <AnimatePresence>
                     {showScrollBtn && (
                         <motion.button initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} onClick={scrollToBottom} className="absolute bottom-32 right-8 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-500 transition-all z-50">
