@@ -23,7 +23,6 @@ import 'katex/dist/katex.min.css';
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-// --- CONSTANTS ---
 const CHAPTER_MAP = {
     CBSE: {
         "8": {
@@ -42,8 +41,6 @@ const CHAPTER_MAP = {
 };
 
 const formatContent = (text) => text.trim();
-
-// --- COMPONENTS ---
 
 const ProfilePrompt = ({ currentTheme }) => {
     const navigate = useNavigate();
@@ -115,7 +112,6 @@ const StudyTimer = ({ currentTheme }) => {
     );
 };
 
-// --- MAIN COMPONENT ---
 export default function Chat() {
     const { currentUser, logout, theme, setTheme } = useAuth();
     const [messages, setMessages] = useState([]);
@@ -142,7 +138,6 @@ export default function Chat() {
     const canvasRef = useRef(null);
     const fileInputRef = useRef(null);
 
-    // UNIFIED THEME MAPPING (Matches Navbar)
     const themes = {
         dark: { container: "bg-[#050505] text-white", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-indigo-600 shadow-lg", input: "bg-white/[0.03] border-white/10 text-white", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-r border-white/10" },
         light: { container: "bg-[#F8FAFF] text-[#1E293B]", aiBubble: "bg-white border border-slate-200 shadow-sm", userBubble: "bg-indigo-600 text-white", input: "bg-white border-slate-200 text-[#1E293B]", button: "bg-indigo-600", sidebar: "bg-white border-r border-slate-200" },
@@ -157,6 +152,59 @@ export default function Chat() {
 
     const currentTheme = themes[theme] || themes.dark;
     const modes = [{ id: "Explain", icon: <FaBookOpen />, label: "Explain" }, { id: "Doubt", icon: <FaQuestion />, label: "Doubt" }, { id: "Quiz", icon: <FaGraduationCap />, label: "Quiz" }, { id: "Summary", icon: <FaLightbulb />, label: "Summary" }];
+
+    // --- VOICE CONFIGURATION ---
+    const speakText = (text) => {
+        window.speechSynthesis.cancel();
+        const cleanText = text.replace(/[*#_~]/g, "").replace(/\[.*?\]/g, "");
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        
+        const voices = window.speechSynthesis.getVoices();
+        // Priority: Indian Male (Rishi, Microsoft Hemant, etc.) -> Indian English -> Any Indian
+        const indianVoice = voices.find(v => (v.lang.includes("en-IN") || v.lang.includes("hi-IN")) && (v.name.toLowerCase().includes("rishi") || v.name.toLowerCase().includes("male"))) 
+                         || voices.find(v => v.lang.includes("en-IN"))
+                         || voices.find(v => v.lang.includes("IN"));
+        
+        if (indianVoice) utterance.voice = indianVoice;
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+
+        utterance.onend = () => {
+            if (isLiveMode) {
+                setTimeout(() => startVoiceMode(), 400); // Continuous loop trigger
+            }
+        };
+        window.speechSynthesis.speak(utterance);
+    };
+
+    const startVoiceMode = () => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return toast.error("Voice not supported");
+        
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-IN';
+        recognition.interimResults = false;
+        
+        setIsListening(true);
+        recognition.start();
+
+        recognition.onresult = (e) => {
+            const t = e.results[0][0].transcript;
+            setInput(t);
+            setIsListening(false);
+            sendMessage(t);
+        };
+
+        recognition.onerror = (err) => {
+            setIsListening(false);
+            // If user stays silent, restart listening if in Live Mode
+            if (isLiveMode && (err.error === 'no-speech')) {
+                startVoiceMode();
+            } else if (err.error !== 'no-speech') {
+                setIsLiveMode(false);
+            }
+        };
+    };
 
     useEffect(() => {
         if (!currentUser) return;
@@ -179,6 +227,8 @@ export default function Chat() {
             fetchSessions();
         };
         initData();
+        // Pre-load voices for speech synthesis
+        window.speechSynthesis.getVoices();
     }, [currentUser]);
 
     const fetchSessions = async () => {
@@ -192,30 +242,6 @@ export default function Chat() {
         const sDoc = await getDoc(doc(db, `users/${currentUser.uid}/sessions`, sid));
         if (sDoc.exists()) setMessages(sDoc.data().messages || []);
         setShowSidebar(false);
-    };
-
-    const speakText = (text) => {
-        window.speechSynthesis.cancel(); 
-        const cleanText = text.replace(/[*#_~]/g, "").replace(/\[.*?\]/g, "");
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.onend = () => { if (isLiveMode) setTimeout(() => startVoiceMode(), 600); };
-        window.speechSynthesis.speak(utterance);
-    };
-
-    const startVoiceMode = () => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return toast.error("Voice not supported");
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'en-IN';
-        setIsListening(true);
-        recognition.start();
-        recognition.onresult = (e) => {
-            const t = e.results[0][0].transcript;
-            setInput(t);
-            setIsListening(false);
-            sendMessage(t);
-        };
-        recognition.onerror = () => { setIsListening(false); setIsLiveMode(false); };
     };
 
     const sendMessage = async (voiceInput = null) => {
@@ -247,10 +273,16 @@ export default function Chat() {
             const aiMsg = { role: "ai", content: res.data.reply, ytLink, timestamp: Date.now() };
             const finalMessages = [...newMessages, aiMsg];
             setMessages(finalMessages);
+            
+            // Trigger Voice Response
             if (isLiveMode || voiceInput) speakText(res.data.reply);
+            
             await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: finalMessages, lastUpdate: Date.now(), title: subjectInput ? `${subjectInput.toUpperCase()}: ${mappedChapter}` : "Study Session" }, { merge: true });
             fetchSessions();
-        } catch (e) { toast.error("Connection failed"); setIsLiveMode(false); }
+        } catch (e) { 
+            toast.error("Connection failed"); 
+            setIsLiveMode(false); 
+        }
         setIsSending(false);
     };
 
@@ -266,7 +298,6 @@ export default function Chat() {
                 {showOnboarding && <ProfilePrompt currentTheme={currentTheme} />}
             </AnimatePresence>
 
-            {/* Sidebar with Theme integration */}
             <AnimatePresence>
                 {showSidebar && (
                     <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 overflow-hidden ${currentTheme.sidebar}`}>
@@ -283,14 +314,12 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
                 <StudyTimer currentTheme={currentTheme} />
 
-                {/* Mode Toggles */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 overflow-x-auto no-scrollbar">
                     <div className="flex gap-2 p-1.5 rounded-[1.5rem] bg-white/5 border border-white/10 w-max mx-auto">
                         {modes.map((m) => (<button key={m.id} onClick={() => setMode(m.id)} className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${mode === m.id ? `${currentTheme.button} text-white shadow-lg` : 'opacity-40'}`}>{m.icon} {m.label}</button>))}
                     </div>
                 </div>
 
-                {/* Subject Selector */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
                     <button onClick={() => setShowSidebar(!showSidebar)} className={`p-4 rounded-2xl border ${currentTheme.aiBubble} border-white/10 shadow-xl`}><FaHistory size={16} /></button>
                     <motion.div layout className={`flex-1 flex items-center gap-2 p-2 rounded-[2rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500/40 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10 shadow-2xl`}`}>
@@ -303,7 +332,6 @@ export default function Chat() {
                     </motion.div>
                 </div>
 
-                {/* Chat Container */}
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar relative">
                     <div className="max-w-3xl mx-auto space-y-12 pb-20">
                         {messages.length === 0 && <div className="text-center py-20 opacity-20"><FaGraduationCap size={48} className="mx-auto mb-4" /><p className="font-bold text-sm uppercase tracking-widest">Select subject to begin</p></div>}
@@ -326,14 +354,18 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* Input Area */}
                 <div className="p-4 md:p-10 shrink-0">
                     <div className="max-w-3xl mx-auto relative">
                         <AnimatePresence>{selectedFile && (<motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="absolute bottom-full left-0 mb-4 p-2 rounded-2xl bg-indigo-600 flex items-center gap-3"><img src={URL.createObjectURL(selectedFile)} className="w-12 h-12 rounded-lg object-cover" alt="preview" /><button onClick={() => setSelectedFile(null)} className="p-2 text-white/60"><FaTimes /></button></motion.div>)}</AnimatePresence>
                         <div className={`flex items-center p-1 md:p-2 rounded-[2.8rem] border transition-all ${currentTheme.input} ${isListening ? 'ring-2 ring-indigo-500 bg-indigo-500/5 shadow-[0_0_20px_rgba(79,70,229,0.2)]' : ''}`}>
                             <input value={input} onChange={e => setInput(e.target.value)} placeholder={isListening ? "Listening..." : "Ask your doubt..."} className="flex-1 bg-transparent px-4 md:px-6 py-4 outline-none font-bold text-xs md:text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex items-center gap-1 md:gap-2 px-1">
-                                <button onClick={() => { setIsLiveMode(!isLiveMode); if(!isLiveMode) startVoiceMode(); else window.speechSynthesis.cancel(); }} className={`p-3 md:p-4 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 text-white shadow-lg' : 'opacity-30 hover:opacity-100'}`}><FaMicrophone size={16} /></button>
+                                <button onClick={() => { 
+                                    const nextState = !isLiveMode;
+                                    setIsLiveMode(nextState);
+                                    if(nextState) startVoiceMode();
+                                    else { window.speechSynthesis.cancel(); setIsListening(false); }
+                                }} className={`p-3 md:p-4 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 text-white shadow-lg scale-110' : 'opacity-30 hover:opacity-100'}`}><FaMicrophone size={16} /></button>
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} accept="image/*" />
                                 <button onClick={() => fileInputRef.current.click()} className="p-2 md:p-3 opacity-30 hover:opacity-100"><FaImage size={16} /></button>
                                 <button onClick={openCamera} className="p-2 md:p-3 opacity-30 hover:opacity-100"><FaCamera size={16} /></button>
@@ -343,7 +375,6 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* Camera Overlay */}
                 <AnimatePresence>
                     {isCameraOpen && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
