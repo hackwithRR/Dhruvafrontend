@@ -21,20 +21,25 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  // --- REUSABLE SYNC FUNCTION ---
+  // --- IMPROVED SYNC FUNCTION ---
   const getFullUserData = async (user) => {
     if (!user) return null;
     try {
       const userDoc = await getDoc(doc(db, "users", user.uid));
-      // Prioritize Auth photoURL (Google PFP) but merge Firestore data (gender/board)
-      return { 
-        ...user, 
-        ...(userDoc.exists() ? userDoc.data() : {}),
-        // Force the PFP to be the Auth one if the Firestore one is missing
-        photoURL: user.photoURL || (userDoc.exists() ? userDoc.data().photoURL : null)
+      const firestoreData = userDoc.exists() ? userDoc.data() : {};
+      
+      // We create a fresh object to force React to re-render everything
+      return {
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName || firestoreData.displayName,
+        // PRIORITY: Google Photo -> Firestore Photo -> Fallback UI Avatar
+        photoURL: user.photoURL || firestoreData.photoURL || `https://ui-avatars.com/api/?name=${user.email}`,
+        ...firestoreData // This brings in gender, board, classLevel
       };
     } catch (e) {
-      return user; // Fallback to just Auth user if Firestore fails
+      console.error("Sync error:", e);
+      return user;
     }
   };
 
@@ -57,19 +62,22 @@ export const AuthProvider = ({ children }) => {
       displayName: name, 
       photoURL: avatarUrl 
     });
-    const merged = await getFullUserData(res.user);
+    // Manually reload to ensure Auth has the new info
+    await res.user.reload();
+    const merged = await getFullUserData(auth.currentUser);
     setCurrentUser(merged);
     return res;
   };
 
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
 
-  // --- GOOGLE LOGIN (SIMPLE & STABLE) ---
+  // --- GOOGLE LOGIN (FIXED FOR PFP & NAME) ---
   const googleLogin = async () => {
     try {
       const res = await signInWithPopup(auth, provider);
+      // Immediately fetch data to prevent "Alphabet PFP" flicker
       const merged = await getFullUserData(res.user);
-      setCurrentUser(merged);
+      setCurrentUser({ ...merged }); 
       return res;
     } catch (error) {
       console.error("Google login error:", error);
@@ -84,7 +92,7 @@ export const AuthProvider = ({ children }) => {
       try {
         await auth.currentUser.reload();
         const merged = await getFullUserData(auth.currentUser);
-        setCurrentUser(merged);
+        setCurrentUser({ ...merged });
       } catch (error) {
         console.error("Reload failed:", error);
       }
