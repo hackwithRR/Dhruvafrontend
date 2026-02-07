@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { FaUser, FaSignOutAlt, FaChevronDown, FaHourglassHalf, FaPalette } from "react-icons/fa";
-import { MdDarkMode, MdLightMode, MdGradient, MdOutlineWaterDrop, MdRocketLaunch } from "react-icons/md";
-import { RiMastodonLine } from "react-icons/ri";
+import { MdDarkMode, MdLightMode, MdGradient } from "react-icons/md";
 import { toast } from "react-toastify";
 
 export default function Navbar({ currentUser, theme, setTheme, logout }) {
@@ -15,7 +14,7 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
     const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || "Student";
     const photoURL = currentUser?.photoURL || `https://ui-avatars.com/api/?name=${displayName}&background=6366f1&color=fff`;
 
-    // Extended configs for all 8 themes
+    // High-end configurations for the Navbar elements based on global theme
     const themeConfigs = {
         dark: { nav: "bg-[#050505]/80 border-white/5 text-white backdrop-blur-md", dropdown: "bg-[#111] border-white/10 text-white", btnProfile: "bg-indigo-600/20 text-indigo-400 border-indigo-500/30", btnLogout: "bg-rose-500/10 text-rose-400 border-rose-500/30" },
         light: { nav: "bg-white/70 border-slate-200 text-slate-900 backdrop-blur-lg", dropdown: "bg-white border-slate-200 text-slate-800", btnProfile: "bg-blue-500/10 text-blue-600 border-blue-500/20", btnLogout: "bg-orange-500/10 text-orange-600 border-orange-500/20" },
@@ -24,7 +23,8 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
         sunset: { nav: "bg-[#1a0a05]/80 border-orange-500/20 text-orange-50 backdrop-blur-md", dropdown: "bg-[#120703] border-orange-500/30 text-orange-100", btnProfile: "bg-orange-500/20 text-orange-400", btnLogout: "bg-red-500/20 text-red-400" },
         cyber: { nav: "bg-black/80 border-[#00ff9f]/30 text-[#00ff9f] backdrop-blur-md", dropdown: "bg-black border-[#00ff9f]/50 text-[#00ff9f]", btnProfile: "bg-[#00ff9f]/10 text-[#00ff9f]", btnLogout: "bg-white/10 text-white" },
         ocean: { nav: "bg-[#000428]/80 border-blue-400/20 text-blue-50 backdrop-blur-md", dropdown: "bg-[#000428] border-blue-400/30 text-blue-100", btnProfile: "bg-blue-500/20 text-blue-300", btnLogout: "bg-cyan-500/20 text-cyan-300" },
-        royal: { nav: "bg-[#0f172a]/80 border-yellow-500/20 text-slate-100 backdrop-blur-md", dropdown: "bg-[#0a101f] border-yellow-500/30 text-amber-100", btnProfile: "bg-amber-500/20 text-amber-400", btnLogout: "bg-slate-700/50 text-slate-300" }
+        royal: { nav: "bg-[#0f172a]/80 border-yellow-500/20 text-slate-100 backdrop-blur-md", dropdown: "bg-[#0a101f] border-yellow-500/30 text-amber-100", btnProfile: "bg-amber-500/20 text-amber-400", btnLogout: "bg-slate-700/50 text-slate-300" },
+        electric: { nav: "bg-[#000]/80 border-white/10 text-white backdrop-blur-xl", dropdown: "bg-black border-white/20 text-white", btnProfile: "bg-orange-500/20 text-orange-400", btnLogout: "bg-red-500/20 text-red-400" }
     };
 
     const config = themeConfigs[theme] || themeConfigs.dark;
@@ -40,7 +40,7 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
 
     return (
         <nav className={`sticky top-0 z-[100] flex items-center justify-between px-4 md:px-8 py-3 border-b transition-all duration-500 ${config.nav}`}>
-            {/* LEFT: USER PROFILE */}
+            {/* USER INFO */}
             <div className="flex items-center gap-4 cursor-pointer active:scale-95 transition-transform" onClick={() => !isLoggingOut && navigate("/profile")}>
                 <img src={photoURL} className={`w-10 h-10 md:w-11 md:h-11 rounded-full border-2 border-white/20 object-cover ${isLoggingOut ? "grayscale" : ""}`} alt="User" />
                 <div className="flex flex-col">
@@ -60,7 +60,7 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
                             </button>
                         )}
 
-                        {/* THEME DROPDOWN */}
+                        {/* THEME PICKER */}
                         <div className="relative">
                             <button onClick={() => setDropdownOpen(!dropdownOpen)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all active:scale-90 text-xs font-bold uppercase tracking-tighter ${config.dropdown}`}>
                                 <FaPalette className="opacity-70" />
@@ -73,7 +73,8 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
                                     <div className="fixed inset-0 z-[-1]" onClick={() => setDropdownOpen(false)} />
                                     <div className={`absolute right-0 mt-3 w-44 rounded-2xl shadow-2xl border p-1 z-50 animate-in fade-in slide-in-from-top-2 ${config.dropdown}`}>
                                         {Object.keys(themeConfigs).map(t => (
-                                            <button key={t} className={`flex items-center justify-between w-full text-left px-4 py-2.5 text-[10px] font-black hover:bg-white/10 rounded-xl capitalize tracking-widest ${theme === t ? 'bg-white/5' : ''}`} onClick={() => { setTheme(t); setDropdownOpen(false); }}>
+                                            <button key={t} className={`flex items-center justify-between w-full text-left px-4 py-2.5 text-[10px] font-black hover:bg-white/10 rounded-xl capitalize tracking-widest ${theme === t ? 'bg-white/5 opacity-100' : 'opacity-60'}`} 
+                                                onClick={() => { setTheme(t); setDropdownOpen(false); }}>
                                                 {t}
                                                 {theme === t && <div className="w-1.5 h-1.5 rounded-full bg-current" />}
                                             </button>
@@ -88,7 +89,6 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
                         </button>
                     </>
                 )}
-                {isLoggingOut && <FaHourglassHalf className="animate-spin opacity-50" />}
             </div>
         </nav>
     );
