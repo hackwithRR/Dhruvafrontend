@@ -5,15 +5,15 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import { 
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, 
-    FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, 
+    FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, 
     FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, 
-    FaBookOpen, FaGraduationCap, FaRocket, FaChevronDown, FaMicrophone, FaCheckCircle 
+    FaBookOpen, FaGraduationCap, FaRocket, FaMicrophone, FaCheckCircle 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { doc, getDoc, setDoc, updateDoc, collection, query, getDocs, orderBy } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, getDocs, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence } from "framer-motion";
@@ -22,6 +22,7 @@ import 'katex/dist/katex.min.css';
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
+// --- CHAPTER MAP ---
 const CHAPTER_MAP = {
     CBSE: {
         "8": {
@@ -41,21 +42,31 @@ const CHAPTER_MAP = {
 
 const formatContent = (text) => text.trim();
 
-// --- UPDATED ONBOARDING: EDIT PROFILE DIRECTLY ---
+// --- ONBOARDING MODAL (FIXED SAVE LOGIC) ---
 const OnboardingModal = ({ currentUser, onComplete, currentTheme }) => {
     const [loading, setLoading] = useState(false);
     const [profile, setProfile] = useState({ board: "CBSE", classLevel: "10", gender: "Male" });
 
     const handleSave = async () => {
+        if (!currentUser) return;
         setLoading(true);
         try {
-            await updateDoc(doc(db, "users", currentUser.uid), {
+            // FIX: Use setDoc with merge:true to avoid "document not found" error
+            const userRef = doc(db, "users", currentUser.uid);
+            const updateData = {
                 ...profile,
-                onboarded: true
-            });
-            onComplete(profile);
+                onboarded: true,
+                uid: currentUser.uid,
+                email: currentUser.email,
+                photoURL: currentUser.photoURL // Keeps the Google PFP in the DB
+            };
+            
+            await setDoc(userRef, updateData, { merge: true });
+            onComplete(updateData);
+            toast.success("Welcome to Dhruva AI!");
         } catch (e) {
-            toast.error("Error saving profile");
+            console.error(e);
+            toast.error("Save failed. Check Firestore rules.");
         }
         setLoading(false);
     };
@@ -66,34 +77,31 @@ const OnboardingModal = ({ currentUser, onComplete, currentTheme }) => {
                 <div className="w-16 h-16 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-4 shadow-xl shadow-indigo-500/20">
                     <FaRocket className="text-white text-2xl animate-bounce" />
                 </div>
-                <h2 className="text-2xl font-black mb-2 italic">Complete Profile</h2>
-                <p className="text-xs font-bold opacity-50 mb-6 uppercase tracking-tighter">Setup your vibe to start studying</p>
-                
-                <div className="space-y-4 text-left">
+                <h2 className="text-2xl font-black mb-2 italic">Setup Profile</h2>
+                <div className="space-y-4 text-left mt-6">
                     <div className="grid grid-cols-2 gap-3">
                         <div className="flex flex-col gap-1">
                             <label className="text-[10px] font-black opacity-40 ml-2">BOARD</label>
-                            <select onChange={e => setProfile({...profile, board: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm">
+                            <select value={profile.board} onChange={e => setProfile({...profile, board: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm">
                                 <option value="CBSE">CBSE</option>
                                 <option value="ICSE">ICSE</option>
                             </select>
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-[10px] font-black opacity-40 ml-2">CLASS</label>
-                            <select onChange={e => setProfile({...profile, classLevel: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm">
+                            <select value={profile.classLevel} onChange={e => setProfile({...profile, classLevel: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm">
                                 {["8","9","10","11","12"].map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                         </div>
                     </div>
                     <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-black opacity-40 ml-2">GENDER</label>
-                        <select onChange={e => setProfile({...profile, gender: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm">
+                        <select value={profile.gender} onChange={e => setProfile({...profile, gender: e.target.value})} className="bg-white/5 border border-white/10 p-3 rounded-xl font-bold outline-none text-sm">
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
                         </select>
                     </div>
                 </div>
-
                 <button onClick={handleSave} disabled={loading} className="w-full mt-8 py-5 bg-indigo-600 text-white font-black rounded-2xl flex items-center justify-center gap-2 hover:bg-indigo-500 transition-all shadow-xl">
                     {loading ? <FaSyncAlt className="animate-spin" /> : <><FaCheckCircle /> SAVE & START</>}
                 </button>
@@ -102,24 +110,22 @@ const OnboardingModal = ({ currentUser, onComplete, currentTheme }) => {
     );
 };
 
-// --- TYPEWRITER & TIMER (Unchanged) ---
+// --- TYPEWRITER & TIMER ---
 const Typewriter = ({ text, onComplete, scrollRef }) => {
     const [displayedText, setDisplayedText] = useState("");
-    const [cursor, setCursor] = useState(true);
     useEffect(() => {
         let i = 0;
         const interval = setInterval(() => {
             setDisplayedText(text.substring(0, i + 1));
             i++;
             if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-            if (i >= text.length) { clearInterval(interval); setCursor(false); if (onComplete) onComplete(); }
+            if (i >= text.length) { clearInterval(interval); if (onComplete) onComplete(); }
         }, 10);
         return () => clearInterval(interval);
     }, [text]);
     return (
         <div className="relative markdown-container prose prose-sm dark:prose-invert max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{formatContent(displayedText)}</ReactMarkdown>
-            {cursor && <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.5 }} className="inline-block w-1 h-4 bg-indigo-500 ml-1 align-middle" />}
         </div>
     );
 };
@@ -129,17 +135,16 @@ const StudyTimer = ({ currentTheme }) => {
     const [isActive, setIsActive] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const timerRef = useRef(null);
-    const playAlarm = () => { const ctx = new (window.AudioContext || window.webkitAudioContext)(); const osc = ctx.createOscillator(); const gain = ctx.createGain(); osc.connect(gain); gain.connect(ctx.destination); osc.start(); osc.stop(ctx.currentTime + 1.5); };
     useEffect(() => {
         if (isActive && timeLeft > 0) { timerRef.current = setInterval(() => setTimeLeft(prev => prev - 1), 1000); }
-        else if (timeLeft === 0 && isActive) { playAlarm(); setIsActive(false); toast.info("Session Complete! ☕"); }
+        else if (timeLeft === 0 && isActive) { setIsActive(false); toast.info("Time's up!"); }
         return () => clearInterval(timerRef.current);
     }, [isActive, timeLeft]);
     const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
     return (
         <motion.div drag dragMomentum={false} initial={{ x: 20, y: 400 }} className="fixed z-[100] cursor-grab active:cursor-grabbing">
             <motion.div animate={{ width: isOpen ? "240px" : "64px", height: isOpen ? "280px" : "64px" }} className={`overflow-hidden rounded-[2rem] border backdrop-blur-3xl shadow-2xl flex flex-col ${currentTheme.aiBubble} border-white/20`}>
-                {!isOpen ? (<button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-500"><FaClock size={24} className={isActive ? "animate-spin-slow" : "animate-pulse"} /></button>) : (
+                {!isOpen ? (<button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-500"><FaClock size={24} /></button>) : (
                     <div className="p-5 flex flex-col h-full">
                         <div className="flex justify-between items-center mb-4"><span className="text-[10px] font-black uppercase opacity-50">Timer</span><button onClick={() => setIsOpen(false)}><FaTimes size={12} /></button></div>
                         <div className="flex-1 flex flex-col items-center justify-center">
@@ -163,7 +168,7 @@ export default function Chat() {
     const [input, setInput] = useState("");
     const [mode, setMode] = useState("Explain");
     const [isSending, setIsSending] = useState(false);
-    const [userData, setUserData] = useState({ board: "", class: "", gender: "", language: "English" });
+    const [userData, setUserData] = useState({ board: "", class: "", gender: "", photoURL: "" });
     const [isLocked, setIsLocked] = useState(false);
     const [subjectInput, setSubjectInput] = useState("");
     const [chapterInput, setChapterInput] = useState("");
@@ -171,8 +176,6 @@ export default function Chat() {
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
-    const [cameraFacing, setCameraFacing] = useState("environment");
-    const [showScrollBtn, setShowScrollBtn] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [isLiveMode, setIsLiveMode] = useState(false);
 
@@ -189,20 +192,20 @@ export default function Chat() {
     const currentTheme = themes[theme] || themes.dark;
     const modes = [{ id: "Explain", icon: <FaBookOpen />, label: "Explain" }, { id: "Doubt", icon: <FaQuestion />, label: "Doubt" }, { id: "Quiz", icon: <FaGraduationCap />, label: "Quiz" }, { id: "Summary", icon: <FaLightbulb />, label: "Summary" }];
 
+    // --- FETCH DATA ---
     useEffect(() => {
         if (!currentUser) return;
         const initData = async () => {
             const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+            const baseData = { board: "", class: "", gender: "", photoURL: currentUser.photoURL };
+
             if (userDoc.exists()) {
                 const data = userDoc.data();
-                setUserData({ 
-                    board: data.board || "", 
-                    class: data.classLevel || data.class || "", 
-                    gender: data.gender || "",
-                    language: data.language || "English" 
-                });
-                if (!data.board || (!data.class && !data.classLevel) || !data.gender) setShowOnboarding(true);
-            } else setShowOnboarding(true);
+                setUserData({ ...baseData, ...data, class: data.classLevel || data.class });
+                if (!data.board || !data.gender) setShowOnboarding(true);
+            } else {
+                setShowOnboarding(true);
+            }
             fetchSessions();
         };
         initData();
@@ -221,46 +224,33 @@ export default function Chat() {
         setShowSidebar(false);
     };
 
-    // --- UPDATED: VOICE LOOP & MALE PERSONALITY ---
+    // --- VOICE LOGIC ---
     const speakText = (text) => {
-        window.speechSynthesis.cancel(); 
-        const cleanText = text.replace(/[*#_~]/g, "").replace(/\[.*?\]/g, "");
+        window.speechSynthesis.cancel();
+        const cleanText = text.replace(/[*#_~]/g, "");
         const utterance = new SpeechSynthesisUtterance(cleanText);
         const voices = window.speechSynthesis.getVoices();
-        
-        // Attempt to find a deep Male Indian Voice
-        const maleVoice = voices.find(v => 
-            (v.name.toLowerCase().includes("male") || v.name.toLowerCase().includes("ravi") || v.name.toLowerCase().includes("rishi")) &&
-            (v.lang.includes("en-IN") || v.lang.includes("en-GB"))
-        ) || voices.find(v => v.lang.includes("en-IN"));
-
+        const maleVoice = voices.find(v => (v.name.toLowerCase().includes("male") || v.name.includes("Rishi")) && v.lang.includes("en-IN")) || voices[0];
         utterance.voice = maleVoice;
-        utterance.pitch = 0.9; // Lower pitch for masculine tone
-        utterance.rate = 1.0;
-
-        utterance.onend = () => { 
-            if (isLiveMode) {
-                // Wait briefly so AI doesn't listen to its own echo
-                setTimeout(() => startVoiceMode(), 600); 
-            }
-        };
+        utterance.pitch = 0.9;
+        utterance.onend = () => { if (isLiveMode) startVoiceMode(); };
         window.speechSynthesis.speak(utterance);
     };
 
     const startVoiceMode = () => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) return toast.error("Voice not supported");
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'en-IN';
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRec) return;
+        const rec = new SpeechRec();
+        rec.lang = 'en-IN';
         setIsListening(true);
-        recognition.start();
-        recognition.onresult = (e) => {
+        rec.start();
+        rec.onresult = (e) => {
             const t = e.results[0][0].transcript;
             setInput(t);
             setIsListening(false);
-            sendMessage(t); // Trigger AI response
+            sendMessage(t);
         };
-        recognition.onerror = () => { setIsListening(false); setIsLiveMode(false); };
+        rec.onerror = () => { setIsListening(false); setIsLiveMode(false); };
     };
 
     const sendMessage = async (voiceInput = null) => {
@@ -278,7 +268,7 @@ export default function Chat() {
         setMessages(newMessages);
 
         try {
-            const payload = { userId: currentUser.uid, message: text || "Explain this image", mode, subject: subjectInput || "General", chapter: mappedChapter, language: userData.language, classLevel: userData.class };
+            const payload = { userId: currentUser.uid, message: text || "Explain this image", mode, subject: subjectInput || "General", chapter: mappedChapter, language: "English", classLevel: userData.class };
             let res;
             if (file) {
                 const formData = new FormData();
@@ -288,49 +278,37 @@ export default function Chat() {
                 res = await axios.post(`${API_BASE}/chat/photo`, formData);
             } else res = await axios.post(`${API_BASE}/chat`, payload);
 
-            let ytLink = (mode === "Explain" || mode === "Doubt") && subjectInput ? `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} class ${userData.class} ${subjectInput} ${mappedChapter}`)}` : null;
-            const aiMsg = { role: "ai", content: res.data.reply, ytLink, timestamp: Date.now() };
+            const aiMsg = { role: "ai", content: res.data.reply, timestamp: Date.now() };
             const finalMessages = [...newMessages, aiMsg];
             setMessages(finalMessages);
-            
-            // Trigger Voice if in Live Mode or if user used Microphone
+
             if (isLiveMode || voiceInput) speakText(res.data.reply);
 
-            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: finalMessages, lastUpdate: Date.now(), title: subjectInput ? `${subjectInput.toUpperCase()}: ${mappedChapter}` : "Study Session" }, { merge: true });
+            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: finalMessages, lastUpdate: Date.now(), title: subjectInput ? `${subjectInput.toUpperCase()}` : "Session" }, { merge: true });
             fetchSessions();
-        } catch (e) { 
-            toast.error("Connection failed"); 
-            setIsLiveMode(false); 
-        }
+        } catch (e) { toast.error("Offline"); setIsLiveMode(false); }
         setIsSending(false);
     };
 
-    // --- CAMERA & FILE LOGIC ---
-    const closeCamera = () => { videoRef.current?.srcObject?.getTracks().forEach(t => t.stop()); setIsCameraOpen(false); };
-    const openCamera = async () => { setIsCameraOpen(true); try { const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacing } }); if (videoRef.current) videoRef.current.srcObject = s; } catch (e) { setIsCameraOpen(false); } };
-    const capturePhoto = () => { const c = canvasRef.current; const v = videoRef.current; c.width = v.videoWidth; c.height = v.videoHeight; c.getContext("2d").drawImage(v, 0, 0); c.toBlob(b => { setSelectedFile(new File([b], "cap.jpg", { type: "image/jpeg" })); closeCamera(); }, "image/jpeg", 0.8); };
+    const openCamera = async () => { setIsCameraOpen(true); const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }); if (videoRef.current) videoRef.current.srcObject = s; };
+    const capturePhoto = () => { const c = canvasRef.current; const v = videoRef.current; c.width = v.videoWidth; c.height = v.videoHeight; c.getContext("2d").drawImage(v, 0, 0); c.toBlob(b => { setSelectedFile(new File([b], "cap.jpg", { type: "image/jpeg" })); setIsCameraOpen(false); v.srcObject.getTracks().forEach(t => t.stop()); }, "image/jpeg", 0.8); };
 
     return (
         <div className={`flex h-screen w-full overflow-hidden transition-all duration-700 ${currentTheme.container}`}>
-            <ToastContainer theme="dark" position="top-center" limit={1} />
+            <ToastContainer theme="dark" position="top-center" />
             
             <AnimatePresence>
-                {showOnboarding && (
-                    <OnboardingModal 
-                        currentUser={currentUser}
-                        onComplete={(data) => { setUserData(data); setShowOnboarding(false); }} 
-                        currentTheme={currentTheme} 
-                    />
-                )}
+                {showOnboarding && <OnboardingModal currentUser={currentUser} onComplete={(d) => { setUserData(d); setShowOnboarding(false); }} currentTheme={currentTheme} />}
             </AnimatePresence>
 
+            {/* Sidebar */}
             <AnimatePresence>
                 {showSidebar && (
                     <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 overflow-hidden ${currentTheme.sidebar}`}>
-                        <div className="flex justify-between items-center mb-10"><span className="text-[10px] font-black uppercase opacity-40">History</span><button onClick={() => setShowSidebar(false)}><FaTimes /></button></div>
-                        <button onClick={() => { setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false); }} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg"><FaPlus /> New Session</button>
-                        <div className="flex-1 overflow-y-auto space-y-3 custom-y-scroll">
-                            {sessions.map((s) => (<div key={s.id} onClick={() => loadSession(s.id)} className={`p-4 rounded-2xl cursor-pointer transition-all ${currentSessionId === s.id ? 'bg-indigo-500/15 text-indigo-500 border border-indigo-500/20' : 'opacity-60'}`}><div className="text-[10px] font-black uppercase truncate">{s.title || "Untitled Chat"}</div></div>))}
+                        <div className="flex justify-between items-center mb-10"><span className="text-[10px] font-black opacity-40">History</span><button onClick={() => setShowSidebar(false)}><FaTimes /></button></div>
+                        <button onClick={() => { setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false); }} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2"><FaPlus /> New Session</button>
+                        <div className="flex-1 overflow-y-auto space-y-3">
+                            {sessions.map((s) => (<div key={s.id} onClick={() => loadSession(s.id)} className={`p-4 rounded-2xl cursor-pointer transition-all ${currentSessionId === s.id ? 'bg-indigo-500/15 text-indigo-500' : 'opacity-60'}`}><div className="text-[10px] font-black uppercase truncate">{s.title || "Untitled Chat"}</div></div>))}
                         </div>
                     </motion.div>
                 )}
@@ -340,72 +318,76 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
                 <StudyTimer currentTheme={currentTheme} />
 
+                {/* Modes */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 overflow-x-auto no-scrollbar">
                     <div className="flex gap-2 p-1.5 rounded-[1.5rem] bg-white/5 border border-white/10 w-max mx-auto">
-                        {modes.map((m) => (<button key={m.id} onClick={() => setMode(m.id)} className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all duration-300 ${mode === m.id ? 'bg-indigo-600 text-white shadow-lg' : 'opacity-40'}`}>{m.icon} {m.label}</button>))}
+                        {modes.map((m) => (<button key={m.id} onClick={() => setMode(m.id)} className={`flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase transition-all duration-300 ${mode === m.id ? 'bg-indigo-600 text-white' : 'opacity-40'}`}>{m.icon} {m.label}</button>))}
                     </div>
                 </div>
 
+                {/* Subject Selector */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
-                    <button onClick={() => setShowSidebar(!showSidebar)} className={`p-4 rounded-2xl border ${currentTheme.aiBubble} border-white/10 shadow-xl`}><FaHistory size={16} /></button>
-                    <motion.div layout className={`flex-1 flex items-center gap-2 p-2 rounded-[2rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500/40 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10 shadow-2xl`}`}>
+                    <button onClick={() => setShowSidebar(!showSidebar)} className={`p-4 rounded-2xl border ${currentTheme.aiBubble} border-white/10`}><FaHistory size={16} /></button>
+                    <div className={`flex-1 flex items-center gap-2 p-2 rounded-[2rem] border transition-all ${isLocked ? 'border-emerald-500/40 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10`}`}>
                         <div className="flex items-center w-full flex-1 gap-3 px-4 py-2">
-                            <div className="flex-1 flex flex-col"><label className="text-[8px] font-bold uppercase opacity-50">Subject</label><input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Physics..." className="bg-transparent text-sm font-bold outline-none w-full" /></div>
-                            <div className="h-8 w-[1px] bg-white/10" />
-                            <div className="flex-1 flex flex-col"><label className="text-[8px] font-bold uppercase opacity-50">Ch #</label><input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="1" className="bg-transparent text-sm font-bold outline-none w-full" /></div>
-                            <button onClick={() => setIsLocked(!isLocked)} className={`p-3.5 rounded-2xl transition-all ${isLocked ? "bg-emerald-500 text-white" : "bg-white/5 text-indigo-500"}`}>{isLocked ? <FaLock size={14} /> : <FaUnlock size={14} />}</button>
+                            <div className="flex-1 flex flex-col"><label className="text-[8px] font-bold opacity-50">Subject</label><input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Physics..." className="bg-transparent text-sm font-bold outline-none" /></div>
+                            <div className="flex-1 flex flex-col"><label className="text-[8px] font-bold opacity-50">Ch #</label><input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="1" className="bg-transparent text-sm font-bold outline-none" /></div>
+                            <button onClick={() => setIsLocked(!isLocked)} className={`p-3.5 rounded-2xl ${isLocked ? "bg-emerald-500 text-white" : "bg-white/5 text-indigo-500"}`}>{isLocked ? <FaLock size={14} /> : <FaUnlock size={14} />}</button>
                         </div>
-                    </motion.div>
+                    </div>
                 </div>
 
-                <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll relative">
+                {/* Chat Display */}
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-8 relative">
                     <div className="max-w-3xl mx-auto space-y-12 pb-20">
-                        {messages.length === 0 && <div className="text-center py-20 opacity-20"><FaGraduationCap size={48} className="mx-auto mb-4" /><p className="font-bold text-sm">Select a subject to start.</p></div>}
+                        {messages.length === 0 && <div className="text-center py-20 opacity-20"><FaGraduationCap size={48} className="mx-auto" /></div>}
                         {messages.map((msg, i) => (
                             <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                                 <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
                                     {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 w-full object-cover" alt="upload" />}
                                     {msg.role === "ai" && i === messages.length - 1 && !isSending ? (<Typewriter text={msg.content} scrollRef={chatContainerRef} onComplete={() => messagesEndRef.current?.scrollIntoView()} />) : (
-                                        <div className="prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{formatContent(msg.content)}</ReactMarkdown></div>
+                                        <div className="prose prose-sm dark:prose-invert max-w-none"><ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{msg.content}</ReactMarkdown></div>
                                     )}
-                                    {msg.ytLink && (<div className="mt-6 pt-4 border-t border-white/10"><a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-600 rounded-2xl text-xs font-bold border border-red-500/20"><FaYoutube size={18} /> Watch Video Guide</a></div>)}
                                 </div>
                             </div>
                         ))}
-                        <div ref={messagesEndRef} className="h-4" />
+                        <div ref={messagesEndRef} />
                     </div>
                 </div>
 
-                {/* --- INPUT AREA --- */}
-                <div className="p-4 md:p-10 shrink-0">
+                {/* Input Area */}
+                <div className="p-4 md:p-10">
                     <div className="max-w-3xl mx-auto relative">
-                        <AnimatePresence>{selectedFile && (<motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="absolute bottom-full left-0 mb-4 p-2 rounded-2xl bg-indigo-600 flex items-center gap-3"><img src={URL.createObjectURL(selectedFile)} className="w-12 h-12 rounded-lg object-cover" alt="preview" /><button onClick={() => setSelectedFile(null)} className="p-2 text-white/60"><FaTimes /></button></motion.div>)}</AnimatePresence>
-                        <div className={`flex items-center p-1 md:p-2 rounded-[2.8rem] border transition-all ${currentTheme.input} ${isListening ? 'ring-2 ring-indigo-500 bg-indigo-500/5' : ''}`}>
-                            {isLiveMode && <div className="pl-4"><span className="flex h-2 w-2 rounded-full bg-red-500 animate-ping"></span></div>}
-                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={isListening ? "Listening..." : isLiveMode ? "Live Tutor..." : "Ask Dhruva..."} className="flex-1 bg-transparent px-4 md:px-6 py-4 outline-none font-bold text-xs md:text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
-                            <div className="flex items-center gap-1 md:gap-2 px-1">
-                                {isLiveMode && <button onClick={() => { setIsLiveMode(false); window.speechSynthesis.cancel(); }} className="p-2 md:p-3 text-red-500 bg-red-500/10 rounded-full"><FaStop size={12} /></button>}
-                                <button onClick={() => { setIsLiveMode(!isLiveMode); if(!isLiveMode) startVoiceMode(); else window.speechSynthesis.cancel(); }} className={`p-3 md:p-4 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 text-white shadow-lg' : 'opacity-30 hover:opacity-100'}`}><FaMicrophone size={16} className={isListening ? "animate-bounce" : ""} /></button>
+                        <div className={`flex items-center p-2 rounded-[2.8rem] border ${currentTheme.input} ${isListening ? 'ring-2 ring-indigo-500' : ''}`}>
+                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={isListening ? "Listening..." : "Ask Dhruva..."} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
+                            <div className="flex items-center gap-2 px-1">
+                                <button onClick={() => { setIsLiveMode(!isLiveMode); if(!isLiveMode) startVoiceMode(); else window.speechSynthesis.cancel(); }} className={`p-4 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 text-white' : 'opacity-30'}`}><FaMicrophone size={16} /></button>
+                                <button onClick={() => fileInputRef.current.click()} className="p-3 opacity-30"><FaImage size={16} /></button>
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} accept="image/*" />
-                                <button onClick={() => fileInputRef.current.click()} className="p-2 md:p-3 opacity-30 hover:opacity-100"><FaImage size={16} /></button>
-                                <button onClick={openCamera} className="p-2 md:p-3 opacity-30 hover:opacity-100"><FaCamera size={16} /></button>
-                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-4 md:p-5 rounded-full ${currentTheme.button} hidden sm:flex`}>{isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane className="text-white" size={14} />}</button>
+                                <button onClick={openCamera} className="p-3 opacity-30"><FaCamera size={16} /></button>
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 rounded-full ${currentTheme.button} hidden sm:flex text-white`}>{isSending ? <FaSyncAlt className="animate-spin" /> : <FaPaperPlane size={14} />}</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                {/* Camera Modal */}
                 <AnimatePresence>
                     {isCameraOpen && (
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
-                            <div className="w-full flex justify-between p-4 text-white"><button onClick={closeCamera} className="p-4 bg-white/5 rounded-full"><FaTimes size={20} /></button><button onClick={() => setCameraFacing(f => f === 'user' ? 'environment' : 'user')} className="p-4 bg-white/5 rounded-full"><FaUndo /></button></div>
-                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/20" />
-                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-95"><div className="w-16 h-16 bg-white rounded-full" /></button>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-center p-6">
+                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem]" />
+                            <div className="mt-10 flex gap-6">
+                                <button onClick={() => { setIsCameraOpen(false); videoRef.current.srcObject.getTracks().forEach(t => t.stop()); }} className="p-6 bg-white/10 rounded-full text-white"><FaTimes size={24} /></button>
+                                <button onClick={capturePhoto} className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center"><div className="w-14 h-14 bg-white rounded-full" /></button>
+                            </div>
                             <canvas ref={canvasRef} className="hidden" />
                         </motion.div>
                     )}
                 </AnimatePresence>
             </div>
+        </div>
+    );
+}
         </div>
     );
 }
