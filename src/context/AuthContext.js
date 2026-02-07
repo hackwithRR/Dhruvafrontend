@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { auth, provider, db } from "../utils/firebase";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"; 
+import { doc, getDoc } from "firebase/firestore";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -17,41 +17,28 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
 
+  // Sync theme with localStorage
   useEffect(() => {
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  // --- HELPER: FETCH OR CREATE FIRESTORE USER ---
-  // This ensures Google users and Email users stay synced
-  const syncUserWithFirestore = async (user) => {
-    if (!user) return null;
-    const userRef = doc(db, "users", user.uid);
-    const userDoc = await getDoc(userRef);
-
-    if (userDoc.exists()) {
-      return { ...user, ...userDoc.data() };
-    } else {
-      // If it's a new Google user, create a basic doc so the app doesn't crash
-      const basicData = {
-        uid: user.uid,
-        displayName: user.displayName,
-        email: user.email,
-        photoURL: user.photoURL, // Restore Google PFP
-        createdAt: serverTimestamp(),
-        board: "",
-        classLevel: "",
-        gender: ""
-      };
-      await setDoc(userRef, basicData);
-      return { ...user, ...basicData };
-    }
-  };
-
+  // --- CORE AUTH LOGIC (BASED ON YOUR WORKING VERSION) ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const fullUser = await syncUserWithFirestore(user);
-        setCurrentUser(fullUser);
+        // 1. Set the user immediately (just like your old version)
+        setCurrentUser(user);
+        
+        // 2. Try to get extra info (gender, board) from Firestore in the background
+        try {
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            // Merge the data so Chat.jsx can see data.gender/data.board
+            setCurrentUser({ ...user, ...userDoc.data() });
+          }
+        } catch (err) {
+          console.error("Firestore background fetch failed:", err);
+        }
       } else {
         setCurrentUser(null);
       }
@@ -60,50 +47,50 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  const register = async (email, password, name, avatarUrl, gender) => {
+  // --- REGISTER (ENHANCED WITH PHOTOURL) ---
+  const register = async (email, password, name, avatarUrl) => {
     const res = await createUserWithEmailAndPassword(auth, email, password);
+    // Update Auth Profile
     await updateProfile(res.user, { 
-      displayName: name,
-      photoURL: avatarUrl 
+        displayName: name, 
+        photoURL: avatarUrl || `https://ui-avatars.com/api/?name=${name}` 
     });
-    
-    // Create Firestore doc immediately for manual registration
-    const userData = {
-      uid: res.user.uid,
-      displayName: name,
-      email: email,
-      photoURL: avatarUrl,
-      gender: gender,
-      createdAt: serverTimestamp()
-    };
-    await setDoc(doc(db, "users", res.user.uid), userData);
-
-    setCurrentUser({ ...res.user, ...userData });
+    // Update local state immediately
+    setCurrentUser({ ...res.user, displayName: name, photoURL: avatarUrl });
     return res;
   };
 
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
 
-  // --- FIXED GOOGLE LOGIN ---
+  // --- GOOGLE LOGIN (CLEAN VERSION) ---
   const googleLogin = async () => {
     try {
-      const res = await signInWithPopup(auth, provider);
-      const fullUser = await syncUserWithFirestore(res.user);
-      setCurrentUser(fullUser);
-      return res;
+      const result = await signInWithPopup(auth, provider);
+      // Firebase automatically handles PFP for Google. 
+      // We set local state so it reflects immediately.
+      setCurrentUser(result.user);
+      return result;
     } catch (error) {
-      console.error("Google Login Error:", error);
+      console.error("Google login failed:", error);
       throw error;
     }
   };
 
   const logout = () => signOut(auth);
 
+  // --- RELOAD USER (FOR PROFILE UPDATES) ---
   const reloadUser = async () => {
     if (auth.currentUser) {
-      await auth.currentUser.reload();
-      const fullUser = await syncUserWithFirestore(auth.currentUser);
-      setCurrentUser(fullUser);
+      try {
+        await auth.currentUser.reload();
+        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+        const extraData = userDoc.exists() ? userDoc.data() : {};
+        
+        // Spread both to ensure Navbar (Auth data) and Chat (Firestore data) stay in sync
+        setCurrentUser({ ...auth.currentUser, ...extraData });
+      } catch (error) {
+        console.error("Failed to refresh user session:", error);
+      }
     }
   };
 
@@ -115,8 +102,8 @@ export const AuthProvider = ({ children }) => {
       logout, 
       googleLogin, 
       reloadUser,
-      theme,      
-      setTheme    
+      theme,
+      setTheme
     }}>
       {!loading && children}
     </AuthContext.Provider>
