@@ -179,17 +179,19 @@ export default function Chat() {
     const canvasRef = useRef(null);
     const fileInputRef = useRef(null);
 
+    // --- ENHANCED THEME ENGINE ---
     const themes = {
         dark: { container: "bg-[#050505] text-white", aiBubble: "bg-white/5 border border-white/10", userBubble: "bg-indigo-600 shadow-lg shadow-indigo-500/20", input: "bg-white/[0.03] border-white/10 text-white", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-r border-white/10" },
         light: { container: "bg-[#F8FAFF] text-[#1E293B]", aiBubble: "bg-white/70 backdrop-blur-md border border-white shadow-sm", userBubble: "bg-indigo-600 text-white shadow-lg", input: "bg-white/80 border-white text-[#1E293B]", button: "bg-indigo-600", sidebar: "bg-white/60 backdrop-blur-xl border-r border-white/20" },
-        cosmic: { container: "bg-[#0f0c29] text-white", aiBubble: "bg-white/10 border-white/10 backdrop-blur-md shadow-2xl shadow-purple-500/10", userBubble: "bg-purple-600", input: "bg-white/5 border-white/10", button: "bg-purple-600", sidebar: "bg-[#0f0c29] border-r border-white/5" },
-        emerald: { container: "bg-[#020d08] text-emerald-50", aiBubble: "bg-emerald-900/20 border-emerald-500/20", userBubble: "bg-emerald-600", input: "bg-[#041a10] border-emerald-500/30", button: "bg-emerald-500", sidebar: "bg-[#010805] border-r border-emerald-900/30" },
-        sunset: { container: "bg-[#1a0a05] text-orange-50", aiBubble: "bg-orange-900/10 border-orange-500/20", userBubble: "bg-orange-600", input: "bg-white/5 border-orange-500/20", button: "bg-orange-600", sidebar: "bg-[#120703] border-r border-orange-900/20" },
-        cyber: { container: "bg-black text-[#00ff9f]", aiBubble: "bg-black border-[#00ff9f]/30", userBubble: "bg-[#00ff9f] text-black", input: "bg-black border-[#00ff9f]/50", button: "bg-[#00ff9f]", sidebar: "bg-black border-r border-[#00ff9f]/20" },
-        ocean: { container: "bg-[#000428] text-blue-50", aiBubble: "bg-white/5 border-blue-400/20", userBubble: "bg-blue-500", input: "bg-white/5 border-blue-400/20", button: "bg-blue-400", sidebar: "bg-[#000428] border-r border-blue-900/30" },
-        royal: { container: "bg-[#0f172a] text-slate-100", aiBubble: "bg-slate-800/50 border-yellow-500/10", userBubble: "bg-amber-600", input: "bg-slate-900 border-yellow-500/10", button: "bg-amber-600", sidebar: "bg-[#0a101f] border-r border-yellow-900/20" },
+        cosmic: { container: "bg-[#0B0118] text-white", aiBubble: "bg-purple-900/10 border-purple-500/20 backdrop-blur-md shadow-2xl shadow-purple-500/5", userBubble: "bg-gradient-to-br from-purple-600 to-blue-600", input: "bg-purple-950/20 border-purple-500/20", button: "bg-purple-600", sidebar: "bg-[#0B0118] border-r border-purple-900/40" },
+        emerald: { container: "bg-[#020d08] text-emerald-50", aiBubble: "bg-emerald-900/20 border-emerald-500/20", userBubble: "bg-gradient-to-br from-emerald-600 to-teal-700", input: "bg-[#041a10] border-emerald-500/30", button: "bg-emerald-500", sidebar: "bg-[#010805] border-r border-emerald-900/30" },
+        sunset: { container: "bg-[#1a0a05] text-orange-50", aiBubble: "bg-orange-900/10 border-orange-500/20", userBubble: "bg-gradient-to-br from-orange-600 to-red-600", input: "bg-white/5 border-orange-500/20", button: "bg-orange-600", sidebar: "bg-[#120703] border-r border-orange-900/20" },
+        cyber: { container: "bg-black text-[#00ff9f]", aiBubble: "bg-black border-[#00ff9f]/30", userBubble: "bg-[#00ff9f] text-black font-black", input: "bg-black border-[#00ff9f]/50 text-[#00ff9f]", button: "bg-[#00ff9f]", sidebar: "bg-black border-r border-[#00ff9f]/20" },
+        ocean: { container: "bg-[#000428] text-blue-50", aiBubble: "bg-blue-900/10 border-blue-400/20 backdrop-blur-md", userBubble: "bg-gradient-to-br from-blue-500 to-cyan-500", input: "bg-white/5 border-blue-400/20", button: "bg-blue-400", sidebar: "bg-[#000428] border-r border-blue-900/30" },
+        royal: { container: "bg-[#0f172a] text-slate-100", aiBubble: "bg-slate-800/50 border-yellow-500/10", userBubble: "bg-gradient-to-br from-amber-600 to-yellow-600", input: "bg-slate-900 border-yellow-500/10", button: "bg-amber-600", sidebar: "bg-[#0a101f] border-r border-yellow-900/20" },
         electric: { container: "bg-[#000] text-white", aiBubble: "bg-white/5 border-white/10 backdrop-blur-xl", userBubble: "bg-gradient-to-r from-red-500 to-orange-500", input: "bg-white/5 border-white/10", button: "bg-orange-500", sidebar: "bg-black border-r border-white/5" }
     };
+
     const currentTheme = themes[theme] || themes.dark;
     const modes = [{ id: "Explain", icon: <FaBookOpen />, label: "Explain" }, { id: "Doubt", icon: <FaQuestion />, label: "Doubt" }, { id: "Quiz", icon: <FaGraduationCap />, label: "Quiz" }, { id: "Summary", icon: <FaLightbulb />, label: "Summary" }];
 
