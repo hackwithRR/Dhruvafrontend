@@ -51,10 +51,9 @@ const OnboardingModal = ({ onComplete, currentTheme }) => (
             <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/40">
                 <FaRocket className="text-white text-3xl" />
             </div>
-            <h2 className="text-2xl font-black mb-3 tracking-tight">Welcome to Gemini 3</h2>
+            <h2 className="text-2xl font-black mb-3 tracking-tight">Setup Your Profile</h2>
             <p className="text-sm opacity-60 mb-8 leading-relaxed">
-                Your AI study companion just got smarter. Now featuring advanced LaTeX math rendering, 
-                interactive tables, and focus timers to help you ace your exams.
+                Welcome! Please ensure your Board and Class are set in your profile so Dhruva can tailor study materials to your syllabus.
             </p>
             <button 
                 onClick={onComplete}
@@ -194,14 +193,23 @@ export default function Chat() {
 
     useEffect(() => {
         if (!currentUser) return;
-        // Onboarding Check
-        if (!localStorage.getItem(`onboarded_${currentUser.uid}`)) setShowOnboarding(true);
 
         const initData = async () => {
             const userDoc = await getDoc(doc(db, "users", currentUser.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data();
-                setUserData({ board: data.board || "", class: data.class || "", language: data.language || "English" });
+                setUserData({ 
+                    board: data.board || "", 
+                    class: data.classLevel || data.class || "", 
+                    language: data.language || "English" 
+                });
+                
+                // Show onboarding ONLY if board or class is missing in Firestore
+                if (!data.board || (!data.class && !data.classLevel)) {
+                    setShowOnboarding(true);
+                }
+            } else {
+                setShowOnboarding(true);
             }
             fetchSessions();
         };
@@ -209,7 +217,6 @@ export default function Chat() {
     }, [currentUser]);
 
     const handleOnboardingComplete = () => {
-        localStorage.setItem(`onboarded_${currentUser.uid}`, 'true');
         setShowOnboarding(false);
     };
 
