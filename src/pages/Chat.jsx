@@ -7,7 +7,8 @@ import {
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, 
     FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, 
     FaClock, FaLightbulb, FaQuestion, 
-    FaBookOpen, FaGraduationCap, FaMicrophone, FaArrowRight, FaSparkles, FaUserEdit, FaPalette
+    FaBookOpen, FaGraduationCap, FaMicrophone, FaArrowRight, FaUserEdit, FaPalette,
+    FaMagic 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -107,13 +108,10 @@ const THEME_CONFIG = {
     }
 };
 
-// --- MAIN CHAT MODULE ---
-
 export default function Chat() {
     const { currentUser, logout } = useAuth();
     const navigate = useNavigate();
     
-    // States
     const [currentThemeKey, setCurrentThemeKey] = useState("dark");
     const [messages, setMessages] = useState([]);
     const [sessions, setSessions] = useState([]);
@@ -129,7 +127,6 @@ export default function Chat() {
     const messagesEndRef = useRef(null);
     const theme = THEME_CONFIG[currentThemeKey];
 
-    // Initialize User Data
     useEffect(() => {
         if (!currentUser) return;
         const checkUser = async () => {
@@ -168,7 +165,6 @@ export default function Chat() {
             const finalMsgs = [...updatedMessages, aiMsg];
             setMessages(finalMsgs);
             
-            // Sync to Firestore
             await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
                 messages: finalMsgs,
                 lastUpdate: Date.now(),
@@ -185,7 +181,7 @@ export default function Chat() {
         <div className={`flex h-screen w-full overflow-hidden transition-all duration-700 ${theme.bg}`}>
             <ToastContainer position="top-center" theme={currentThemeKey === 'light' ? 'light' : 'dark'} />
 
-            {/* Premium Onboarding Modal */}
+            {/* Onboarding Modal */}
             <AnimatePresence>
                 {showOnboarding && (
                     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-lg">
@@ -202,13 +198,13 @@ export default function Chat() {
                 )}
             </AnimatePresence>
 
-            {/* Dynamic Sidebar */}
+            {/* Sidebar */}
             <AnimatePresence>
                 {showSidebar && (
                     <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[600] w-80 h-full p-6 shadow-2xl flex flex-col ${theme.sidebar}`}>
                         <div className="flex justify-between items-center mb-8">
                             <div className="flex items-center gap-2">
-                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white ${theme.btn}`}><FaSparkles size={14}/></div>
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white ${theme.btn}`}><FaMagic size={14}/></div>
                                 <span className="font-black text-xs uppercase tracking-widest">Dhruva AI</span>
                             </div>
                             <button onClick={() => setShowSidebar(false)}><FaTimes /></button>
@@ -239,13 +235,19 @@ export default function Chat() {
                 )}
             </AnimatePresence>
 
-            {/* Main Chat Stage */}
+            {/* Main Stage */}
             <div className="flex-1 flex flex-col min-w-0 relative">
-                <Navbar currentUser={currentUser} theme={currentThemeKey} />
-
-                {/* Subject Control Center */}
-                <div className="w-full max-w-4xl mx-auto px-4 mt-4 flex items-center gap-2">
+                <div className="h-20 flex items-center justify-between px-6 border-b border-white/5 backdrop-blur-md">
                     <button onClick={() => setShowSidebar(true)} className={`p-4 rounded-2xl border ${theme.bubble}`}><FaHistory/></button>
+                    <div className="flex items-center gap-4">
+                         <div className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border border-white/10 ${theme.bubble}`}>
+                            AI: Active
+                         </div>
+                    </div>
+                </div>
+
+                {/* Subject Controls */}
+                <div className="w-full max-w-4xl mx-auto px-4 mt-4 flex items-center gap-2">
                     <div className={`flex-1 flex items-center gap-2 p-2 rounded-3xl border transition-all ${theme.bubble}`}>
                         <div className="flex-1 px-4">
                             <label className="text-[8px] font-black opacity-30 block uppercase">Current Subject</label>
@@ -263,15 +265,13 @@ export default function Chat() {
                         {messages.length === 0 ? (
                             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center min-h-[50vh] text-center">
                                 <div className={`w-20 h-20 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-2xl ${theme.bubble}`}>
-                                    <FaSparkles className={`text-3xl animate-pulse ${theme.accent}`} />
+                                    <FaMagic className={`text-3xl animate-pulse ${theme.accent}`} />
                                 </div>
-                                <h1 className="text-3xl font-black mb-4">How can I help you study?</h1>
+                                <h1 className="text-3xl font-black mb-4">Ready to learn?</h1>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl">
                                     {[
                                         { t: "Explain Photosynthesis", s: "Biology", i: <FaLightbulb/> },
-                                        { t: "Math Doubt: Trigonometry", s: "Maths", i: <FaGraduationCap/> },
-                                        { t: "Summary of WW1", s: "History", i: <FaBookOpen/> },
-                                        { t: "Solve this Physics Problem", s: "Physics", i: <FaQuestion/> }
+                                        { t: "Math: Trigonometry Help", s: "Maths", i: <FaGraduationCap/> }
                                     ].map((card, i) => (
                                         <button key={i} onClick={() => { setSubjectInput(card.s); sendMessage(card.t); }}
                                             className={`p-5 rounded-[2rem] border text-left flex items-center gap-4 transition-all hover:scale-[1.02] active:scale-95 ${theme.bubble}`}>
@@ -301,21 +301,14 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* Floating Action Bar */}
-                <div className="absolute bottom-0 left-0 w-full p-4 md:p-10 bg-gradient-to-t from-black/20 to-transparent pointer-events-none">
+                {/* Input Bar */}
+                <div className="absolute bottom-0 left-0 w-full p-4 md:p-10 bg-gradient-to-t from-black/10 to-transparent pointer-events-none">
                     <div className="max-w-3xl mx-auto pointer-events-auto">
-                        <div className={`flex items-center gap-2 p-2 rounded-[3rem] border shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-500 ${theme.input}`}>
-                            <input 
-                                value={input} 
-                                onChange={e => setInput(e.target.value)}
-                                placeholder="Message Dhruva..."
-                                className="flex-1 bg-transparent px-6 py-4 outline-none font-black text-sm md:text-base"
-                                onKeyDown={e => e.key === "Enter" && sendMessage()}
-                            />
+                        <div className={`flex items-center gap-2 p-2 rounded-[3rem] border transition-all duration-500 ${theme.input}`}>
+                            <input value={input} onChange={e => setInput(e.target.value)} placeholder="Message Dhruva..." className="flex-1 bg-transparent px-6 py-4 outline-none font-black text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex items-center gap-1 pr-2">
-                                <button className="hidden md:flex p-4 rounded-full bg-white/5 opacity-50 hover:opacity-100 transition-all"><FaCamera size={18}/></button>
-                                <button onClick={() => sendMessage()} disabled={isSending} 
-                                    className={`p-5 rounded-full shadow-lg transition-all active:scale-95 text-white ${theme.btn}`}>
+                                <button className="hidden md:flex p-4 rounded-full bg-white/5 opacity-50 hover:opacity-100"><FaCamera size={18}/></button>
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 rounded-full text-white ${theme.btn}`}>
                                     {isSending ? <FaSyncAlt className="animate-spin" size={20} /> : <FaPaperPlane size={20} />}
                                 </button>
                             </div>
