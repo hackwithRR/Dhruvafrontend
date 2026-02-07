@@ -8,10 +8,10 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import { doc, getDoc, updateDoc, arrayUnion, setDoc, collection, query, where, getDocs, orderBy, limit, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, getDocs, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
-import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Import KaTeX CSS for math rendering
 import 'katex/dist/katex.min.css';
@@ -38,34 +38,52 @@ const CHAPTER_MAP = {
 
 const formatContent = (text) => text.trim();
 
-// --- ONBOARDING COMPONENT ---
+// --- ONBOARDING COMPONENT (GEN-Z EDITION) ---
 const OnboardingModal = ({ onComplete, currentTheme }) => (
     <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-md flex items-center justify-center p-6"
+        className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6"
     >
         <motion.div 
-            initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }}
-            className={`max-w-md w-full p-8 rounded-[2.5rem] border border-white/10 shadow-2xl text-center ${currentTheme.aiBubble}`}
+            initial={{ scale: 0.8, rotate: -2 }} 
+            animate={{ scale: 1, rotate: 0 }}
+            className={`max-w-md w-full p-10 rounded-[3rem] border-2 border-white/20 shadow-[0_32px_64px_rgba(0,0,0,0.5)] text-center relative overflow-hidden ${currentTheme.aiBubble}`}
         >
-            <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-indigo-500/40">
-                <FaRocket className="text-white text-3xl" />
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 blur-3xl rounded-full" />
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-pink-500/20 blur-3xl rounded-full" />
+
+            <div className="w-24 h-24 bg-gradient-to-tr from-indigo-600 to-purple-500 rounded-[2rem] flex items-center justify-center mx-auto mb-8 rotate-6 shadow-xl shadow-indigo-500/30">
+                <FaRocket className="text-white text-4xl animate-bounce" />
             </div>
-            <h2 className="text-2xl font-black mb-3 tracking-tight">Setup Your Profile</h2>
-            <p className="text-sm opacity-60 mb-8 leading-relaxed">
-                Welcome! Please ensure your Board and Class are set in your profile so Dhruva can tailor study materials to your syllabus.
+
+            <h2 className="text-3xl font-black mb-4 tracking-tight bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent italic">
+                Ayo, Let's Level Up! 🚀
+            </h2>
+            
+            <p className="text-base font-medium opacity-80 mb-8 leading-relaxed">
+                To give you that <span className="text-indigo-400 font-bold">Main Character</span> energy, we need your Board, Class, and Gender. No setup = no personalized vibes. 
             </p>
-            <button 
-                onClick={onComplete}
-                className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-2xl transition-all active:scale-95"
-            >
-                Start Learning
-            </button>
+
+            <div className="space-y-3">
+                <button 
+                    onClick={() => window.location.href = '/profile'}
+                    className="w-full py-5 bg-white text-black font-black rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-3 hover:bg-indigo-50"
+                >
+                    FIX PROFILE <FaArrowDown className="animate-bounce" />
+                </button>
+                
+                <button 
+                    onClick={onComplete}
+                    className="w-full py-4 text-xs font-bold opacity-40 hover:opacity-100 transition-all uppercase tracking-widest"
+                >
+                    I'll vibe later
+                </button>
+            </div>
         </motion.div>
     </motion.div>
 );
 
-// --- UPDATED TYPEWRITER WITH MATH SUPPORT ---
+// --- TYPEWRITER COMPONENT ---
 const Typewriter = ({ text, onComplete, scrollRef }) => {
     const [displayedText, setDisplayedText] = useState("");
     const [cursor, setCursor] = useState(true);
@@ -75,7 +93,6 @@ const Typewriter = ({ text, onComplete, scrollRef }) => {
         const interval = setInterval(() => {
             setDisplayedText(text.substring(0, i + 1));
             i++;
-            // Auto-scroll while typing
             if (scrollRef.current) {
                 scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
             }
@@ -90,10 +107,7 @@ const Typewriter = ({ text, onComplete, scrollRef }) => {
 
     return (
         <div className="relative markdown-container prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown 
-                remarkPlugins={[remarkGfm, remarkMath]} 
-                rehypePlugins={[rehypeKatex]}
-            >
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                 {formatContent(displayedText)}
             </ReactMarkdown>
             {cursor && <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.5 }} className="inline-block w-1 h-4 bg-indigo-500 ml-1 align-middle" />}
@@ -170,14 +184,13 @@ const StudyTimer = ({ currentTheme }) => {
 };
 
 export default function Chat() {
-    const { currentUser, logout } = useAuth();
+    const { currentUser, logout, theme, setTheme } = useAuth(); // Use context theme
     const [messages, setMessages] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [currentSessionId, setCurrentSessionId] = useState(Date.now().toString());
     const [input, setInput] = useState("");
     const [mode, setMode] = useState("Explain");
     const [isSending, setIsSending] = useState(false);
-    const [theme, setTheme] = useState("dark");
     const [userData, setUserData] = useState({ board: "", class: "", language: "English" });
     const [isLocked, setIsLocked] = useState(false);
     const [subjectInput, setSubjectInput] = useState("");
@@ -202,26 +215,6 @@ export default function Chat() {
     const currentTheme = themes[theme] || themes.dark;
     const modes = [ { id: "Explain", icon: <FaBookOpen />, label: "Explain" }, { id: "Doubt", icon: <FaQuestion />, label: "Doubt" }, { id: "Quiz", icon: <FaGraduationCap />, label: "Quiz" }, { id: "Summary", icon: <FaLightbulb />, label: "Summary" } ];
 
-    // Auto-scroll when messages update
-    useEffect(() => {
-        if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-        }
-    }, [messages]);
-
-    // Handle showing/hiding scroll button
-    const handleScroll = () => {
-        if (chatContainerRef.current) {
-            const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-            const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
-            setShowScrollBtn(!isAtBottom);
-        }
-    };
-
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-
     useEffect(() => {
         if (!currentUser) return;
 
@@ -235,7 +228,9 @@ export default function Chat() {
                     language: data.language || "English" 
                 });
                 
-                if (!data.board || (!data.class && !data.classLevel)) {
+                // --- ONBOARDING TRIGGER ---
+                // Shows if board, class, or gender is missing
+                if (!data.board || (!data.class && !data.classLevel) || !data.gender) {
                     setShowOnboarding(true);
                 }
             } else {
@@ -246,14 +241,24 @@ export default function Chat() {
         initData();
     }, [currentUser]);
 
-    const handleOnboardingComplete = () => {
-        setShowOnboarding(false);
-    };
-
     const fetchSessions = async () => {
         const q = query(collection(db, `users/${currentUser.uid}/sessions`), orderBy("lastUpdate", "desc"));
         const snap = await getDocs(q);
         setSessions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    };
+
+    const handleOnboardingComplete = () => setShowOnboarding(false);
+
+    const handleScroll = () => {
+        if (chatContainerRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+            const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+            setShowScrollBtn(!isAtBottom);
+        }
+    };
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
 
     const loadSession = async (sid) => {
@@ -376,11 +381,7 @@ export default function Chat() {
                 </div>
 
                 {/* --- CHAT AREA --- */}
-                <div 
-                    ref={chatContainerRef}
-                    onScroll={handleScroll}
-                    className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll scroll-smooth relative"
-                >
+                <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll scroll-smooth relative">
                     <div className="max-w-3xl mx-auto space-y-12">
                         {messages.length === 0 && (
                             <div className="text-center py-20 opacity-20">
@@ -393,11 +394,7 @@ export default function Chat() {
                                 <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
                                     {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 w-full object-cover shadow-xl" alt="upload" />}
                                     {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
-                                        <Typewriter 
-                                            text={msg.content} 
-                                            scrollRef={chatContainerRef}
-                                            onComplete={() => messagesEndRef.current?.scrollIntoView()} 
-                                        />
+                                        <Typewriter text={msg.content} scrollRef={chatContainerRef} onComplete={() => messagesEndRef.current?.scrollIntoView()} />
                                     ) : (
                                         <div className="prose prose-sm dark:prose-invert max-w-none">
                                             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
@@ -416,16 +413,9 @@ export default function Chat() {
                         <div ref={messagesEndRef} className="h-4" />
                     </div>
 
-                    {/* SCROLL TO BOTTOM BUTTON */}
                     <AnimatePresence>
                         {showScrollBtn && (
-                            <motion.button
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: 10 }}
-                                onClick={scrollToBottom}
-                                className="fixed bottom-32 right-10 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-500 transition-all z-50 border border-white/20"
-                            >
+                            <motion.button initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} onClick={scrollToBottom} className="fixed bottom-32 right-10 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-500 transition-all z-50 border border-white/20">
                                 <FaChevronDown size={14} />
                             </motion.button>
                         )}
