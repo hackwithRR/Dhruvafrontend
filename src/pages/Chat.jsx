@@ -9,7 +9,7 @@ import {
     FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, 
     FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, 
     FaBookOpen, FaGraduationCap, FaUserCog, FaMicrophone,
-    FaBolt, FaChartLine 
+    FaBolt, FaChartLine, FaMedal, FaTrophy, FaStar 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -44,7 +44,7 @@ const CHAPTER_MAP = {
 
 const formatContent = (text) => text.trim();
 
-// --- NEW HELPER COMPONENT: ACTION CHIPS ---
+// --- NEW COMPONENT: ACTION CHIPS ---
 const ActionChips = ({ mode, onChipClick }) => {
     const chips = {
         Explain: ["Give an Example", "Simpler Version", "Key Terms"],
@@ -149,7 +149,7 @@ export default function Chat() {
     const [input, setInput] = useState("");
     const [mode, setMode] = useState("Explain");
     const [isSending, setIsSending] = useState(false);
-    const [userData, setUserData] = useState({ board: "", class: "", gender: "", language: "English" });
+    const [userData, setUserData] = useState({ board: "", class: "", gender: "", language: "English", stats: { totalMinutes: 0 } });
     const [isLocked, setIsLocked] = useState(false);
     const [subjectInput, setSubjectInput] = useState("");
     const [chapterInput, setChapterInput] = useState("");
@@ -218,10 +218,14 @@ export default function Chat() {
     const trackStudyProgress = async (minutes) => {
         if (!currentUser) return;
         try {
-            await updateDoc(doc(db, "users", currentUser.uid), {
+            const userRef = doc(db, "users", currentUser.uid);
+            await updateDoc(userRef, {
                 "stats.totalMinutes": increment(minutes),
                 "stats.lastActive": Date.now()
             });
+            // Re-fetch user data to update sidebar in real-time
+            const updated = await getDoc(userRef);
+            if(updated.exists()) setUserData(prev => ({ ...prev, stats: updated.data().stats }));
         } catch (e) { console.error("Stats update failed", e); }
     };
 
@@ -235,7 +239,8 @@ export default function Chat() {
                     board: data.board || "", 
                     class: data.classLevel || data.class || "", 
                     gender: data.gender || "",
-                    language: data.language || "English" 
+                    language: data.language || "English",
+                    stats: data.stats || { totalMinutes: 0 }
                 });
                 if (!data.board || (!data.class && !data.classLevel) || !data.gender) setShowOnboarding(true);
             } else setShowOnboarding(true);
@@ -305,11 +310,50 @@ export default function Chat() {
 
             <AnimatePresence>
                 {showSidebar && (
-                    <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 overflow-hidden ${currentTheme.sidebar}`}>
-                        <div className="flex justify-between items-center mb-10"><span className="text-[10px] font-black uppercase opacity-40">History</span><button onClick={() => setShowSidebar(false)}><FaTimes /></button></div>
+                    <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[150] w-80 h-full flex flex-col p-6 overflow-hidden ${currentTheme.sidebar}`}>
+                        <div className="flex justify-between items-center mb-6">
+                            <span className="text-[10px] font-black uppercase opacity-40 tracking-widest">Scholar Profile</span>
+                            <button onClick={() => setShowSidebar(false)} className="p-2 hover:bg-white/5 rounded-full"><FaTimes /></button>
+                        </div>
+
+                        {/* --- REWARDS & STATS SECTION --- */}
+                        <div className="mb-6 p-5 rounded-[2rem] bg-indigo-600/10 border border-indigo-500/20 relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:rotate-12 transition-transform">
+                                <FaTrophy size={60} />
+                            </div>
+                            <div className="relative z-10">
+                                <h4 className="text-[10px] font-black uppercase opacity-60 mb-1">Scholar Level</h4>
+                                <p className="text-sm font-black italic text-indigo-400 mb-4">
+                                    {(userData.stats?.totalMinutes || 0) >= 300 ? "🏅 EXPERT SCHOLAR" : (userData.stats?.totalMinutes || 0) >= 60 ? "🎖️ ADVANCED" : "⭐ NOVICE"}
+                                </p>
+                                
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="p-3 bg-white/5 rounded-2xl border border-white/5 text-center">
+                                        <p className="text-[8px] font-black opacity-40 mb-1 uppercase">Focus Time</p>
+                                        <p className="text-xs font-black">{Math.floor((userData.stats?.totalMinutes || 0) / 60)}h { (userData.stats?.totalMinutes || 0) % 60}m</p>
+                                    </div>
+                                    <div className="p-3 bg-white/5 rounded-2xl border border-white/5 text-center">
+                                        <p className="text-[8px] font-black opacity-40 mb-1 uppercase">Badges</p>
+                                        <div className="flex justify-center gap-1">
+                                            {(userData.stats?.totalMinutes || 0) >= 60 && <FaMedal className="text-yellow-500" />}
+                                            {(userData.stats?.totalMinutes || 0) >= 300 && <FaTrophy className="text-orange-500" />}
+                                            {sessions.length >= 10 && <FaStar className="text-emerald-400" />}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <button onClick={() => { setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false); }} className={`w-full py-4 mb-6 rounded-2xl text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg ${currentTheme.button}`}><FaPlus /> New Session</button>
+                        
                         <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
-                            {sessions.map((s) => (<div key={s.id} onClick={() => loadSession(s.id)} className={`p-4 rounded-2xl cursor-pointer transition-all ${currentSessionId === s.id ? 'bg-indigo-500/15 text-indigo-500 border border-indigo-500/20' : 'opacity-60'}`}><div className="text-[10px] font-black uppercase truncate">{s.title || "Untitled Chat"}</div></div>))}
+                            <span className="text-[10px] font-black uppercase opacity-40 ml-2">Recent Sessions</span>
+                            {sessions.map((s) => (
+                                <div key={s.id} onClick={() => loadSession(s.id)} className={`p-4 rounded-2xl cursor-pointer transition-all flex items-center gap-3 border ${currentSessionId === s.id ? 'bg-indigo-500/15 text-indigo-500 border-indigo-500/20' : 'opacity-60 border-transparent'}`}>
+                                    <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                                    <div className="text-[10px] font-black uppercase truncate">{s.title || "Untitled Session"}</div>
+                                </div>
+                            ))}
                         </div>
                     </motion.div>
                 )}
@@ -341,11 +385,10 @@ export default function Chat() {
                     <div className="max-w-3xl mx-auto space-y-12 pb-20">
                         {messages.length === 0 && <div className="text-center py-20 opacity-20"><FaGraduationCap size={48} className="mx-auto mb-4" /><p className="font-bold text-sm uppercase tracking-widest">Select subject to begin</p></div>}
                         
-                        {/* STUDY DASHBOARD CHIP (NEW) */}
                         {messages.length > 0 && (
                             <div className="p-4 rounded-2xl flex items-center justify-between bg-white/5 border border-white/5">
-                                <div className="flex items-center gap-3 text-xs font-bold"><FaChartLine className="text-indigo-400" /> Study Mode: <span className="text-indigo-400 uppercase">{mode}</span></div>
-                                <div className="text-[10px] font-black opacity-40 uppercase">Tracking Session Live</div>
+                                <div className="flex items-center gap-3 text-xs font-bold"><FaChartLine className="text-indigo-400" /> Mode: <span className="text-indigo-400 uppercase">{mode}</span></div>
+                                <div className="text-[10px] font-black opacity-40 uppercase">Tracking Progress Live</div>
                             </div>
                         )}
 
@@ -356,7 +399,6 @@ export default function Chat() {
                                     {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
                                         <>
                                             <Typewriter text={msg.content} scrollRef={chatContainerRef} onComplete={() => messagesEndRef.current?.scrollIntoView()} />
-                                            {/* ACTION CHIPS INJECTED HERE */}
                                             <ActionChips mode={mode} onChipClick={(text) => { setInput(text); sendMessage(text); }} />
                                         </>
                                     ) : (
