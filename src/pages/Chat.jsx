@@ -7,7 +7,7 @@ import {
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, 
     FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, 
     FaClock, FaLightbulb, FaQuestion, 
-    FaBookOpen, FaGraduationCap, FaMicrophone, FaArrowRight, FaSparkles, FaUserEdit
+    FaBookOpen, FaGraduationCap, FaMicrophone, FaArrowRight, FaSparkles, FaUserEdit, FaPalette
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -23,247 +23,123 @@ import 'katex/dist/katex.min.css';
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-const CHAPTER_MAP = {
-    CBSE: {
-        "10": {
-            MATHEMATICS: { "1": "Real Numbers", "8": "Trigonometry" },
-            SCIENCE: { "1": "Chemical Reactions", "11": "Electricity" }
-        }
+// --- 8 ELITE THEMES ---
+const THEME_CONFIG = {
+    dark: {
+        name: "Deep Dark",
+        bg: "bg-[#050505] text-white",
+        bubble: "bg-white/[0.03] border-white/10 backdrop-blur-xl",
+        user: "bg-indigo-600 text-white",
+        input: "bg-[#111] border-white/10 text-white",
+        sidebar: "bg-[#0A0A0A] border-white/5",
+        btn: "bg-indigo-600 hover:bg-indigo-500",
+        accent: "text-indigo-500"
+    },
+    light: {
+        name: "Pure Light",
+        bg: "bg-[#F8FAFF] text-slate-900",
+        bubble: "bg-white border-slate-200 shadow-xl shadow-slate-200/50",
+        user: "bg-indigo-600 text-white",
+        input: "bg-white border-indigo-100 text-slate-900",
+        sidebar: "bg-white border-slate-100",
+        btn: "bg-indigo-600 hover:bg-indigo-700",
+        accent: "text-indigo-600"
+    },
+    cosmic: {
+        name: "Cosmic Gradient",
+        bg: "bg-gradient-to-br from-[#0f0c29] via-[#302b63] to-[#24243e] text-white",
+        bubble: "bg-white/10 border-white/20 backdrop-blur-md shadow-2xl",
+        user: "bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white",
+        input: "bg-white/5 border-white/10 text-white",
+        sidebar: "bg-black/30 border-white/5",
+        btn: "bg-purple-500 hover:bg-purple-400",
+        accent: "text-fuchsia-400"
+    },
+    emerald: {
+        name: "Emerald Forest",
+        bg: "bg-[#020d08] text-emerald-50",
+        bubble: "bg-emerald-900/20 border-emerald-500/20 shadow-2xl",
+        user: "bg-emerald-600 text-white",
+        input: "bg-[#041a10] border-emerald-500/30 text-emerald-50",
+        sidebar: "bg-[#010a06] border-emerald-500/10",
+        btn: "bg-emerald-500 hover:bg-emerald-400",
+        accent: "text-emerald-400"
+    },
+    sunset: {
+        name: "Sunset Vibes",
+        bg: "bg-gradient-to-b from-[#1a0a05] to-[#000] text-orange-50",
+        bubble: "bg-orange-900/10 border-orange-500/20 shadow-2xl",
+        user: "bg-gradient-to-r from-orange-600 to-red-600 text-white",
+        input: "bg-white/5 border-orange-500/20 text-orange-50",
+        sidebar: "bg-[#110602] border-orange-500/10",
+        btn: "bg-orange-600 hover:bg-orange-500",
+        accent: "text-orange-400"
+    },
+    cyber: {
+        name: "Cyber Neon",
+        bg: "bg-black text-[#00ff9f]",
+        bubble: "bg-[#0a0a0a] border-[#00ff9f]/30 shadow-[0_0_15px_rgba(0,255,159,0.1)]",
+        user: "bg-[#00ff9f] text-black font-black",
+        input: "bg-[#0a0a0a] border-[#00ff9f]/50 text-[#00ff9f]",
+        sidebar: "bg-black border-[#00ff9f]/10",
+        btn: "bg-[#00ff9f] !text-black",
+        accent: "text-[#00ff9f]"
+    },
+    ocean: {
+        name: "Deep Ocean",
+        bg: "bg-gradient-to-tr from-[#000428] to-[#004e92] text-blue-50",
+        bubble: "bg-white/5 border-blue-400/20 shadow-2xl",
+        user: "bg-blue-500 text-white shadow-lg shadow-blue-500/30",
+        input: "bg-white/5 border-blue-400/20 text-white",
+        sidebar: "bg-black/20 border-white/5",
+        btn: "bg-blue-400 hover:bg-blue-300",
+        accent: "text-blue-300"
+    },
+    royal: {
+        name: "Royal Gold",
+        bg: "bg-[#0f172a] text-slate-100",
+        bubble: "bg-slate-800/50 border-yellow-500/20 shadow-2xl",
+        user: "bg-gradient-to-r from-yellow-600 to-amber-700 text-white font-bold",
+        input: "bg-slate-900 border-yellow-500/10 text-white",
+        sidebar: "bg-[#020617] border-white/5",
+        btn: "bg-amber-600 hover:bg-amber-500",
+        accent: "text-yellow-500"
     }
 };
 
-const formatContent = (text) => text.trim();
-
-// --- SUB-COMPONENTS ---
-
-/**
- * Premium Centered Onboarding Modal
- */
-const OnboardingModal = ({ isOpen, onClose, theme }) => {
-    const navigate = useNavigate();
-    return (
-        <AnimatePresence>
-            {isOpen && (
-                <div className="fixed inset-0 z-[999] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md">
-                    <motion.div 
-                        initial={{ scale: 0.9, opacity: 0, y: 20 }}
-                        animate={{ scale: 1, opacity: 1, y: 0 }}
-                        exit={{ scale: 0.9, opacity: 0, y: 20 }}
-                        className={`relative w-full max-w-sm overflow-hidden rounded-[3rem] border p-8 shadow-2xl ${
-                            theme === 'dark' ? 'bg-[#0A0A0A] border-white/10 text-white' : 'bg-white border-slate-100 text-slate-900'
-                        }`}
-                    >
-                        <div className="absolute -top-16 -right-16 h-40 w-40 rounded-full bg-indigo-600/20 blur-3xl" />
-                        
-                        <div className="relative z-10 flex flex-col items-center text-center">
-                            <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[2rem] bg-indigo-600 shadow-xl shadow-indigo-600/40">
-                                <FaUserEdit className="text-3xl text-white" />
-                            </div>
-                            
-                            <h2 className="mb-3 text-2xl font-black tracking-tight">Complete Profile</h2>
-                            <p className="mb-8 text-sm font-medium opacity-60 leading-relaxed">
-                                Let Dhruva know your Board and Class to provide accurate, syllabus-aligned answers.
-                            </p>
-
-                            <div className="flex w-full flex-col gap-3">
-                                <button 
-                                    onClick={() => navigate("/profile")}
-                                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 py-4 text-sm font-black uppercase tracking-widest text-white transition-all hover:bg-indigo-700 active:scale-95 shadow-lg shadow-indigo-600/20"
-                                >
-                                    Go to Profile <FaArrowRight size={12} />
-                                </button>
-                                <button 
-                                    onClick={onClose}
-                                    className="w-full py-3 text-[10px] font-black uppercase tracking-widest opacity-30 hover:opacity-100 transition-opacity"
-                                >
-                                    Maybe Later
-                                </button>
-                            </div>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
-        </AnimatePresence>
-    );
-};
-
-/**
- * First-time User Guidance Grid (Empty State)
- */
-const EmptyStateGuidance = ({ setInput, setSubjectInput, theme }) => {
-    const suggestions = [
-        { icon: <FaQuestion />, title: "Solve Doubt", text: "Explain Newton's Third Law", sub: "Physics" },
-        { icon: <FaBookOpen />, title: "Summarize", text: "Summary of French Revolution", sub: "History" },
-        { icon: <FaGraduationCap />, title: "Quick Quiz", text: "Test me on Trigonometry", sub: "Maths" },
-        { icon: <FaLightbulb />, title: "Concept", text: "How do plants breathe?", sub: "Biology" }
-    ];
-
-    return (
-        <motion.div 
-            initial={{ opacity: 0, y: 10 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4"
-        >
-            <div className="w-16 h-16 bg-indigo-600/10 rounded-3xl flex items-center justify-center mb-6">
-                <FaSparkles className="text-indigo-500 text-2xl animate-pulse" />
-            </div>
-            <h1 className="text-2xl md:text-3xl font-black mb-2 tracking-tight">Start Learning</h1>
-            <p className="text-xs md:text-sm font-bold opacity-40 mb-10">Pick a topic or type your own question below</p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-2xl">
-                {suggestions.map((s, i) => (
-                    <button 
-                        key={i} 
-                        onClick={() => { setInput(s.text); setSubjectInput(s.sub); }}
-                        className={`flex items-center gap-4 p-5 rounded-[2rem] border transition-all text-left group ${
-                            theme === 'dark' ? 'bg-white/5 border-white/5 hover:bg-white/10' : 'bg-white border-slate-100 shadow-sm hover:shadow-md'
-                        }`}
-                    >
-                        <div className="p-3 rounded-2xl bg-indigo-600 text-white group-hover:scale-110 transition-transform">{s.icon}</div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase opacity-40 tracking-tighter">{s.title}</p>
-                            <p className="text-sm font-bold truncate w-40 md:w-auto">{s.text}</p>
-                        </div>
-                    </button>
-                ))}
-            </div>
-        </motion.div>
-    );
-};
-
-const Typewriter = ({ text, onComplete, scrollRef }) => {
-    const [displayedText, setDisplayedText] = useState("");
-    useEffect(() => {
-        let i = 0;
-        const interval = setInterval(() => {
-            setDisplayedText(text.substring(0, i + 1));
-            i++;
-            if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-            if (i >= text.length) { 
-                clearInterval(interval); 
-                if (onComplete) onComplete(); 
-            }
-        }, 12);
-        return () => clearInterval(interval);
-    }, [text, onComplete, scrollRef]);
-
-    return (
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                {formatContent(displayedText)}
-            </ReactMarkdown>
-        </div>
-    );
-};
-
-const StudyTimer = ({ currentTheme }) => {
-    const [timeLeft, setTimeLeft] = useState(0);
-    const [isActive, setIsActive] = useState(false);
-    const [isOpen, setIsOpen] = useState(false);
-    const timerRef = useRef(null);
-
-    useEffect(() => {
-        if (isActive && timeLeft > 0) { 
-            timerRef.current = setInterval(() => setTimeLeft(prev => prev - 1), 1000); 
-        } else if (timeLeft === 0 && isActive) { 
-            setIsActive(false); 
-            toast.info("Session Complete! ☕"); 
-        }
-        return () => clearInterval(timerRef.current);
-    }, [isActive, timeLeft]);
-
-    const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
-
-    return (
-        <motion.div drag dragMomentum={false} className="fixed z-[100] right-4 bottom-32 lg:bottom-10 cursor-pointer">
-            <motion.div animate={{ width: isOpen ? "220px" : "56px", height: isOpen ? "260px" : "56px" }} className={`rounded-[1.8rem] border backdrop-blur-3xl shadow-2xl flex flex-col items-center justify-center ${currentTheme.aiBubble} border-white/20 overflow-hidden`}>
-                {!isOpen ? (
-                    <button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-500">
-                        <FaClock size={20} className={isActive ? "animate-spin-slow" : ""} />
-                    </button>
-                ) : (
-                    <div className="p-4 w-full flex flex-col items-center">
-                        <button onClick={() => setIsOpen(false)} className="self-end mb-1 opacity-40"><FaTimes size={12}/></button>
-                        <h2 className="text-3xl font-black font-mono mb-4">{formatTime(timeLeft)}</h2>
-                        <div className="grid grid-cols-2 gap-2 w-full">
-                            {[15, 25, 45, 60].map(m => (
-                                <button key={m} onClick={() => { setTimeLeft(m * 60); setIsActive(true); }} className="bg-indigo-600/10 text-[10px] font-bold py-2 rounded-xl border border-indigo-500/20 hover:bg-indigo-600 hover:text-white transition-all">
-                                    {m}m
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-            </motion.div>
-        </motion.div>
-    );
-};
-
-// --- MAIN COMPONENT ---
+// --- MAIN CHAT MODULE ---
 
 export default function Chat() {
-    const { currentUser, logout, theme, setTheme } = useAuth();
+    const { currentUser, logout } = useAuth();
+    const navigate = useNavigate();
+    
+    // States
+    const [currentThemeKey, setCurrentThemeKey] = useState("dark");
     const [messages, setMessages] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [currentSessionId, setCurrentSessionId] = useState(Date.now().toString());
     const [input, setInput] = useState("");
-    const [mode, setMode] = useState("Explain");
-    const [isSending, setIsSending] = useState(false);
-    const [userData, setUserData] = useState({ board: "CBSE", class: "10", gender: "Male", language: "English" });
-    const [isLocked, setIsLocked] = useState(false);
     const [subjectInput, setSubjectInput] = useState("");
-    const [chapterInput, setChapterInput] = useState("");
+    const [isSending, setIsSending] = useState(false);
     const [showSidebar, setShowSidebar] = useState(false);
+    const [isLocked, setIsLocked] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [isCameraOpen, setIsCameraOpen] = useState(false);
-    const [isListening, setIsListening] = useState(false);
 
     const chatContainerRef = useRef(null);
     const messagesEndRef = useRef(null);
-    const videoRef = useRef(null);
-    const canvasRef = useRef(null);
-    const fileInputRef = useRef(null);
+    const theme = THEME_CONFIG[currentThemeKey];
 
-    const themes = {
-        dark: { 
-            container: "bg-[#050505] text-white", 
-            aiBubble: "bg-white/5 border border-white/10 shadow-2xl", 
-            userBubble: "bg-indigo-600 text-white", 
-            input: "bg-[#111] border-white/10 text-white", 
-            button: "bg-indigo-600", 
-            sidebar: "bg-[#0A0A0A] border-r border-white/10" 
-        },
-        light: { 
-            container: "bg-[#F8FAFF] text-[#1E293B]", 
-            aiBubble: "bg-white border border-white shadow-lg", 
-            userBubble: "bg-indigo-600 text-white", 
-            input: "bg-white border-indigo-100 text-[#1E293B]", 
-            button: "bg-indigo-600", 
-            sidebar: "bg-white border-r border-gray-100" 
-        }
-    };
-    const currentTheme = themes[theme] || themes.dark;
-
+    // Initialize User Data
     useEffect(() => {
         if (!currentUser) return;
-        const initData = async () => {
+        const checkUser = async () => {
             const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-            if (userDoc.exists()) {
-                const data = userDoc.data();
-                setUserData({ 
-                    board: data.board || "CBSE", 
-                    class: data.classLevel || data.class || "10", 
-                    gender: data.gender || "Male",
-                    language: data.language || "English" 
-                });
-                if (!data.board) setShowOnboarding(true);
-            } else {
+            if (!userDoc.exists() || !userDoc.data().board) {
                 setShowOnboarding(true);
             }
             fetchSessions();
         };
-        initData();
+        checkUser();
     }, [currentUser]);
 
     const fetchSessions = async () => {
@@ -272,182 +148,181 @@ export default function Chat() {
         setSessions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     };
 
-    const loadSession = async (id) => {
-        setCurrentSessionId(id);
-        const s = await getDoc(doc(db, `users/${currentUser.uid}/sessions`, id));
-        if (s.exists()) setMessages(s.data().messages || []);
-        setShowSidebar(false);
-    };
-
-    const sendMessage = async (vInput = null) => {
-        const text = vInput || input;
-        if (!currentUser || isSending || (!text.trim() && !selectedFile)) return;
+    const sendMessage = async (overrideInput = null) => {
+        const finalInput = overrideInput || input;
+        if (!finalInput.trim() || isSending) return;
+        
         setIsSending(true);
-        const file = selectedFile;
-        setSelectedFile(null);
+        const userMsg = { role: "user", content: finalInput };
+        const updatedMessages = [...messages, userMsg];
+        setMessages(updatedMessages);
         setInput("");
 
-        const subUpper = subjectInput.toUpperCase();
-        const mappedChapter = CHAPTER_MAP[userData.board]?.[userData.class]?.[subUpper]?.[chapterInput] || `Chapter ${chapterInput}`;
-        const userMsg = { role: "user", content: text || "Analyzing image...", image: file ? URL.createObjectURL(file) : null };
-        const updatedMsgs = [...messages, userMsg];
-        setMessages(updatedMsgs);
-
         try {
-            const payload = { userId: currentUser.uid, message: text || "Explain", mode, subject: subjectInput || "General", chapter: mappedChapter, classLevel: userData.class, language: userData.language };
-            let res;
-            if (file) {
-                const fd = new FormData();
-                const comp = await imageCompression(file, { maxSizeMB: 0.5 });
-                fd.append("photo", comp);
-                Object.keys(payload).forEach(k => fd.append(k, payload[k]));
-                res = await axios.post(`${API_BASE}/chat/photo`, fd);
-            } else {
-                res = await axios.post(`${API_BASE}/chat`, payload);
-            }
-            const aiMsg = { role: "ai", content: res.data.reply, ytLink: subjectInput ? `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} class ${userData.class} ${subjectInput}`)}` : null };
-            const final = [...updatedMsgs, aiMsg];
-            setMessages(final);
-            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: final, lastUpdate: Date.now(), title: subjectInput ? `${subjectInput}: ${mappedChapter}` : "Study Session" }, { merge: true });
-            fetchSessions();
-        } catch (e) { toast.error("Connection Failed"); }
+            const res = await axios.post(`${API_BASE}/chat`, { 
+                userId: currentUser.uid, 
+                message: finalInput, 
+                subject: subjectInput || "General" 
+            });
+            const aiMsg = { role: "ai", content: res.data.reply };
+            const finalMsgs = [...updatedMessages, aiMsg];
+            setMessages(finalMsgs);
+            
+            // Sync to Firestore
+            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
+                messages: finalMsgs,
+                lastUpdate: Date.now(),
+                title: subjectInput ? `${subjectInput} Session` : "Study Session"
+            }, { merge: true });
+            
+        } catch (e) {
+            toast.error("Communication error with Dhruva engine.");
+        }
         setIsSending(false);
     };
 
-    const startVoiceMode = () => {
-        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SR) return toast.error("Speech not supported");
-        const rec = new SR();
-        setIsListening(true);
-        rec.start();
-        rec.onresult = (e) => {
-            const t = e.results[0][0].transcript;
-            setInput(t);
-            setIsListening(false);
-            sendMessage(t);
-        };
-        rec.onerror = () => setIsListening(false);
-    };
-
     return (
-        <div className={`flex h-screen w-full overflow-hidden transition-all duration-500 ${currentTheme.container}`}>
-            <ToastContainer theme={theme === "dark" ? "dark" : "light"} position="top-center" />
-            
-            {/* Centered Modal */}
-            <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} theme={theme} />
+        <div className={`flex h-screen w-full overflow-hidden transition-all duration-700 ${theme.bg}`}>
+            <ToastContainer position="top-center" theme={currentThemeKey === 'light' ? 'light' : 'dark'} />
 
-            {/* Sidebar for Mobile */}
+            {/* Premium Onboarding Modal */}
+            <AnimatePresence>
+                {showOnboarding && (
+                    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-6 bg-black/80 backdrop-blur-lg">
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className={`max-w-sm w-full p-8 rounded-[3rem] border shadow-2xl text-center ${theme.bubble}`}>
+                            <div className={`w-20 h-20 mx-auto mb-6 rounded-[2rem] flex items-center justify-center text-white shadow-xl ${theme.btn}`}>
+                                <FaUserEdit size={30} />
+                            </div>
+                            <h2 className="text-2xl font-black mb-2">Welcome to Dhruva</h2>
+                            <p className="text-sm opacity-60 mb-8 leading-relaxed">Setup your Class and Board so we can provide syllabus-accurate solutions.</p>
+                            <button onClick={() => navigate("/profile")} className={`w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm text-white shadow-lg active:scale-95 transition-all ${theme.btn}`}>Setup Profile</button>
+                            <button onClick={() => setShowOnboarding(false)} className="mt-4 text-[10px] font-black opacity-30 uppercase tracking-widest">Skip for now</button>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Dynamic Sidebar */}
             <AnimatePresence>
                 {showSidebar && (
-                    <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[600] w-72 h-full flex flex-col p-6 shadow-2xl ${currentTheme.sidebar}`}>
-                        <div className="flex justify-between items-center mb-6"><span className="text-[10px] font-black opacity-40">HISTORY</span><button onClick={() => setShowSidebar(false)}><FaTimes /></button></div>
-                        <button onClick={() => { setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false); }} className="w-full py-4 mb-4 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2"><FaPlus /> NEW CHAT</button>
-                        <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
-                            {sessions.map(s => <div key={s.id} onClick={() => loadSession(s.id)} className={`p-4 rounded-xl cursor-pointer text-[10px] font-bold border ${currentSessionId === s.id ? 'bg-indigo-500/10 border-indigo-500/20 text-indigo-500' : 'border-transparent opacity-50'}`}>{s.title || "Untitled Session"}</div>)}
+                    <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[600] w-80 h-full p-6 shadow-2xl flex flex-col ${theme.sidebar}`}>
+                        <div className="flex justify-between items-center mb-8">
+                            <div className="flex items-center gap-2">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-white ${theme.btn}`}><FaSparkles size={14}/></div>
+                                <span className="font-black text-xs uppercase tracking-widest">Dhruva AI</span>
+                            </div>
+                            <button onClick={() => setShowSidebar(false)}><FaTimes /></button>
                         </div>
+                        
+                        <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
+                            <p className="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase">Visual Themes</p>
+                            <div className="grid grid-cols-2 gap-2 mb-8">
+                                {Object.keys(THEME_CONFIG).map(k => (
+                                    <button key={k} onClick={() => setCurrentThemeKey(k)} 
+                                        className={`p-3 rounded-xl text-[10px] font-black border transition-all ${currentThemeKey === k ? `border-indigo-500 ${theme.bubble} text-indigo-400` : 'border-white/5 opacity-40'}`}>
+                                        {THEME_CONFIG[k].name}
+                                    </button>
+                                ))}
+                            </div>
+                            
+                            <p className="text-[10px] font-black opacity-30 mb-4 tracking-widest uppercase">History</p>
+                            {sessions.map(s => (
+                                <button key={s.id} onClick={() => { setMessages(s.messages); setCurrentSessionId(s.id); setShowSidebar(false); }}
+                                    className="w-full p-4 rounded-2xl text-left text-xs font-bold border border-white/5 hover:bg-white/5 truncate">
+                                    {s.title || "Previous Session"}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        <button onClick={logout} className="mt-4 p-4 rounded-2xl bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest">Sign Out</button>
                     </motion.div>
                 )}
             </AnimatePresence>
 
+            {/* Main Chat Stage */}
             <div className="flex-1 flex flex-col min-w-0 relative">
-                <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
-                <StudyTimer currentTheme={currentTheme} />
+                <Navbar currentUser={currentUser} theme={currentThemeKey} />
 
-                {/* Subject Inputs Bar */}
-                <div className="w-full max-w-4xl mx-auto px-4 pt-4 flex items-center gap-2">
-                    <button onClick={() => setShowSidebar(true)} className={`p-4 rounded-2xl border ${currentTheme.aiBubble} lg:hidden`}><FaHistory/></button>
-                    <div className={`flex-1 flex items-center gap-2 p-2 rounded-3xl border transition-all ${isLocked ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-white/10 bg-white/5 shadow-lg'}`}>
-                        <div className="flex-1 px-3"><label className="text-[7px] font-black opacity-40 block">SUBJECT</label><input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="E.g. Science" className="bg-transparent text-[11px] font-bold outline-none w-full" /></div>
-                        <div className="w-px h-6 bg-white/10" />
-                        <div className="flex-1 px-3"><label className="text-[7px] font-black opacity-40 block">CHAPTER</label><input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Ch #" className="bg-transparent text-[11px] font-bold outline-none w-full" /></div>
-                        <button onClick={() => setIsLocked(!isLocked)} className={`p-2.5 rounded-xl ${isLocked ? 'bg-emerald-500 text-white' : 'bg-white/5 text-indigo-500'}`}>{isLocked ? <FaLock size={12}/> : <FaUnlock size={12}/>}</button>
+                {/* Subject Control Center */}
+                <div className="w-full max-w-4xl mx-auto px-4 mt-4 flex items-center gap-2">
+                    <button onClick={() => setShowSidebar(true)} className={`p-4 rounded-2xl border ${theme.bubble}`}><FaHistory/></button>
+                    <div className={`flex-1 flex items-center gap-2 p-2 rounded-3xl border transition-all ${theme.bubble}`}>
+                        <div className="flex-1 px-4">
+                            <label className="text-[8px] font-black opacity-30 block uppercase">Current Subject</label>
+                            <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Physics, Maths, etc." className="bg-transparent text-xs font-bold outline-none w-full" />
+                        </div>
+                        <button onClick={() => setIsLocked(!isLocked)} className={`p-3 rounded-xl transition-all ${isLocked ? 'bg-emerald-500 text-white' : 'bg-white/10 opacity-50'}`}>
+                            {isLocked ? <FaLock size={12}/> : <FaUnlock size={12}/>}
+                        </button>
                     </div>
                 </div>
 
-                {/* Messages Container */}
-                <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-6 no-scrollbar">
+                {/* Content Area */}
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar">
                     <div className="max-w-3xl mx-auto space-y-8 pb-32">
                         {messages.length === 0 ? (
-                            <EmptyStateGuidance theme={theme} setInput={setInput} setSubjectInput={setSubjectInput} />
+                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+                                <div className={`w-20 h-20 rounded-[2.5rem] flex items-center justify-center mb-8 shadow-2xl ${theme.bubble}`}>
+                                    <FaSparkles className={`text-3xl animate-pulse ${theme.accent}`} />
+                                </div>
+                                <h1 className="text-3xl font-black mb-4">How can I help you study?</h1>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-xl">
+                                    {[
+                                        { t: "Explain Photosynthesis", s: "Biology", i: <FaLightbulb/> },
+                                        { t: "Math Doubt: Trigonometry", s: "Maths", i: <FaGraduationCap/> },
+                                        { t: "Summary of WW1", s: "History", i: <FaBookOpen/> },
+                                        { t: "Solve this Physics Problem", s: "Physics", i: <FaQuestion/> }
+                                    ].map((card, i) => (
+                                        <button key={i} onClick={() => { setSubjectInput(card.s); sendMessage(card.t); }}
+                                            className={`p-5 rounded-[2rem] border text-left flex items-center gap-4 transition-all hover:scale-[1.02] active:scale-95 ${theme.bubble}`}>
+                                            <div className={`p-3 rounded-2xl text-white ${theme.btn}`}>{card.i}</div>
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-black uppercase opacity-30">{card.s}</span>
+                                                <span className="text-sm font-bold truncate w-40">{card.t}</span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </motion.div>
                         ) : (
                             messages.map((msg, i) => (
-                                <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                                    <div className={`max-w-[90%] p-5 rounded-3xl ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none shadow-xl shadow-indigo-500/10` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
-                                        {msg.image && <img src={msg.image} alt="upload" className="rounded-xl mb-3 max-h-48 w-full object-cover" />}
-                                        {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
-                                            <Typewriter text={msg.content} scrollRef={chatContainerRef} onComplete={() => messagesEndRef.current?.scrollIntoView()} />
-                                        ) : (
-                                            <div className="prose prose-sm dark:prose-invert"><ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown></div>
-                                        )}
-                                        {msg.ytLink && <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-2 px-3 py-2 bg-red-600/10 text-red-500 rounded-xl text-[9px] font-black border border-red-500/20"><FaYoutube/> VIDEO GUIDE</a>}
+                                <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                                    <div className={`max-w-[85%] p-6 rounded-[2.5rem] shadow-2xl ${msg.role === "user" ? `${theme.user} rounded-tr-none` : `${theme.bubble} rounded-tl-none`}`}>
+                                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                                {msg.content}
+                                            </ReactMarkdown>
+                                        </div>
                                     </div>
-                                </div>
+                                </motion.div>
                             ))
                         )}
                         <div ref={messagesEndRef} />
                     </div>
                 </div>
 
-                {/* --- RESPONSIVE BOTTOM BAR --- */}
-                <div className="absolute bottom-0 left-0 w-full p-4 md:p-8 bg-gradient-to-t from-black via-black/90 to-transparent md:from-transparent pointer-events-none">
+                {/* Floating Action Bar */}
+                <div className="absolute bottom-0 left-0 w-full p-4 md:p-10 bg-gradient-to-t from-black/20 to-transparent pointer-events-none">
                     <div className="max-w-3xl mx-auto pointer-events-auto">
-                        <div className={`flex flex-col md:flex-row items-stretch md:items-center gap-2 p-1.5 md:p-2 rounded-[2rem] md:rounded-[3rem] border transition-all duration-300 ${currentTheme.input} ${isListening ? 'ring-2 ring-indigo-500' : 'border-white/10 shadow-2xl'}`}>
-                            
-                            <div className="flex items-center flex-1 px-4 py-2 md:py-0">
-                                <input 
-                                    value={input} 
-                                    onChange={e => setInput(e.target.value)} 
-                                    placeholder={isListening ? "Listening..." : "Message Dhruva..."} 
-                                    className="flex-1 bg-transparent py-2 outline-none font-bold text-sm md:text-base" 
-                                    onKeyDown={e => e.key === "Enter" && sendMessage()} 
-                                />
-                            </div>
-
-                            <div className="flex items-center justify-between md:justify-end gap-1 px-2 pb-2 md:pb-0 md:pr-1">
-                                <div className="flex items-center gap-1">
-                                    <button onClick={startVoiceMode} className={`p-3 md:p-4 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white/5 opacity-50 hover:opacity-100'}`}><FaMicrophone size={16}/></button>
-                                    <button onClick={() => fileInputRef.current.click()} className="p-3 md:p-4 bg-white/5 opacity-50 hover:opacity-100 rounded-full transition-all"><FaImage size={16}/></button>
-                                    <button onClick={() => setIsCameraOpen(true)} className="p-3 md:p-4 bg-white/5 opacity-50 hover:opacity-100 rounded-full transition-all"><FaCamera size={16}/></button>
-                                </div>
-                                
-                                <button 
-                                    onClick={() => sendMessage()} 
-                                    disabled={isSending} 
-                                    className={`p-4 md:p-5 rounded-full ${currentTheme.button} shadow-xl shadow-indigo-500/30 active:scale-95 transition-all ml-2`}
-                                >
-                                    {isSending ? <FaSyncAlt className="animate-spin" size={18} /> : <FaPaperPlane size={18} />}
+                        <div className={`flex items-center gap-2 p-2 rounded-[3rem] border shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-500 ${theme.input}`}>
+                            <input 
+                                value={input} 
+                                onChange={e => setInput(e.target.value)}
+                                placeholder="Message Dhruva..."
+                                className="flex-1 bg-transparent px-6 py-4 outline-none font-black text-sm md:text-base"
+                                onKeyDown={e => e.key === "Enter" && sendMessage()}
+                            />
+                            <div className="flex items-center gap-1 pr-2">
+                                <button className="hidden md:flex p-4 rounded-full bg-white/5 opacity-50 hover:opacity-100 transition-all"><FaCamera size={18}/></button>
+                                <button onClick={() => sendMessage()} disabled={isSending} 
+                                    className={`p-5 rounded-full shadow-lg transition-all active:scale-95 text-white ${theme.btn}`}>
+                                    {isSending ? <FaSyncAlt className="animate-spin" size={20} /> : <FaPaperPlane size={20} />}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} accept="image/*" />
             </div>
-
-            {/* Neural Camera */}
-            <AnimatePresence>
-                {isCameraOpen && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center p-6">
-                        <video ref={videoRef} autoPlay playsInline className="w-full max-w-md rounded-[2.5rem] border border-white/10" onLoadedMetadata={() => videoRef.current.play()} />
-                        <div className="mt-8 flex gap-6">
-                            <button onClick={() => setIsCameraOpen(false)} className="p-5 bg-white/10 rounded-full text-white"><FaTimes size={20}/></button>
-                            <button onClick={() => {
-                                const c = canvasRef.current;
-                                const v = videoRef.current;
-                                c.width = v.videoWidth; c.height = v.videoHeight;
-                                c.getContext("2d").drawImage(v, 0, 0);
-                                c.toBlob(b => {
-                                    setSelectedFile(new File([b], "shot.jpg", { type: "image/jpeg" }));
-                                    v.srcObject.getTracks().forEach(t => t.stop());
-                                    setIsCameraOpen(false);
-                                }, "image/jpeg", 0.7);
-                            }} className="w-20 h-20 rounded-full border-4 border-white flex items-center justify-center"><div className="w-14 h-14 bg-white rounded-full"/></button>
-                        </div>
-                        <canvas ref={canvasRef} className="hidden" />
-                    </motion.div>
-                )}
-            </AnimatePresence>
         </div>
     );
 }
