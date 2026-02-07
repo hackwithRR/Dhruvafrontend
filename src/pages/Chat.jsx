@@ -13,26 +13,41 @@ import { motion, AnimatePresence } from "framer-motion";
 // --- API CONFIGURATION ---
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-// --- TYPEWRITER HELPER COMPONENT ---
-const Typewriter = ({ text, delay = 10, onComplete }) => {
+// --- ENHANCED TYPEWRITER WITH CURSOR INDICATOR ---
+const Typewriter = ({ text, delay = 35, onComplete }) => {
     const [displayedText, setDisplayedText] = useState("");
-    const [isFinished, setIsFinished] = useState(false);
+    const [showCursor, setShowCursor] = useState(true);
 
     useEffect(() => {
         let i = 0;
+        setDisplayedText("");
+        setShowCursor(true);
+
         const timer = setInterval(() => {
             setDisplayedText(text.substring(0, i + 1));
             i++;
             if (i >= text.length) {
                 clearInterval(timer);
-                setIsFinished(true);
+                setShowCursor(false); // Hide cursor when done
                 if (onComplete) onComplete();
             }
         }, delay);
-        return () => clearInterval(timer);
-    }, [text, delay, onComplete]);
 
-    return <ReactMarkdown>{displayedText}</ReactMarkdown>;
+        return () => clearInterval(timer);
+    }, [text, delay]);
+
+    return (
+        <div className="relative">
+            <ReactMarkdown>{displayedText}</ReactMarkdown>
+            {showCursor && (
+                <motion.span
+                    animate={{ opacity: [1, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.6 }}
+                    className="inline-block w-1 h-5 bg-indigo-500 ml-1 translate-y-1"
+                />
+            )}
+        </div>
+    );
 };
 
 export default function Chat() {
@@ -113,13 +128,13 @@ export default function Chat() {
         checkUserSetup();
     }, [currentUser]);
 
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages, isSending]);
-
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages, isSending]);
 
     const handleScroll = (e) => {
         const bottom = e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 100;
@@ -206,7 +221,7 @@ export default function Chat() {
                                     <option value="English">English</option>
                                     <option value="Hinglish">Hinglish</option>
                                 </select>
-                                <button onClick={saveSetup} className="w-full py-4 bg-indigo-600 rounded-2xl font-bold">Start</button>
+                                <button onClick={saveSetup} className="w-full py-4 bg-indigo-600 rounded-2xl font-bold">Start Learning</button>
                             </div>
                         </div>
                     </motion.div>
@@ -214,7 +229,7 @@ export default function Chat() {
             </AnimatePresence>
 
             {showSidebar && (
-                <div className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 ${currentTheme.sidebar}`}>
+                <motion.div initial={{ x: -300 }} animate={{ x: 0 }} className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 ${currentTheme.sidebar}`}>
                     <button onClick={() => setShowSidebar(false)} className="lg:hidden mb-4"><FaTimes /></button>
                     <button onClick={() => setMessages([])} className="w-full py-4 mb-4 rounded-2xl bg-indigo-600 font-bold"><FaPlus /> New Terminal</button>
                     <div className="flex-1 overflow-y-auto space-y-4 custom-y-scroll">
@@ -222,7 +237,7 @@ export default function Chat() {
                             <div key={i} className="text-[10px] font-bold opacity-30 truncate uppercase border-b border-white/5 pb-2">{m.content}</div>
                         ))}
                     </div>
-                </div>
+                </motion.div>
             )}
 
             <div className="flex-1 flex flex-col h-full relative overflow-hidden">
@@ -239,21 +254,21 @@ export default function Chat() {
                 <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll scroll-smooth">
                     <div className="max-w-3xl mx-auto space-y-12">
                         {messages.map((msg, i) => (
-                            <div key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
                                 <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? currentTheme.userBubble : currentTheme.aiBubble}`}>
                                     {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 object-cover" alt="upload" />}
                                     <div className={`prose prose-sm ${theme === 'light' ? 'prose-slate' : 'prose-invert'} font-medium`}>
                                         {msg.role === "ai" && i === messages.length - 1 ? (
-                                            <Typewriter text={msg.content} onComplete={scrollToBottom} />
+                                            <Typewriter text={msg.content} delay={40} onComplete={scrollToBottom} />
                                         ) : (
                                             <ReactMarkdown>{msg.content}</ReactMarkdown>
                                         )}
                                     </div>
                                 </div>
-                            </div>
+                            </motion.div>
                         ))}
-                        {isSending && <div className="text-[9px] font-black uppercase animate-pulse">Processing...</div>}
-                        <div ref={messagesEndRef} />
+                        {isSending && <div className="text-[9px] font-black uppercase animate-pulse">Dhruva is thinking...</div>}
+                        <div ref={messagesEndRef} className="h-4" />
                     </div>
                 </div>
 
@@ -261,20 +276,20 @@ export default function Chat() {
                     <div className="max-w-3xl mx-auto relative">
                         <AnimatePresence>
                             {selectedFile && (
-                                <div className="absolute bottom-full mb-6 left-4">
+                                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="absolute bottom-full mb-6 left-4">
                                     <img src={URL.createObjectURL(selectedFile)} className="w-24 h-24 rounded-[2rem] border-2 border-indigo-500" alt="preview" />
                                     <button onClick={() => setSelectedFile(null)} className="absolute -top-2 -right-2 bg-red-500 p-2 rounded-full"><FaTimes size={10} /></button>
-                                </div>
+                                </motion.div>
                             )}
                         </AnimatePresence>
-                        <div className={`flex items-center p-2 rounded-[2.8rem] border ${currentTheme.input}`}>
-                            <input value={input} onChange={e => setInput(e.target.value)} placeholder="Ask Dhruva..." className="flex-1 bg-transparent px-6 py-4 outline-none font-bold" onKeyDown={e => e.key === "Enter" && sendMessage()} />
+                        <div className={`flex items-center p-2 rounded-[2.8rem] border shadow-2xl ${currentTheme.input}`}>
+                            <input value={input} onChange={e => setInput(e.target.value)} placeholder="Type a message..." className="flex-1 bg-transparent px-6 py-4 outline-none font-bold" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex gap-2 px-2">
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} />
-                                <button onClick={() => fileInputRef.current.click()}><FaImage /></button>
-                                <button onClick={openCamera}><FaCamera /></button>
-                                <button onClick={sendMessage} className={`p-5 rounded-full ${currentTheme.button}`}>
-                                    {isSending ? <FaSyncAlt className="animate-spin" /> : <FaPaperPlane size={14} />}
+                                <button onClick={() => fileInputRef.current.click()} className="opacity-40 hover:opacity-100 transition-all"><FaImage /></button>
+                                <button onClick={openCamera} className="opacity-40 hover:opacity-100 transition-all"><FaCamera /></button>
+                                <button onClick={sendMessage} className={`p-5 rounded-full ${currentTheme.button} active:scale-95 transition-all`}>
+                                    {isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane size={14} className="text-white" />}
                                 </button>
                             </div>
                         </div>
@@ -283,12 +298,12 @@ export default function Chat() {
 
                 <AnimatePresence>
                     {isCameraOpen && (
-                        <div className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
-                            <button onClick={closeCamera} className="self-end p-4"><FaTimes size={20} className="text-white"/></button>
-                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem]" />
-                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center"><div className="w-16 h-16 bg-white rounded-full" /></button>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
+                            <button onClick={closeCamera} className="self-end p-4 bg-white/10 rounded-full"><FaTimes size={20} className="text-white"/></button>
+                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/20" />
+                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-90"><div className="w-16 h-16 bg-white rounded-full" /></button>
                             <canvas ref={canvasRef} className="hidden" />
-                        </div>
+                        </motion.div>
                     )}
                 </AnimatePresence>
             </div>
