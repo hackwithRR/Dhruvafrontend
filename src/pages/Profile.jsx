@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom"; // Optimization: Prevent full page reloads
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../utils/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { getAuth, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
+import { getAuth, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, linkWithCredential } from "firebase/auth";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Navbar from "../components/Navbar";
@@ -12,7 +12,7 @@ import {
     FaArrowLeft, FaSave, FaSyncAlt, FaShieldAlt,
     FaChevronDown, FaLanguage, FaEye, FaEyeSlash, FaUserCircle,
     FaGraduationCap, FaBook, FaBolt, FaTerminal,
-    FaMars, FaVenus, FaGenderless, FaDice
+    FaMars, FaVenus, FaGenderless, FaDice, FaKey
 } from "react-icons/fa";
 
 // --- Custom Select Component ---
@@ -81,7 +81,9 @@ export default function Profile() {
         gender: "other"
     });
 
-    const isGoogleUser = currentUser?.providerData[0]?.providerId === 'google.com';
+    // Check if user has a password provider linked
+    const hasPassword = currentUser?.providerData.some(p => p.providerId === 'password');
+    const isGoogleUserOnly = currentUser?.providerData.length === 1 && currentUser?.providerData[0].providerId === 'google.com';
 
     const avatarStyles = [
         "adventurer", "avataaars", "bottts", "big-smile", "miniavs", "open-peeps",
@@ -126,7 +128,7 @@ export default function Profile() {
                         classLevel: d.class || d.classLevel || "10",
                         language: d.language || "English",
                         pfp: d.pfp || currentUser.photoURL || prev.pfp,
-                        gender: d.gender || "other",
+                        gender: d.gender || "other", // Fixed: Ensuring gender syncs from DB
                     }));
                 }
             } catch (err) {
@@ -162,16 +164,28 @@ export default function Profile() {
     };
 
     const handlePasswordUpdate = async () => {
-        if (isGoogleUser) return toast.info("MANAGED VIA GOOGLE");
         if (!passwords.newPass) return toast.error("NEW KEY MISSING");
+        if (passwords.newPass.length < 6) return toast.error("KEY TOO WEAK (MIN 6)");
+        
         setLoading(true);
         try {
-            const cred = EmailAuthProvider.credential(currentUser.email, passwords.oldPass);
-            await reauthenticateWithCredential(auth.currentUser, cred);
-            await updatePassword(auth.currentUser, passwords.newPass);
-            toast.success("SECURITY RESET SUCCESSFUL");
+            if (hasPassword) {
+                // Change existing password
+                const cred = EmailAuthProvider.credential(currentUser.email, passwords.oldPass);
+                await reauthenticateWithCredential(auth.currentUser, cred);
+                await updatePassword(auth.currentUser, passwords.newPass);
+                toast.success("SECURITY RESET SUCCESSFUL");
+            } else {
+                // Set password for the first time (Google Link)
+                const credential = EmailAuthProvider.credential(currentUser.email, passwords.newPass);
+                await linkWithCredential(auth.currentUser, credential);
+                toast.success("PASSWORD NODE ESTABLISHED");
+            }
             setPasswords({ oldPass: "", newPass: "" });
-        } catch (e) { toast.error(e.message); }
+            await reloadUser();
+        } catch (e) { 
+            toast.error(e.code === 'auth/wrong-password' ? "INVALID CURRENT KEY" : e.message); 
+        }
         finally { setLoading(false); }
     };
 
@@ -180,14 +194,11 @@ export default function Profile() {
             <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
             <ToastContainer position="top-right" theme={theme === 'dark' ? 'dark' : 'light'} />
 
-            {/* Mesh Background */}
             <div className={`fixed inset-0 pointer-events-none ${s.mesh} overflow-hidden`}>
                 <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-600/20 blur-[120px] rounded-full" />
             </div>
 
             <main className="max-w-4xl mx-auto pt-16 sm:pt-24 px-4 sm:px-6 relative z-10">
-
-                {/* ID Tag */}
                 <div className="flex justify-center sm:justify-start mb-8 sm:mb-12 opacity-40">
                     <div className="flex items-center gap-3 text-[10px] font-black tracking-[0.3em] uppercase border-l-2 border-indigo-500 pl-4">
                         <FaTerminal />
@@ -199,7 +210,6 @@ export default function Profile() {
                     initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
                     className={`rounded-[40px] sm:rounded-[60px] p-6 sm:p-16 border shadow-2xl ${s.card}`}
                 >
-                    {/* Hero Section */}
                     <div className="flex flex-col items-center sm:flex-row gap-8 sm:gap-12 mb-16 sm:mb-20">
                         <div className="relative group">
                             <div className="absolute inset-0 bg-indigo-500 blur-3xl opacity-20 group-hover:opacity-40 transition-opacity" />
@@ -221,7 +231,6 @@ export default function Profile() {
                         </div>
                     </div>
 
-                    {/* Avatar Picker */}
                     <div className="mb-16">
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 opacity-40 text-center sm:text-left px-2">Expansion Packs</p>
                         <div className="flex flex-wrap justify-center sm:justify-start gap-2 sm:gap-3">
@@ -237,7 +246,6 @@ export default function Profile() {
                         </div>
                     </div>
 
-                    {/* Main Form */}
                     <div className="space-y-8 sm:space-y-12">
                         <div className="relative group">
                             <span className={`absolute -top-2 left-5 px-3 py-0.5 text-[9px] font-black uppercase rounded-full z-20 border border-white/10 tracking-widest ${s.label}`}>Neural Alias</span>
@@ -293,14 +301,16 @@ export default function Profile() {
                         {loading ? <FaSyncAlt className="animate-spin" /> : <FaSave />} Sync_Changes
                     </motion.button>
 
-                    {/* Security Section - Conditionally hidden for Google Users */}
-                    {!isGoogleUser && (
-                        <div className="mt-16 sm:mt-24 pt-10 sm:pt-12 border-t border-white/5">
-                            <div className="flex items-center gap-4 mb-8 sm:mb-10">
-                                <FaShieldAlt className="text-red-500 text-lg sm:text-xl" />
-                                <h3 className="text-[10px] font-black uppercase tracking-[0.4em] opacity-40">Security Override</h3>
-                            </div>
-                            <div className="space-y-4">
+                    {/* Security Section - Now handles both "Change" and "Set" password */}
+                    <div className="mt-16 sm:mt-24 pt-10 sm:pt-12 border-t border-white/5">
+                        <div className="flex items-center gap-4 mb-8 sm:mb-10">
+                            <FaShieldAlt className={`${hasPassword ? 'text-red-500' : 'text-green-500'} text-lg sm:text-xl`} />
+                            <h3 className="text-[10px] font-black uppercase tracking-[0.4em] opacity-40">
+                                {hasPassword ? "Security Override" : "Establish Password Node"}
+                            </h3>
+                        </div>
+                        <div className="space-y-4">
+                            {hasPassword && (
                                 <input
                                     type="password"
                                     placeholder="CURRENT KEY"
@@ -308,66 +318,64 @@ export default function Profile() {
                                     onChange={(e) => setPasswords({ ...passwords, oldPass: e.target.value })}
                                     className={`w-full p-5 sm:p-6 rounded-[20px] sm:rounded-[24px] border outline-none text-[10px] font-black tracking-widest ${s.input}`}
                                 />
-                                <div className="relative">
-                                    <input
-                                        type={showPass.new ? "text" : "password"}
-                                        placeholder="NEW SECURITY HASH"
-                                        value={passwords.newPass}
-                                        onChange={(e) => setPasswords({ ...passwords, newPass: e.target.value })}
-                                        className={`w-full p-5 sm:p-6 rounded-[20px] sm:rounded-[24px] border outline-none text-[10px] font-black tracking-widest ${s.input}`}
-                                    />
-                                    <button type="button" onClick={() => setShowPass({ ...showPass, new: !showPass.new })} className="absolute right-6 top-1/2 -translate-y-1/2 opacity-30">
-                                        {showPass.new ? <FaEyeSlash /> : <FaEye />}
-                                    </button>
-                                </div>
-                                <button
-                                    onClick={handlePasswordUpdate}
-                                    className="w-full py-4 rounded-[20px] sm:rounded-[24px] bg-red-500/10 border border-red-500/20 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all"
-                                >
-                                    Flash_Auth_Memory
+                            )}
+                            <div className="relative">
+                                <input
+                                    type={showPass.new ? "text" : "password"}
+                                    placeholder={hasPassword ? "NEW SECURITY HASH" : "CREATE NEW KEY"}
+                                    value={passwords.newPass}
+                                    onChange={(e) => setPasswords({ ...passwords, newPass: e.target.value })}
+                                    className={`w-full p-5 sm:p-6 rounded-[20px] sm:rounded-[24px] border outline-none text-[10px] font-black tracking-widest ${s.input}`}
+                                />
+                                <button type="button" onClick={() => setShowPass({ ...showPass, new: !showPass.new })} className="absolute right-6 top-1/2 -translate-y-1/2 opacity-30">
+                                    {showPass.new ? <FaEyeSlash /> : <FaEye />}
                                 </button>
                             </div>
+                            <button
+                                onClick={handlePasswordUpdate}
+                                disabled={loading}
+                                className={`w-full py-4 rounded-[20px] sm:rounded-[24px] transition-all flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-widest ${
+                                    hasPassword 
+                                    ? 'bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white' 
+                                    : 'bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 hover:bg-indigo-500 hover:text-white'
+                                }`}
+                            >
+                                {loading ? <FaSyncAlt className="animate-spin" /> : <FaKey />}
+                                {hasPassword ? "Flash_Auth_Memory" : "Initialize_Key_Link"}
+                            </button>
                         </div>
-                    )}
+                    </div>
 
                     {/* --- IMPROVED RETURN TO CHAT BUTTON --- */}
                     <div className="mt-12 pt-8 border-t border-white/5 flex justify-center">
                         <motion.button
-                            whileHover={{ scale: 1.02, backgroundColor: "rgba(255, 255, 255, 0.03)" }}
+                            whileHover={{ scale: 1.02, backgroundColor: theme === 'dark' ? "rgba(255, 255, 255, 0.05)" : "rgba(0, 0, 0, 0.02)" }}
                             whileTap={{ scale: 0.98 }}
                             onClick={() => navigate("/chat")}
-                            className="group relative w-full flex items-center p-2 pr-10 rounded-[24px] sm:rounded-full bg-transparent border-2 border-white/10 hover:border-indigo-500/50 transition-all duration-300 shadow-2xl"
+                            className={`group relative w-full flex items-center p-2 pr-10 rounded-[24px] sm:rounded-full bg-transparent border-2 transition-all duration-300 shadow-xl ${theme === 'dark' ? 'border-white/10 hover:border-indigo-500/50' : 'border-slate-200 hover:border-blue-500/50'}`}
                         >
-                            <div className="bg-white/5 group-hover:bg-indigo-600 p-4 sm:p-5 rounded-[18px] sm:rounded-full flex items-center justify-center transition-all duration-300">
-                                <FaArrowLeft className="text-white text-lg sm:text-xl transition-transform group-hover:-translate-x-1" />
+                            <div className={`${theme === 'dark' ? 'bg-white/5' : 'bg-slate-100'} group-hover:bg-indigo-600 p-4 sm:p-5 rounded-[18px] sm:rounded-full flex items-center justify-center transition-all duration-300`}>
+                                <FaArrowLeft className={`${theme === 'dark' ? 'text-white' : 'text-slate-600'} group-hover:text-white text-lg sm:text-xl transition-transform group-hover:-translate-x-1`} />
                             </div>
 
                             <div className="text-left ml-5 flex flex-col justify-center overflow-hidden">
-                                <span className="block text-white font-black text-[11px] sm:text-sm uppercase tracking-[0.4em] leading-none mb-1.5 transition-colors group-hover:text-indigo-400">
+                                <span className={`block font-black text-[11px] sm:text-sm uppercase tracking-[0.4em] leading-none mb-1.5 transition-colors ${theme === 'dark' ? 'text-white' : 'text-slate-800'} group-hover:text-indigo-500`}>
                                     Return To Chat
                                 </span>
                                 <div className="flex items-center gap-2">
                                     <div className="h-1 w-1 rounded-full bg-indigo-500 group-hover:animate-pulse" />
-                                    <span className="text-[8px] sm:text-[9px] text-white/30 font-black uppercase tracking-[0.2em] whitespace-nowrap">
+                                    <span className="text-[8px] sm:text-[9px] opacity-40 font-black uppercase tracking-[0.2em] whitespace-nowrap">
                                         Close_Config // Exit_Node
                                     </span>
-                                </div>
-                            </div>
-
-                            <div className="ml-auto opacity-20 group-hover:opacity-60 transition-all hidden sm:block">
-                                <div className="flex flex-col items-end">
-                                    <div className="w-4 h-[1px] bg-white mb-1" />
-                                    <div className="w-2 h-[1px] bg-white" />
                                 </div>
                             </div>
                         </motion.button>
                     </div>
                 </motion.div>
 
-                <p className="mt-8 text-center text-[8px] font-black uppercase tracking-[1em] opacity-10 text-white">
+                <p className="mt-8 text-center text-[8px] font-black uppercase tracking-[1em] opacity-10">
                     System Protocol Alpha
                 </p>
-
             </main>
         </div>
     );
