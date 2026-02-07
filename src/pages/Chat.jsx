@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
-import { FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, FaTrash, FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, FaBookOpen, FaGraduationCap, FaRocket } from "react-icons/fa";
+import { FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, FaTrash, FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, FaBookOpen, FaGraduationCap, FaRocket, FaChevronDown } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -66,15 +66,24 @@ const OnboardingModal = ({ onComplete, currentTheme }) => (
 );
 
 // --- UPDATED TYPEWRITER WITH MATH SUPPORT ---
-const Typewriter = ({ text, onComplete }) => {
+const Typewriter = ({ text, onComplete, scrollRef }) => {
     const [displayedText, setDisplayedText] = useState("");
     const [cursor, setCursor] = useState(true);
+    
     useEffect(() => {
         let i = 0;
         const interval = setInterval(() => {
             setDisplayedText(text.substring(0, i + 1));
             i++;
-            if (i >= text.length) { clearInterval(interval); setCursor(false); if (onComplete) onComplete(); }
+            // Auto-scroll while typing
+            if (scrollRef.current) {
+                scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+            }
+            if (i >= text.length) { 
+                clearInterval(interval); 
+                setCursor(false); 
+                if (onComplete) onComplete(); 
+            }
         }, 10); 
         return () => clearInterval(interval);
     }, [text]);
@@ -178,7 +187,9 @@ export default function Chat() {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [cameraFacing, setCameraFacing] = useState("environment");
+    const [showScrollBtn, setShowScrollBtn] = useState(false);
 
+    const chatContainerRef = useRef(null);
     const messagesEndRef = useRef(null);
     const videoRef = useRef(null);
     const canvasRef = useRef(null);
@@ -190,6 +201,26 @@ export default function Chat() {
     };
     const currentTheme = themes[theme] || themes.dark;
     const modes = [ { id: "Explain", icon: <FaBookOpen />, label: "Explain" }, { id: "Doubt", icon: <FaQuestion />, label: "Doubt" }, { id: "Quiz", icon: <FaGraduationCap />, label: "Quiz" }, { id: "Summary", icon: <FaLightbulb />, label: "Summary" } ];
+
+    // Auto-scroll when messages update
+    useEffect(() => {
+        if (chatContainerRef.current) {
+            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    // Handle showing/hiding scroll button
+    const handleScroll = () => {
+        if (chatContainerRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+            const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+            setShowScrollBtn(!isAtBottom);
+        }
+    };
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
 
     useEffect(() => {
         if (!currentUser) return;
@@ -204,7 +235,6 @@ export default function Chat() {
                     language: data.language || "English" 
                 });
                 
-                // Show onboarding ONLY if board or class is missing in Firestore
                 if (!data.board || (!data.class && !data.classLevel)) {
                     setShowOnboarding(true);
                 }
@@ -346,7 +376,11 @@ export default function Chat() {
                 </div>
 
                 {/* --- CHAT AREA --- */}
-                <div className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll scroll-smooth">
+                <div 
+                    ref={chatContainerRef}
+                    onScroll={handleScroll}
+                    className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll scroll-smooth relative"
+                >
                     <div className="max-w-3xl mx-auto space-y-12">
                         {messages.length === 0 && (
                             <div className="text-center py-20 opacity-20">
@@ -359,7 +393,11 @@ export default function Chat() {
                                 <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
                                     {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 w-full object-cover shadow-xl" alt="upload" />}
                                     {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
-                                        <Typewriter text={msg.content} onComplete={() => messagesEndRef.current?.scrollIntoView()} />
+                                        <Typewriter 
+                                            text={msg.content} 
+                                            scrollRef={chatContainerRef}
+                                            onComplete={() => messagesEndRef.current?.scrollIntoView()} 
+                                        />
                                     ) : (
                                         <div className="prose prose-sm dark:prose-invert max-w-none">
                                             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
@@ -377,6 +415,21 @@ export default function Chat() {
                         ))}
                         <div ref={messagesEndRef} className="h-4" />
                     </div>
+
+                    {/* SCROLL TO BOTTOM BUTTON */}
+                    <AnimatePresence>
+                        {showScrollBtn && (
+                            <motion.button
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: 10 }}
+                                onClick={scrollToBottom}
+                                className="fixed bottom-32 right-10 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-500 transition-all z-50 border border-white/20"
+                            >
+                                <FaChevronDown size={14} />
+                            </motion.button>
+                        )}
+                    </AnimatePresence>
                 </div>
 
                 {/* --- INPUT --- */}
