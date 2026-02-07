@@ -1,51 +1,41 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
-import { FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, FaImage, FaPlus, FaHistory, FaUnlock, FaChevronDown } from "react-icons/fa";
+import { FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, FaImage, FaPlus, FaHistory, FaUnlock, FaChevronDown, FaYoutube } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { doc, getDoc, updateDoc, arrayUnion, setDoc } from "firebase/firestore";
 import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence } from "framer-motion";
 
-// --- API CONFIGURATION ---
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-// --- ENHANCED TYPEWRITER WITH CURSOR INDICATOR ---
-const Typewriter = ({ text, delay = 35, onComplete }) => {
+// --- ENHANCED TYPEWRITER COMPONENT ---
+const Typewriter = ({ text, onComplete }) => {
     const [displayedText, setDisplayedText] = useState("");
-    const [showCursor, setShowCursor] = useState(true);
+    const [cursor, setCursor] = useState(true);
 
     useEffect(() => {
         let i = 0;
-        setDisplayedText("");
-        setShowCursor(true);
-
-        const timer = setInterval(() => {
+        const interval = setInterval(() => {
             setDisplayedText(text.substring(0, i + 1));
             i++;
             if (i >= text.length) {
-                clearInterval(timer);
-                setShowCursor(false); // Hide cursor when done
+                clearInterval(interval);
+                setCursor(false);
                 if (onComplete) onComplete();
             }
-        }, delay);
-
-        return () => clearInterval(timer);
-    }, [text, delay]);
+        }, 25); // Natural typing speed
+        return () => clearInterval(interval);
+    }, [text]);
 
     return (
         <div className="relative">
-            <ReactMarkdown>{displayedText}</ReactMarkdown>
-            {showCursor && (
-                <motion.span
-                    animate={{ opacity: [1, 0] }}
-                    transition={{ repeat: Infinity, duration: 0.6 }}
-                    className="inline-block w-1 h-5 bg-indigo-500 ml-1 translate-y-1"
-                />
-            )}
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{displayedText}</ReactMarkdown>
+            {cursor && <motion.span animate={{ opacity: [1, 0] }} transition={{ repeat: Infinity, duration: 0.5 }} className="inline-block w-1 h-5 bg-indigo-500 ml-1" />}
         </div>
     );
 };
@@ -115,42 +105,14 @@ export default function Chat() {
             if (userDoc.exists()) {
                 const data = userDoc.data();
                 setMessages(data.messages || []);
-                setUserData({
-                    board: data.board || "",
-                    class: data.class || "",
-                    language: data.language || "English"
-                });
-                if (!data.board || !data.class || !data.language) setShowSetup(true);
-            } else {
-                setShowSetup(true);
-            }
+                setUserData({ board: data.board || "", class: data.class || "", language: data.language || "English" });
+                if (!data.board || !data.class) setShowSetup(true);
+            } else { setShowSetup(true); }
         };
         checkUserSetup();
     }, [currentUser]);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    };
-
-    useEffect(() => {
-        scrollToBottom();
-    }, [messages, isSending]);
-
-    const handleScroll = (e) => {
-        const bottom = e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 100;
-        setShowScrollBtn(!bottom);
-    };
-
-    const saveSetup = async () => {
-        if (!userData.board || !userData.class || !userData.language) return toast.warning("Complete all fields!");
-        try {
-            await setDoc(doc(db, "users", currentUser.uid), userData, { merge: true });
-            setShowSetup(false);
-            toast.success("Profile Initialized");
-        } catch (e) {
-            toast.error("Setup failed");
-        }
-    };
+    const scrollToBottom = () => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
 
     const sendMessage = async () => {
         if (!currentUser || isSending || (!input.trim() && !selectedFile)) return;
@@ -163,7 +125,7 @@ export default function Chat() {
 
         const userMsg = {
             role: "user",
-            content: text || "Analyzing Attachment...",
+            content: text || "Analyzing file...",
             image: file ? URL.createObjectURL(file) : null,
             timestamp: Date.now()
         };
@@ -172,10 +134,10 @@ export default function Chat() {
         try {
             const payload = {
                 userId: currentUser.uid,
-                message: text || "Explain the attached image",
+                message: text || "Explain this image",
                 mode,
-                subject: subjectInput.trim() || "General",
-                chapter: chapterInput.trim() || "General",
+                subject: subjectInput || "General",
+                chapter: chapterInput || "General",
                 language: userData.language,
                 classLevel: userData.class
             };
@@ -191,17 +153,23 @@ export default function Chat() {
                 res = await axios.post(`${API_BASE}/chat`, payload);
             }
 
-            const aiMsg = { role: "ai", content: res.data.reply, timestamp: Date.now() };
+            // Extract core topic for YouTube suggestion
+            const topic = subjectInput || text.slice(0, 20);
+            const aiMsg = { 
+                role: "ai", 
+                content: res.data.reply, 
+                ytLink: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + " concept explanation")}`,
+                timestamp: Date.now() 
+            };
+            
             setMessages(prev => [...prev, aiMsg]);
             await updateDoc(doc(db, "users", currentUser.uid), { messages: arrayUnion(userMsg, aiMsg) });
-        } catch (e) {
-            toast.error("Server connection failed");
-        }
+        } catch (e) { toast.error("Server connection failed"); }
         setIsSending(false);
     };
 
     const closeCamera = () => { if (videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t => t.stop()); setIsCameraOpen(false); };
-    const openCamera = async () => { setIsCameraOpen(true); try { const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacing } }); if (videoRef.current) videoRef.current.srcObject = s; } catch (e) { toast.error("Camera error"); setIsCameraOpen(false); } };
+    const openCamera = async () => { setIsCameraOpen(true); try { const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: cameraFacing } }); if (videoRef.current) videoRef.current.srcObject = s; } catch (e) { setIsCameraOpen(false); } };
     const capturePhoto = () => { const c = canvasRef.current; const v = videoRef.current; c.width = v.videoWidth; c.height = v.videoHeight; c.getContext("2d").drawImage(v, 0, 0); c.toBlob(b => { setSelectedFile(new File([b], "cap.jpg", { type: "image/jpeg" })); closeCamera(); }, "image/jpeg", 0.8); };
 
     return (
@@ -209,99 +177,116 @@ export default function Chat() {
             <ToastContainer theme="dark" position="top-center" limit={1} />
             <style>{`.custom-y-scroll::-webkit-scrollbar { width: 4px; } .custom-y-scroll::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.2); border-radius: 10px; }`}</style>
 
+            {/* RESTORED MODES & SIDEBAR */}
             <AnimatePresence>
-                {showSetup && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[500] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
-                        <div className="bg-[#111] border border-white/10 p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl">
-                            <h2 className="text-2xl font-black mb-6 uppercase tracking-tighter">Initialize Dhruva</h2>
-                            <div className="space-y-4">
-                                <input className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none" placeholder="Board (e.g. CBSE)" value={userData.board} onChange={e => setUserData({ ...userData, board: e.target.value })} />
-                                <input className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none" placeholder="Class (e.g. 10)" value={userData.class} onChange={e => setUserData({ ...userData, class: e.target.value })} />
-                                <select className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none" value={userData.language} onChange={e => setUserData({ ...userData, language: e.target.value })}>
-                                    <option value="English">English</option>
-                                    <option value="Hinglish">Hinglish</option>
-                                </select>
-                                <button onClick={saveSetup} className="w-full py-4 bg-indigo-600 rounded-2xl font-bold">Start Learning</button>
-                            </div>
+                {showSidebar && (
+                    <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 overflow-hidden ${currentTheme.sidebar}`}>
+                        <div className="flex justify-between items-center mb-10">
+                            <span className="text-[10px] font-black tracking-widest uppercase opacity-40">History</span>
+                            <button onClick={() => setShowSidebar(false)} className="lg:hidden text-white/50"><FaTimes /></button>
+                        </div>
+                        <button onClick={() => { setMessages([]); setShowSidebar(false) }} className="w-full py-4 mb-4 rounded-2xl bg-indigo-600 text-white font-bold text-xs flex items-center justify-center gap-2">
+                            <FaPlus /> New Terminal
+                        </button>
+                        <div className="flex-1 overflow-y-auto space-y-4 custom-y-scroll">
+                            {messages.filter(m => m.role === 'user').slice(-10).map((m, i) => (
+                                <div key={i} className="text-[10px] font-bold text-white/30 uppercase truncate border-b border-white/5 pb-2">{m.content}</div>
+                            ))}
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {showSidebar && (
-                <motion.div initial={{ x: -300 }} animate={{ x: 0 }} className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 ${currentTheme.sidebar}`}>
-                    <button onClick={() => setShowSidebar(false)} className="lg:hidden mb-4"><FaTimes /></button>
-                    <button onClick={() => setMessages([])} className="w-full py-4 mb-4 rounded-2xl bg-indigo-600 font-bold"><FaPlus /> New Terminal</button>
-                    <div className="flex-1 overflow-y-auto space-y-4 custom-y-scroll">
-                        {messages.filter(m => m.role === 'user').slice(-10).map((m, i) => (
-                            <div key={i} className="text-[10px] font-bold opacity-30 truncate uppercase border-b border-white/5 pb-2">{m.content}</div>
-                        ))}
-                    </div>
-                </motion.div>
-            )}
-
-            <div className="flex-1 flex flex-col h-full relative overflow-hidden">
+            <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
 
+                {/* RESTORED TOP CONTROLS (MODE & LOCK) */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
-                    <button onClick={() => setShowSidebar(!showSidebar)} className="p-4 rounded-2xl bg-white/5 border border-white/10"><FaHistory size={14} /></button>
-                    <div className={`flex-1 flex gap-2 p-2 rounded-2xl border ${isLocked ? 'border-green-500/50 bg-green-500/5' : currentTheme.nav}`}>
-                        <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject" className="flex-1 bg-transparent text-[10px] font-black uppercase outline-none" />
-                        <button onClick={() => setIsLocked(!isLocked)} className="p-2">{isLocked ? <FaLock size={12} className="text-green-500"/> : <FaUnlock size={12} />}</button>
+                    <button onClick={() => setShowSidebar(!showSidebar)} className="p-4 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white"><FaHistory size={14} /></button>
+                    <div className={`flex-1 flex flex-col md:flex-row gap-2 p-2 rounded-2xl border transition-all ${isLocked ? 'border-green-500/50 bg-green-500/5' : currentTheme.nav}`}>
+                        <div className="flex flex-1 items-center gap-2 px-2">
+                            <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject..." className={`flex-1 bg-transparent text-[10px] font-black uppercase outline-none ${isLocked ? 'text-green-500' : 'opacity-60'}`} />
+                            <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Chapter..." className={`w-24 bg-transparent text-[10px] font-black uppercase outline-none ${isLocked ? 'text-green-500' : 'opacity-60'}`} />
+                            <button onClick={() => setIsLocked(!isLocked)} className={`p-2.5 rounded-xl transition-all ${isLocked ? "bg-green-500 text-white" : "bg-white/5 text-white/20"}`}>
+                                {isLocked ? <FaLock size={12} /> : <FaUnlock size={12} />}
+                            </button>
+                        </div>
+                        <div className="flex bg-black/20 p-1 rounded-xl gap-1">
+                            {["Explain", "Doubt", "Quiz"].map(m => (
+                                <button key={m} onClick={() => setMode(m)} className={`px-4 py-1.5 text-[9px] font-[1000] uppercase rounded-lg transition-all ${mode === m ? "bg-white text-black" : "opacity-30"}`}>{m}</button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
-                <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll scroll-smooth">
+                {/* CHAT AREA WITH TYPEWRITER */}
+                <div ref={chatContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-8 custom-y-scroll scroll-smooth">
                     <div className="max-w-3xl mx-auto space-y-12">
                         {messages.map((msg, i) => (
-                            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                                <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? currentTheme.userBubble : currentTheme.aiBubble}`}>
-                                    {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 object-cover" alt="upload" />}
-                                    <div className={`prose prose-sm ${theme === 'light' ? 'prose-slate' : 'prose-invert'} font-medium`}>
-                                        {msg.role === "ai" && i === messages.length - 1 ? (
-                                            <Typewriter text={msg.content} delay={40} onComplete={scrollToBottom} />
+                            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                                <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
+                                    {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 w-full object-cover" alt="upload" />}
+                                    
+                                    <div className={`prose prose-sm ${theme === 'light' ? 'prose-slate' : 'prose-invert'} text-sm leading-relaxed font-medium space-y-4`}>
+                                        {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
+                                            <Typewriter text={msg.content} onComplete={scrollToBottom} />
                                         ) : (
-                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                                         )}
                                     </div>
+
+                                    {/* VIDEO RECOMMENDATION */}
+                                    {msg.role === "ai" && msg.ytLink && (
+                                        <div className="mt-6 pt-4 border-t border-white/10">
+                                            <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Deepen your understanding:</p>
+                                            <a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-red-600/10 text-red-500 rounded-xl text-xs font-bold hover:bg-red-600/20 transition-all">
+                                                <FaYoutube size={16} /> Watch Concept Video
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         ))}
-                        {isSending && <div className="text-[9px] font-black uppercase animate-pulse">Dhruva is thinking...</div>}
+                        {isSending && <div className="text-[10px] font-black uppercase opacity-30 animate-pulse px-4">Dhruva is typing...</div>}
                         <div ref={messagesEndRef} className="h-4" />
                     </div>
                 </div>
 
-                <div className="p-4 md:p-10">
+                {/* INPUT BAR */}
+                <div className="p-4 md:p-10 shrink-0">
                     <div className="max-w-3xl mx-auto relative">
                         <AnimatePresence>
                             {selectedFile && (
                                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="absolute bottom-full mb-6 left-4">
-                                    <img src={URL.createObjectURL(selectedFile)} className="w-24 h-24 rounded-[2rem] border-2 border-indigo-500" alt="preview" />
-                                    <button onClick={() => setSelectedFile(null)} className="absolute -top-2 -right-2 bg-red-500 p-2 rounded-full"><FaTimes size={10} /></button>
+                                    <img src={URL.createObjectURL(selectedFile)} className="w-24 h-24 object-cover rounded-[2rem] border-2 border-indigo-500 shadow-2xl" alt="preview" />
+                                    <button onClick={() => setSelectedFile(null)} className="absolute -top-2 -right-2 bg-red-500 p-2 rounded-full text-white"><FaTimes size={10} /></button>
                                 </motion.div>
                             )}
                         </AnimatePresence>
-                        <div className={`flex items-center p-2 rounded-[2.8rem] border shadow-2xl ${currentTheme.input}`}>
-                            <input value={input} onChange={e => setInput(e.target.value)} placeholder="Type a message..." className="flex-1 bg-transparent px-6 py-4 outline-none font-bold" onKeyDown={e => e.key === "Enter" && sendMessage()} />
-                            <div className="flex gap-2 px-2">
+                        <div className={`flex items-center p-2 rounded-[2.8rem] border shadow-2xl transition-all ${currentTheme.input}`}>
+                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Ask anything in ${userData.language}...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
+                            <div className="flex items-center gap-2 px-2">
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} />
-                                <button onClick={() => fileInputRef.current.click()} className="opacity-40 hover:opacity-100 transition-all"><FaImage /></button>
-                                <button onClick={openCamera} className="opacity-40 hover:opacity-100 transition-all"><FaCamera /></button>
-                                <button onClick={sendMessage} className={`p-5 rounded-full ${currentTheme.button} active:scale-95 transition-all`}>
-                                    {isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane size={14} className="text-white" />}
+                                <button onClick={() => fileInputRef.current.click()} className="p-3 opacity-30 hover:opacity-100 transition-all"><FaImage /></button>
+                                <button onClick={openCamera} className="p-3 opacity-30 hover:opacity-100 transition-all"><FaCamera /></button>
+                                <button onClick={sendMessage} disabled={isSending} className={`p-5 rounded-full active:scale-90 transition-all ${currentTheme.button}`}>
+                                    {isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane className="text-white" size={14} />}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
+                {/* CAMERA MODAL */}
                 <AnimatePresence>
                     {isCameraOpen && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
-                            <button onClick={closeCamera} className="self-end p-4 bg-white/10 rounded-full"><FaTimes size={20} className="text-white"/></button>
-                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/20" />
-                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-90"><div className="w-16 h-16 bg-white rounded-full" /></button>
+                            <div className="w-full flex justify-between p-4 text-white">
+                                <button onClick={closeCamera} className="p-4 bg-white/5 rounded-full"><FaTimes size={20} /></button>
+                                <button onClick={() => setCameraFacing(f => f === 'user' ? 'environment' : 'user')} className="p-4 bg-white/5 rounded-full"><FaUndo /></button>
+                            </div>
+                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/10 shadow-2xl" />
+                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center"><div className="w-16 h-16 bg-white rounded-full" /></button>
                             <canvas ref={canvasRef} className="hidden" />
                         </motion.div>
                     )}
