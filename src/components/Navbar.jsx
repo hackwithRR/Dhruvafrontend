@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { FaUser, FaSignOutAlt, FaChevronDown, FaHourglassHalf, FaPalette } from "react-icons/fa";
-import { MdDarkMode, MdLightMode, MdGradient } from "react-icons/md";
+import { FaUser, FaSignOutAlt, FaChevronDown, FaPalette } from "react-icons/fa";
 import { toast } from "react-toastify";
 
 export default function Navbar({ currentUser, theme, setTheme, logout }) {
@@ -14,7 +13,7 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
     const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || "Student";
     const photoURL = currentUser?.photoURL || `https://ui-avatars.com/api/?name=${displayName}&background=6366f1&color=fff`;
 
-    // High-end configurations for the Navbar elements based on global theme
+    // SYNCED THEME CONFIGS
     const themeConfigs = {
         dark: { nav: "bg-[#050505]/80 border-white/5 text-white backdrop-blur-md", dropdown: "bg-[#111] border-white/10 text-white", btnProfile: "bg-indigo-600/20 text-indigo-400 border-indigo-500/30", btnLogout: "bg-rose-500/10 text-rose-400 border-rose-500/30" },
         light: { nav: "bg-white/70 border-slate-200 text-slate-900 backdrop-blur-lg", dropdown: "bg-white border-slate-200 text-slate-800", btnProfile: "bg-blue-500/10 text-blue-600 border-blue-500/20", btnLogout: "bg-orange-500/10 text-orange-600 border-orange-500/20" },
@@ -40,13 +39,12 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
 
     return (
         <nav className={`sticky top-0 z-[100] flex items-center justify-between px-4 md:px-8 py-3 border-b transition-all duration-500 ${config.nav}`}>
-            {/* USER INFO */}
             <div className="flex items-center gap-4 cursor-pointer active:scale-95 transition-transform" onClick={() => !isLoggingOut && navigate("/profile")}>
                 <img src={photoURL} className={`w-10 h-10 md:w-11 md:h-11 rounded-full border-2 border-white/20 object-cover ${isLoggingOut ? "grayscale" : ""}`} alt="User" />
                 <div className="flex flex-col">
                     <span className="font-bold text-sm md:text-base tracking-tight">{displayName}</span>
                     <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] opacity-50">
-                        {isLoggingOut ? "Ending Session" : isProfilePage ? "Account" : "Dhruva AI"}
+                        {isLoggingOut ? "Ending Session" : isProfilePage ? "Account Settings" : "Dhruva AI"}
                     </span>
                 </div>
             </div>
@@ -60,7 +58,6 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
                             </button>
                         )}
 
-                        {/* THEME PICKER */}
                         <div className="relative">
                             <button onClick={() => setDropdownOpen(!dropdownOpen)} className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all active:scale-90 text-xs font-bold uppercase tracking-tighter ${config.dropdown}`}>
                                 <FaPalette className="opacity-70" />
@@ -71,12 +68,12 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
                             {dropdownOpen && (
                                 <>
                                     <div className="fixed inset-0 z-[-1]" onClick={() => setDropdownOpen(false)} />
-                                    <div className={`absolute right-0 mt-3 w-44 rounded-2xl shadow-2xl border p-1 z-50 animate-in fade-in slide-in-from-top-2 ${config.dropdown}`}>
+                                    <div className={`absolute right-0 mt-3 w-44 rounded-2xl shadow-2xl border p-1 z-50 ${config.dropdown}`}>
                                         {Object.keys(themeConfigs).map(t => (
-                                            <button key={t} className={`flex items-center justify-between w-full text-left px-4 py-2.5 text-[10px] font-black hover:bg-white/10 rounded-xl capitalize tracking-widest ${theme === t ? 'bg-white/5 opacity-100' : 'opacity-60'}`} 
+                                            <button key={t} className={`flex items-center justify-between w-full text-left px-4 py-2.5 text-[10px] font-black hover:bg-white/10 rounded-xl capitalize tracking-widest ${theme === t ? 'bg-white/10' : 'opacity-60'}`} 
                                                 onClick={() => { setTheme(t); setDropdownOpen(false); }}>
                                                 {t}
-                                                {theme === t && <div className="w-1.5 h-1.5 rounded-full bg-current" />}
+                                                {theme === t && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
                                             </button>
                                         ))}
                                     </div>
