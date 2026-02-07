@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
@@ -13,7 +13,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-// --- ENHANCED TYPEWRITER COMPONENT ---
+// --- TYPEWRITER COMPONENT (Only for latest message) ---
 const Typewriter = ({ text, onComplete }) => {
     const [displayedText, setDisplayedText] = useState("");
     const [cursor, setCursor] = useState(true);
@@ -28,7 +28,7 @@ const Typewriter = ({ text, onComplete }) => {
                 setCursor(false);
                 if (onComplete) onComplete();
             }
-        }, 25); // Natural typing speed
+        }, 20); 
         return () => clearInterval(interval);
     }, [text]);
 
@@ -125,7 +125,7 @@ export default function Chat() {
 
         const userMsg = {
             role: "user",
-            content: text || "Analyzing file...",
+            content: text || "Analyzing attachment...",
             image: file ? URL.createObjectURL(file) : null,
             timestamp: Date.now()
         };
@@ -153,12 +153,21 @@ export default function Chat() {
                 res = await axios.post(`${API_BASE}/chat`, payload);
             }
 
-            // Extract core topic for YouTube suggestion
-            const topic = subjectInput || text.slice(0, 20);
+            // --- REFINED YOUTUBE SEARCH LOGIC ---
+            // Priority: Chapter + Subject + Class > Subject + Class > Message Context
+            let searchQuery = "";
+            if (chapterInput && subjectInput) {
+                searchQuery = `${userData.class} ${subjectInput} ${chapterInput} concept`;
+            } else if (subjectInput) {
+                searchQuery = `${userData.class} ${subjectInput} lesson`;
+            } else {
+                searchQuery = `${userData.class} ${text.slice(0, 30)} explanation`;
+            }
+
             const aiMsg = { 
                 role: "ai", 
                 content: res.data.reply, 
-                ytLink: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + " concept explanation")}`,
+                ytLink: `https://www.youtube.com/results?search_query=${encodeURIComponent(searchQuery)}`,
                 timestamp: Date.now() 
             };
             
@@ -177,7 +186,7 @@ export default function Chat() {
             <ToastContainer theme="dark" position="top-center" limit={1} />
             <style>{`.custom-y-scroll::-webkit-scrollbar { width: 4px; } .custom-y-scroll::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.2); border-radius: 10px; }`}</style>
 
-            {/* RESTORED MODES & SIDEBAR */}
+            {/* SIDEBAR */}
             <AnimatePresence>
                 {showSidebar && (
                     <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[150] w-72 h-full flex flex-col p-6 overflow-hidden ${currentTheme.sidebar}`}>
@@ -200,7 +209,7 @@ export default function Chat() {
             <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
 
-                {/* RESTORED TOP CONTROLS (MODE & LOCK) */}
+                {/* TOP BAR: MODES & SUBJECT LOCK */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
                     <button onClick={() => setShowSidebar(!showSidebar)} className="p-4 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white"><FaHistory size={14} /></button>
                     <div className={`flex-1 flex flex-col md:flex-row gap-2 p-2 rounded-2xl border transition-all ${isLocked ? 'border-green-500/50 bg-green-500/5' : currentTheme.nav}`}>
@@ -219,7 +228,7 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* CHAT AREA WITH TYPEWRITER */}
+                {/* CHAT AREA */}
                 <div ref={chatContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-8 custom-y-scroll scroll-smooth">
                     <div className="max-w-3xl mx-auto space-y-12">
                         {messages.map((msg, i) => (
@@ -238,16 +247,16 @@ export default function Chat() {
                                     {/* VIDEO RECOMMENDATION */}
                                     {msg.role === "ai" && msg.ytLink && (
                                         <div className="mt-6 pt-4 border-t border-white/10">
-                                            <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Deepen your understanding:</p>
-                                            <a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-4 py-2 bg-red-600/10 text-red-500 rounded-xl text-xs font-bold hover:bg-red-600/20 transition-all">
-                                                <FaYoutube size={16} /> Watch Concept Video
+                                            <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Visual Learning Recommended:</p>
+                                            <a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-500 rounded-2xl text-xs font-bold hover:bg-red-600/20 transition-all border border-red-500/20">
+                                                <FaYoutube size={18} /> Watch {chapterInput || "Concept"} Video
                                             </a>
                                         </div>
                                     )}
                                 </div>
                             </motion.div>
                         ))}
-                        {isSending && <div className="text-[10px] font-black uppercase opacity-30 animate-pulse px-4">Dhruva is typing...</div>}
+                        {isSending && <div className="text-[10px] font-black uppercase opacity-30 animate-pulse px-4">Dhruva is processing...</div>}
                         <div ref={messagesEndRef} className="h-4" />
                     </div>
                 </div>
@@ -264,7 +273,7 @@ export default function Chat() {
                             )}
                         </AnimatePresence>
                         <div className={`flex items-center p-2 rounded-[2.8rem] border shadow-2xl transition-all ${currentTheme.input}`}>
-                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Ask anything in ${userData.language}...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
+                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Ask in ${userData.language}...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex items-center gap-2 px-2">
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} />
                                 <button onClick={() => fileInputRef.current.click()} className="p-3 opacity-30 hover:opacity-100 transition-all"><FaImage /></button>
@@ -277,7 +286,7 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* CAMERA MODAL */}
+                {/* CAMERA */}
                 <AnimatePresence>
                     {isCameraOpen && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
@@ -285,8 +294,8 @@ export default function Chat() {
                                 <button onClick={closeCamera} className="p-4 bg-white/5 rounded-full"><FaTimes size={20} /></button>
                                 <button onClick={() => setCameraFacing(f => f === 'user' ? 'environment' : 'user')} className="p-4 bg-white/5 rounded-full"><FaUndo /></button>
                             </div>
-                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/10 shadow-2xl" />
-                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center"><div className="w-16 h-16 bg-white rounded-full" /></button>
+                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/10" />
+                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-95"><div className="w-16 h-16 bg-white rounded-full" /></button>
                             <canvas ref={canvasRef} className="hidden" />
                         </motion.div>
                     )}
