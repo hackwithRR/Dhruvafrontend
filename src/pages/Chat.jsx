@@ -17,8 +17,8 @@ const formatContent = (text) => {
     return text.replace(/\$\$/g, '').replace(/\n\s*\n/g, '\n\n').trim();
 };
 
-// --- STUDY TIMER COMPONENT ---
-const StudyTimer = ({ theme, currentTheme }) => {
+// --- DRAGGABLE STUDY TIMER COMPONENT ---
+const StudyTimer = ({ currentTheme }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isActive, setIsActive] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
@@ -58,14 +58,19 @@ const StudyTimer = ({ theme, currentTheme }) => {
     };
 
     return (
-        <div className="fixed bottom-32 left-6 z-[100]">
+        <motion.div 
+            drag
+            dragMomentum={false}
+            initial={{ x: 20, y: 500 }}
+            className="fixed z-[100] cursor-grab active:cursor-grabbing"
+        >
             <motion.div 
-                animate={{ width: isOpen ? "240px" : "60px", height: isOpen ? "280px" : "60px" }}
-                className={`overflow-hidden rounded-[2rem] border backdrop-blur-2xl shadow-2xl flex flex-col ${currentTheme.aiBubble} border-white/20`}
+                animate={{ width: isOpen ? "240px" : "64px", height: isOpen ? "280px" : "64px" }}
+                className={`overflow-hidden rounded-[2rem] border backdrop-blur-3xl shadow-2xl flex flex-col ${currentTheme.aiBubble} border-white/20`}
             >
                 {!isOpen ? (
                     <button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-500">
-                        <FaClock size={24} className="animate-pulse" />
+                        <FaClock size={24} className={isActive ? "animate-spin-slow" : "animate-pulse"} />
                     </button>
                 ) : (
                     <div className="p-5 flex flex-col h-full">
@@ -101,7 +106,7 @@ const StudyTimer = ({ theme, currentTheme }) => {
                     </div>
                 )}
             </motion.div>
-        </div>
+        </motion.div>
     );
 };
 
@@ -208,7 +213,11 @@ export default function Chat() {
     const loadSession = async (sid) => {
         setCurrentSessionId(sid);
         const sDoc = await getDoc(doc(db, `users/${currentUser.uid}/sessions`, sid));
-        if (sDoc.exists()) setMessages(sDoc.data().messages || []);
+        if (sDoc.exists()) {
+            const data = sDoc.data();
+            setMessages(data.messages || []);
+            // Optional: extract subject/chapter from title if you want to restore bar state
+        }
         setShowSidebar(false);
     };
 
@@ -288,10 +297,15 @@ export default function Chat() {
             const finalMessages = [...newMessages, aiMsg];
             setMessages(finalMessages);
 
+            // Automatic Session Naming Logic
+            const sessionTitle = subjectInput 
+                ? `${subjectInput.toUpperCase()} - ${chapterInput || 'LESSON'}` 
+                : (text.slice(0, 25) || "New Study Session");
+
             await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
                 messages: finalMessages,
                 lastUpdate: Date.now(),
-                title: subjectInput ? `${subjectInput}: ${chapterInput || 'Lesson'}` : text.slice(0, 25) || "New Conversation"
+                title: sessionTitle
             }, { merge: true });
             
             fetchSessions();
@@ -306,7 +320,7 @@ export default function Chat() {
     return (
         <div className={`flex h-screen w-full overflow-hidden transition-all duration-700 ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" limit={1} />
-            <style>{`.custom-y-scroll::-webkit-scrollbar { width: 4px; } .custom-y-scroll::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.2); border-radius: 10px; }`}</style>
+            <style>{`.custom-y-scroll::-webkit-scrollbar { width: 4px; } .custom-y-scroll::-webkit-scrollbar-thumb { background: rgba(128, 128, 128, 0.2); border-radius: 10px; } .animate-spin-slow { animation: spin 3s linear infinite; } @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
 
             <AnimatePresence>
                 {showSidebar && (
@@ -345,138 +359,43 @@ export default function Chat() {
 
             <div className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
-                <StudyTimer theme={theme} currentTheme={currentTheme} />
+                
+                {/* DRAGGABLE TIMER */}
+                <StudyTimer currentTheme={currentTheme} />
 
-                {/* --- SUPER COOL ADAPTIVE TOP BAR --- */}
+                {/* --- MODERN SESSION BAR --- */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex flex-col md:flex-row items-stretch md:items-center gap-3">
-                    <button onClick={() => setShowSidebar(!showSidebar)} className={`hidden md:block p-4 rounded-2xl border transition-all ${currentTheme.aiBubble} hover:scale-105 active:scale-95 shadow-sm`}>
-                        <FaHistory size={14} className={theme === 'light' ? 'text-indigo-600' : 'text-indigo-400'} />
-                    </button>
+                    <motion.button 
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => setShowSidebar(!showSidebar)} 
+                        className={`hidden md:flex items-center justify-center p-4 rounded-2xl border transition-all ${currentTheme.aiBubble} border-white/10 shadow-xl`}
+                    >
+                        <FaHistory size={16} className={theme === 'light' ? 'text-indigo-600' : 'text-indigo-400'} />
+                    </motion.button>
                     
                     <motion.div 
                         layout
-                        className={`flex-1 flex flex-col md:flex-row items-center gap-2 p-1.5 rounded-[1.8rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500/50 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10`}`}
+                        className={`flex-1 flex flex-col md:flex-row items-center gap-2 p-2 rounded-[2rem] border transition-all duration-500 relative overflow-hidden ${isLocked ? 'border-emerald-500/40 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10 shadow-2xl`}`}
                     >
+                        {/* Auto-Naming State Indicator */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2">
+                             <div className={`text-[6px] font-black uppercase tracking-[0.2em] px-3 py-0.5 rounded-b-lg ${isLocked ? 'bg-emerald-500 text-white' : 'bg-indigo-500/20 text-indigo-500'}`}>
+                                {isLocked ? "Session Locked" : "Setup Session"}
+                             </div>
+                        </div>
+
                         {/* INPUTS GROUP */}
-                        <div className="flex items-center w-full flex-1 gap-2 px-3 py-1">
-                            <div className="flex-1 flex flex-col min-w-[80px]">
-                                <span className={`text-[7px] font-black uppercase tracking-tighter ${isLocked ? 'text-emerald-500' : 'opacity-40'}`}>Subject</span>
-                                <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="E.g. Biology" className={`bg-transparent text-[11px] font-bold uppercase outline-none placeholder:opacity-30 ${isLocked ? 'text-emerald-500/80' : 'text-current'}`} />
+                        <div className="flex items-center w-full flex-1 gap-3 px-4 py-2 mt-1">
+                            <div className="flex-1 flex flex-col">
+                                <label className={`text-[8px] font-bold uppercase tracking-wider mb-0.5 ${isLocked ? 'text-emerald-500' : 'text-indigo-500/60'}`}>Subject</label>
+                                <input 
+                                    disabled={isLocked} 
+                                    value={subjectInput} 
+                                    onChange={e => setSubjectInput(e.target.value)} 
+                                    placeholder="Physics, Bio..." 
+                                    className={`bg-transparent text-sm font-bold outline-none placeholder:opacity-20 ${isLocked ? 'text-emerald-500/90' : 'text-current'}`} 
+                                />
                             </div>
                             
-                            <div className="h-6 w-[1px] bg-current opacity-10" />
-
-                            <div className="flex-1 flex flex-col min-w-[80px]">
-                                <span className={`text-[7px] font-black uppercase tracking-tighter ${isLocked ? 'text-emerald-500' : 'opacity-40'}`}>Chapter</span>
-                                <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="CH-01" className={`bg-transparent text-[11px] font-bold uppercase outline-none placeholder:opacity-30 ${isLocked ? 'text-emerald-500/80' : 'text-current'}`} />
-                            </div>
-
-                            <button onClick={() => setIsLocked(!isLocked)} className={`p-3 rounded-xl transition-all duration-300 ${isLocked ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/30" : "bg-black/5 dark:bg-white/5 text-gray-500 dark:text-white/20 hover:text-current hover:bg-black/10"}`}>
-                                {isLocked ? <FaLock size={12} /> : <FaUnlock size={12} />}
-                            </button>
-                        </div>
-
-                        {/* MODE SLIDER - Mobile Optimized */}
-                        <div className="flex bg-black/5 dark:bg-black/40 p-1 rounded-2xl relative w-full md:w-auto">
-                            <LayoutGroup>
-                                {["Explain", "Doubt", "Quiz"].map(m => (
-                                    <button key={m} onClick={() => setMode(m)} className={`flex-1 md:flex-none relative z-10 px-6 py-2.5 text-[9px] font-black uppercase transition-all duration-300 ${mode === m ? (theme === 'light' ? 'text-indigo-600' : 'text-white') : "opacity-40 hover:opacity-100"}`}>
-                                        {m}
-                                        {mode === m && (
-                                            <motion.div layoutId="mode-pill" className={`absolute inset-0 rounded-xl shadow-sm ${theme === 'light' ? 'bg-white shadow-indigo-200/50 shadow-md' : 'bg-white/10 border border-white/10'}`} transition={{ type: "spring", bounce: 0.2, duration: 0.6 }} />
-                                        )}
-                                    </button>
-                                ))}
-                            </LayoutGroup>
-                        </div>
-                    </motion.div>
-                </div>
-
-                {/* CHAT AREA */}
-                <div onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-8 custom-y-scroll scroll-smooth">
-                    <div className="max-w-3xl mx-auto space-y-12">
-                        {messages.map((msg, i) => (
-                            <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                                <div className={`max-w-[85%] p-6 rounded-[2.2rem] ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none` : `${currentTheme.aiBubble} rounded-tl-none`}`}>
-                                    {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-64 w-full object-cover" alt="upload" />}
-                                    <div className={`prose prose-sm ${theme === 'light' ? 'prose-slate' : 'prose-invert'} text-sm leading-relaxed font-medium`}>
-                                        {msg.role === "ai" && i === messages.length - 1 && !isSending ? (
-                                            <Typewriter text={msg.content} onComplete={scrollToBottom} />
-                                        ) : (
-                                            <ReactMarkdown 
-                                                remarkPlugins={[remarkGfm]}
-                                                components={{
-                                                    p: ({node, ...props}) => <p className="mb-4 last:mb-0 leading-relaxed" {...props} />,
-                                                    ul: ({node, ...props}) => <ul className="list-disc ml-4 mb-4" {...props} />,
-                                                    ol: ({node, ...props}) => <ol className="list-decimal ml-4 mb-4" {...props} />,
-                                                }}
-                                            >
-                                                {formatContent(msg.content)}
-                                            </ReactMarkdown>
-                                        )}
-                                    </div>
-                                    {msg.role === "ai" && msg.ytLink && (
-                                        <div className="mt-6 pt-4 border-t border-indigo-500/10">
-                                            <p className="text-[10px] font-bold uppercase opacity-40 mb-2">Visual Concept Guide:</p>
-                                            <a href={msg.ytLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 px-5 py-3 bg-red-600/10 text-red-600 rounded-2xl text-xs font-bold hover:bg-red-600/20 transition-all border border-red-500/20 shadow-sm">
-                                                <FaYoutube size={18} /> Learn {chapterInput || "Topic"} on YouTube 📺
-                                            </a>
-                                        </div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        ))}
-                        {isSending && <div className={`text-[10px] font-black uppercase opacity-30 animate-pulse px-4 ml-2 ${theme === 'light' ? 'text-indigo-600' : ''}`}>Dhruva is typing... ✨</div>}
-                        <div ref={messagesEndRef} className="h-4" />
-                    </div>
-                </div>
-
-                <AnimatePresence>
-                    {showScrollBtn && (
-                        <motion.button initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} onClick={scrollToBottom} className="absolute bottom-32 right-8 p-4 bg-indigo-600 text-white rounded-full shadow-2xl hover:bg-indigo-500 transition-all z-50">
-                            <FaArrowDown />
-                        </motion.button>
-                    )}
-                </AnimatePresence>
-
-                <div className="p-4 md:p-10 shrink-0">
-                    <div className="max-w-3xl mx-auto relative">
-                        <AnimatePresence>
-                            {selectedFile && (
-                                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="absolute bottom-full mb-6 left-4">
-                                    <img src={URL.createObjectURL(selectedFile)} className="w-24 h-24 object-cover rounded-[2rem] border-2 border-indigo-500 shadow-2xl" alt="preview" />
-                                    <button onClick={() => setSelectedFile(null)} className="absolute -top-2 -right-2 bg-red-500 p-2 rounded-full text-white"><FaTimes size={10} /></button>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                        <div className={`flex items-center p-2 rounded-[2.8rem] border transition-all ${currentTheme.input}`}>
-                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Ask anything in ${userData.language}...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
-                            <div className="flex items-center gap-2 px-2">
-                                <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} />
-                                <button onClick={() => fileInputRef.current.click()} className={`p-3 opacity-30 hover:opacity-100 transition-all ${theme === 'light' ? 'text-indigo-600' : ''}`}><FaImage /></button>
-                                <button onClick={openCamera} className={`p-3 opacity-30 hover:opacity-100 transition-all ${theme === 'light' ? 'text-indigo-600' : ''}`}><FaCamera /></button>
-                                <button onClick={sendMessage} disabled={isSending} className={`p-5 rounded-full active:scale-90 transition-all ${currentTheme.button}`}>
-                                    {isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane className="text-white" size={14} />}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <AnimatePresence>
-                    {isCameraOpen && (
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
-                            <div className="w-full flex justify-between p-4 text-white">
-                                <button onClick={closeCamera} className="p-4 bg-white/5 rounded-full"><FaTimes size={20} /></button>
-                                <button onClick={() => setCameraFacing(f => f === 'user' ? 'environment' : 'user')} className="p-4 bg-white/5 rounded-full"><FaUndo /></button>
-                            </div>
-                            <video ref={videoRef} autoPlay playsInline className="w-full max-w-md aspect-[3/4] object-cover rounded-[3rem] border border-white/10" />
-                            <button onClick={capturePhoto} className="mb-10 w-24 h-24 rounded-full border-4 border-white flex items-center justify-center active:scale-95"><div className="w-16 h-16 bg-white rounded-full" /></button>
-                            <canvas ref={canvasRef} className="hidden" />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
-        </div>
-    );
-}
+                            <div className="h-8 w-
