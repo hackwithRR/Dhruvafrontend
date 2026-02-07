@@ -1,10 +1,9 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastContainer } from "react-toastify";
 import { AnimatePresence, motion } from "framer-motion";
 import "react-toastify/dist/ReactToastify.css";
-import { useEffect } from "react";
 import { HelmetProvider } from 'react-helmet-async';
 
 import LoginPage from "./pages/LoginPage";
@@ -43,6 +42,7 @@ const PageTransition = ({ children }) => (
     animate={{ opacity: 1, y: 0 }}
     exit={{ opacity: 0, y: -20 }}
     transition={{ duration: 0.5 }}
+    className="h-full w-full"
   >
     {children}
   </motion.div>
@@ -50,25 +50,33 @@ const PageTransition = ({ children }) => (
 
 function AppContent() {
   const location = useLocation();
-  const { currentUser, loading } = useAuth(); // Access auth state for root logic
+  const { currentUser, loading } = useAuth();
+  
+  // --- THEME STATE LOGIC ---
+  // Load initial theme from localStorage or default to 'dark'
+  const [theme, setTheme] = useState(localStorage.getItem("theme") || "dark");
+
+  useEffect(() => {
+    localStorage.setItem("theme", theme);
+  }, [theme]);
 
   return (
     <>
+      {/* Backgrounds now receive the theme prop */}
       <AnimatePresence mode="wait">
         {location.pathname === "/register" ? (
           <motion.div key="bg2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <Background2 />
+            <Background2 theme={theme} />
           </motion.div>
         ) : (
           <motion.div key="bg1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <Background />
+            <Background theme={theme} />
           </motion.div>
         )}
       </AnimatePresence>
 
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
-          {/* THE SMART ROOT: Decisions happen here */}
           <Route 
             path="/" 
             element={
@@ -80,10 +88,23 @@ function AppContent() {
           <Route path="/login" element={<AuthRedirect><PageTransition><LoginPage /></PageTransition></AuthRedirect>} />
           <Route path="/register" element={<AuthRedirect><PageTransition><Register /></PageTransition></AuthRedirect>} />
           
-          <Route path="/chat" element={<ProtectedRoute><PageTransition><Chat /></PageTransition></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><PageTransition><Profile /></PageTransition></ProtectedRoute>} />
+          {/* PASS THEME PROPS TO CHAT AND PROFILE */}
+          <Route path="/chat" element={
+            <ProtectedRoute>
+              <PageTransition>
+                <Chat theme={theme} setTheme={setTheme} />
+              </PageTransition>
+            </ProtectedRoute>
+          } />
           
-          {/* Fallback for broken URLs */}
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <PageTransition>
+                <Profile theme={theme} setTheme={setTheme} />
+              </PageTransition>
+            </ProtectedRoute>
+          } />
+          
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>
@@ -94,13 +115,12 @@ function AppContent() {
 export default function App() {
   return (
     <HelmetProvider>
-    <AuthProvider>
-      <Router>
-        <AppContent />
-      </Router>
-      <ToastContainer position="top-center" autoClose={2000} theme="dark" />
+      <AuthProvider>
+        <Router>
+          <AppContent />
+        </Router>
+        <ToastContainer position="top-center" autoClose={2000} theme="dark" />
       </AuthProvider>
-      </HelmetProvider>
+    </HelmetProvider>
   );
 }
-
