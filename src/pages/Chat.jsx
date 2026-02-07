@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
-import { FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, FaTrash, FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, FaBookOpen, FaGraduationCap, FaRocket, FaChevronDown } from "react-icons/fa";
+import { FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaUndo, FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaArrowDown, FaTrash, FaClock, FaPlay, FaPause, FaStop, FaLightbulb, FaQuestion, FaBookOpen, FaGraduationCap, FaRocket, FaChevronDown, FaMicrophone } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -13,12 +13,10 @@ import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Import KaTeX CSS for math rendering
 import 'katex/dist/katex.min.css';
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-// --- SYLLABUS DATA ---
 const CHAPTER_MAP = {
     CBSE: {
         "8": {
@@ -38,45 +36,41 @@ const CHAPTER_MAP = {
 
 const formatContent = (text) => text.trim();
 
-// --- ONBOARDING COMPONENT (GEN-Z EDITION) ---
+// --- FIXED ONBOARDING COMPONENT ---
 const OnboardingModal = ({ onComplete, currentTheme }) => (
     <motion.div 
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 z-[1000] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6"
     >
         <motion.div 
-            initial={{ scale: 0.8, rotate: -2 }} 
-            animate={{ scale: 1, rotate: 0 }}
-            className={`max-w-md w-full p-10 rounded-[3rem] border-2 border-white/20 shadow-[0_32px_64px_rgba(0,0,0,0.5)] text-center relative overflow-hidden ${currentTheme.aiBubble}`}
+            initial={{ scale: 0.8 }} animate={{ scale: 1 }}
+            className={`max-w-md w-full p-10 rounded-[3rem] border-2 border-white/20 shadow-2xl text-center relative overflow-hidden ${currentTheme.aiBubble}`}
         >
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-indigo-500/20 blur-3xl rounded-full" />
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-pink-500/20 blur-3xl rounded-full" />
-
-            <div className="w-24 h-24 bg-gradient-to-tr from-indigo-600 to-purple-500 rounded-[2rem] flex items-center justify-center mx-auto mb-8 rotate-6 shadow-xl shadow-indigo-500/30">
-                <FaRocket className="text-white text-4xl animate-bounce" />
+            <div className="w-20 h-20 bg-gradient-to-tr from-indigo-600 to-purple-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-indigo-500/30">
+                <FaRocket className="text-white text-3xl animate-bounce" />
             </div>
 
-            <h2 className="text-3xl font-black mb-4 tracking-tight bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent italic">
-                Ayo, Let's Level Up! 🚀
+            <h2 className="text-3xl font-black mb-4 bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                Setup Required 🚀
             </h2>
             
-            <p className="text-base font-medium opacity-80 mb-8 leading-relaxed">
-                To give you that <span className="text-indigo-400 font-bold">Main Character</span> energy, we need your Board, Class, and Gender. No setup = no personalized vibes. 
+            <p className="text-sm font-medium opacity-70 mb-8 px-4">
+                To personalize your study journey, please set your <b>Board, Class, and Gender</b> in your profile.
             </p>
 
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
                 <button 
                     onClick={() => window.location.href = '/profile'}
-                    className="w-full py-5 bg-white text-black font-black rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-3 hover:bg-indigo-50"
+                    className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
                 >
-                    FIX PROFILE <FaArrowDown className="animate-bounce" />
+                    GO TO PROFILE
                 </button>
                 
                 <button 
                     onClick={onComplete}
-                    className="w-full py-4 text-xs font-bold opacity-40 hover:opacity-100 transition-all uppercase tracking-widest"
+                    className="w-full py-4 text-xs font-bold opacity-60 hover:opacity-100 transition-all uppercase tracking-widest"
                 >
-                    I'll vibe later
+                    OKAY, I'LL VIBE LATER
                 </button>
             </div>
         </motion.div>
@@ -184,7 +178,7 @@ const StudyTimer = ({ currentTheme }) => {
 };
 
 export default function Chat() {
-    const { currentUser, logout, theme, setTheme } = useAuth(); // Use context theme
+    const { currentUser, logout, theme, setTheme } = useAuth();
     const [messages, setMessages] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [currentSessionId, setCurrentSessionId] = useState(Date.now().toString());
@@ -201,6 +195,7 @@ export default function Chat() {
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [cameraFacing, setCameraFacing] = useState("environment");
     const [showScrollBtn, setShowScrollBtn] = useState(false);
+    const [isListening, setIsListening] = useState(false);
 
     const chatContainerRef = useRef(null);
     const messagesEndRef = useRef(null);
@@ -217,7 +212,6 @@ export default function Chat() {
 
     useEffect(() => {
         if (!currentUser) return;
-
         const initData = async () => {
             const userDoc = await getDoc(doc(db, "users", currentUser.uid));
             if (userDoc.exists()) {
@@ -227,9 +221,6 @@ export default function Chat() {
                     class: data.classLevel || data.class || "", 
                     language: data.language || "English" 
                 });
-                
-                // --- ONBOARDING TRIGGER ---
-                // Shows if board, class, or gender is missing
                 if (!data.board || (!data.class && !data.classLevel) || !data.gender) {
                     setShowOnboarding(true);
                 }
@@ -268,22 +259,48 @@ export default function Chat() {
         setShowSidebar(false);
     };
 
-    const sendMessage = async () => {
-        if (!currentUser || isSending || (!input.trim() && !selectedFile)) return;
+    // --- VOICE TO TUTOR LOGIC ---
+    const startVoiceMode = () => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            toast.error("Speech Recognition not supported in this browser.");
+            return;
+        }
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-IN';
+        recognition.start();
+        setIsListening(true);
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            setInput(transcript);
+            setIsListening(false);
+            // Auto-send voice queries
+            setTimeout(() => sendMessage(transcript), 500);
+        };
+
+        recognition.onerror = () => {
+            setIsListening(false);
+            toast.error("Voice failed. Try typing!");
+        };
+    };
+
+    const sendMessage = async (voiceInput = null) => {
+        const messageText = voiceInput || input;
+        if (!currentUser || isSending || (!messageText.trim() && !selectedFile)) return;
         const file = selectedFile;
-        const text = input;
         setIsSending(true);
         setSelectedFile(null);
         setInput("");
 
         const subUpper = subjectInput.toUpperCase();
         const mappedChapter = CHAPTER_MAP[userData.board]?.[userData.class]?.[subUpper]?.[chapterInput] || `Chapter ${chapterInput}`;
-        const userMsg = { role: "user", content: text || "Analyzing attachment...", image: file ? URL.createObjectURL(file) : null, timestamp: Date.now() };
+        const userMsg = { role: "user", content: messageText || "Analyzing attachment...", image: file ? URL.createObjectURL(file) : null, timestamp: Date.now() };
         const newMessages = [...messages, userMsg];
         setMessages(newMessages);
 
         try {
-            const payload = { userId: currentUser.uid, message: text || "Explain this image", mode, subject: subjectInput || "General", chapter: mappedChapter, language: userData.language, classLevel: userData.class };
+            const payload = { userId: currentUser.uid, message: messageText || "Explain this image", mode, subject: subjectInput || "General", chapter: mappedChapter, language: userData.language, classLevel: userData.class };
             let res;
             if (file) {
                 const formData = new FormData();
@@ -348,7 +365,6 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
                 <StudyTimer currentTheme={currentTheme} />
 
-                {/* --- MODES --- */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 overflow-x-auto no-scrollbar">
                     <div className="flex gap-2 p-1.5 rounded-[1.5rem] bg-white/5 border border-white/10 w-max mx-auto">
                         {modes.map((m) => (
@@ -359,7 +375,6 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* --- CONTEXT BAR --- */}
                 <div className="max-w-4xl mx-auto w-full px-4 pt-4 flex items-center gap-3">
                     <button onClick={() => setShowSidebar(!showSidebar)} className={`p-4 rounded-2xl border ${currentTheme.aiBubble} border-white/10 shadow-xl`}><FaHistory size={16} /></button>
                     <motion.div layout className={`flex-1 flex items-center gap-2 p-2 rounded-[2rem] border transition-all duration-500 ${isLocked ? 'border-emerald-500/40 bg-emerald-500/5' : `${currentTheme.aiBubble} border-white/10 shadow-2xl`}`}>
@@ -380,7 +395,6 @@ export default function Chat() {
                     </motion.div>
                 </div>
 
-                {/* --- CHAT AREA --- */}
                 <div ref={chatContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-8 custom-y-scroll scroll-smooth relative">
                     <div className="max-w-3xl mx-auto space-y-12">
                         {messages.length === 0 && (
@@ -422,7 +436,7 @@ export default function Chat() {
                     </AnimatePresence>
                 </div>
 
-                {/* --- INPUT --- */}
+                {/* --- INPUT AREA WITH VOICE --- */}
                 <div className="p-4 md:p-10 shrink-0">
                     <div className="max-w-3xl mx-auto relative">
                         <AnimatePresence>
@@ -433,13 +447,17 @@ export default function Chat() {
                                 </motion.div>
                             )}
                         </AnimatePresence>
-                        <div className={`flex items-center p-2 rounded-[2.8rem] border transition-all ${currentTheme.input}`}>
-                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={`Ask anything in ${mode} mode...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
+                        <div className={`flex items-center p-2 rounded-[2.8rem] border transition-all ${currentTheme.input} ${isListening ? 'ring-2 ring-indigo-500' : ''}`}>
+                            <input value={input} onChange={e => setInput(e.target.value)} placeholder={isListening ? "Listening..." : `Ask anything in ${mode} mode...`} className="flex-1 bg-transparent px-6 py-4 outline-none font-bold text-sm" onKeyDown={e => e.key === "Enter" && sendMessage()} />
                             <div className="flex items-center gap-2 px-2">
+                                {/* VOICE BUTTON */}
+                                <button onClick={startVoiceMode} className={`p-3 transition-all ${isListening ? 'text-indigo-500 animate-pulse' : 'opacity-30 hover:opacity-100'}`}>
+                                    <FaMicrophone size={18} />
+                                </button>
                                 <input type="file" ref={fileInputRef} hidden onChange={(e) => setSelectedFile(e.target.files[0])} accept="image/*" />
                                 <button onClick={() => fileInputRef.current.click()} className="p-3 opacity-30 hover:opacity-100"><FaImage /></button>
                                 <button onClick={openCamera} className="p-3 opacity-30 hover:opacity-100"><FaCamera /></button>
-                                <button onClick={sendMessage} disabled={isSending} className={`p-5 rounded-full ${currentTheme.button}`}>
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 rounded-full ${currentTheme.button}`}>
                                     {isSending ? <FaSyncAlt className="animate-spin text-white" /> : <FaPaperPlane className="text-white" size={14} />}
                                 </button>
                             </div>
@@ -447,7 +465,6 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* --- CAMERA --- */}
                 <AnimatePresence>
                     {isCameraOpen && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between p-6">
