@@ -68,8 +68,7 @@ export default function Chat() {
     const [subject, setSubject] = useState("MATHEMATICS");
     const [chapter, setChapter] = useState("");
     const [isSending, setIsSending] = useState(false);
-    const [theme, setTheme] = useState("DeepSpace");
-    const [userData, setUserData] = useState({ board: "CBSE", class: "10", xp: 0, dailyXp: 0, streak: 0 });
+    const [userData, setUserData] = useState({ board: "CBSE", class: "10", xp: 0, dailyXp: 0, streak: 0, theme: "DeepSpace", displayName: "" });
     const [timer, setTimer] = useState(0);
     const [showSidebar, setShowSidebar] = useState(false);
     const [showSessionPicker, setShowSessionPicker] = useState(false);
@@ -78,7 +77,8 @@ export default function Chat() {
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
-    const activeTheme = themes[theme] || themes.DeepSpace;
+    
+    const activeTheme = useMemo(() => themes[userData.theme] || themes.DeepSpace, [userData.theme]);
 
     useEffect(() => {
         const interval = setInterval(() => setTimer(prev => prev + 1), 1000);
@@ -116,6 +116,8 @@ export default function Chat() {
     const handleFileSelect = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
+        if (file.size > 10 * 1024 * 1024) return toast.error("Image exceeds 10MB limit");
+        
         setSelectedFile(file);
         const reader = new FileReader();
         reader.onloadend = () => setImagePreview(reader.result);
@@ -200,14 +202,14 @@ export default function Chat() {
     }, [sessions, searchQuery]);
 
     return (
-        <div className={`flex h-[100dvh] w-full ${activeTheme.bg} ${activeTheme.text} overflow-hidden font-sans selection:bg-indigo-500/30`}>
+        <div className={`flex h-[100dvh] w-full ${activeTheme.bg} ${activeTheme.text} overflow-hidden font-sans selection:bg-indigo-500/30 transition-colors duration-500`}>
             <ToastContainer theme={activeTheme.isDark ? "dark" : "light"} />
 
             <AnimatePresence>
                 {showSidebar && (
                     <>
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSidebar(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md z-[450]" />
-                        <motion.div initial={{ x: -400 }} animate={{ x: 0 }} exit={{ x: -400 }} className={`fixed inset-y-0 left-0 w-80 ${activeTheme.isDark ? 'bg-[#080808]' : 'bg-white'} border-r ${activeTheme.border} z-[451] p-8 flex flex-col`}>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSidebar(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md z-[800]" />
+                        <motion.div initial={{ x: -400 }} animate={{ x: 0 }} exit={{ x: -400 }} className={`fixed inset-y-0 left-0 w-80 ${activeTheme.isDark ? 'bg-[#080808]' : 'bg-white'} border-r ${activeTheme.border} z-[801] p-8 flex flex-col`}>
                             <div className="flex justify-between items-center mb-10">
                                 <div className="flex items-center gap-2">
                                     <FaBrain className="text-indigo-500"/>
@@ -231,8 +233,8 @@ export default function Chat() {
                                         <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(((userData.dailyXp || 0) / 500) * 100, 100)}%` }} className="h-full bg-indigo-500" />
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <p className="text-[9px] font-black uppercase text-indigo-400">Daily Goal</p>
-                                        <p className="text-[9px] font-black uppercase opacity-40">{userData.dailyXp || 0}/500 XP</p>
+                                        <p className="text-[9px] font-black uppercase text-indigo-400">Daily Session</p>
+                                        <p className="text-[9px] font-black uppercase opacity-40">{userData.dailyXp || 0} / 500 XP</p>
                                     </div>
                                 </div>
 
@@ -243,9 +245,12 @@ export default function Chat() {
                                             <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border ${activeTheme.border} ${user.id === currentUser?.uid ? 'bg-indigo-600/10 border-indigo-500/30' : 'bg-white/[0.02]'}`}>
                                                 <div className="flex items-center gap-3">
                                                     <span className={`text-xs font-black ${idx === 0 ? 'text-yellow-500' : 'opacity-20'}`}>0{idx+1}</span>
-                                                    <span className="text-xs font-bold truncate w-24 uppercase tracking-tight">{user.displayName || "Anonymous"}</span>
+                                                    <span className="text-xs font-bold truncate w-24 uppercase tracking-tight">{user.displayName || user.email?.split('@')[0] || "Scholar"}</span>
                                                 </div>
-                                                <span className="text-[10px] font-black text-indigo-500">{user.xp || 0}</span>
+                                                <div className="text-right">
+                                                    <span className="text-[10px] font-black text-indigo-500 block leading-tight">{user.xp || 0}</span>
+                                                    <span className="text-[7px] opacity-30 font-black uppercase tracking-tighter">Global XP</span>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -261,14 +266,16 @@ export default function Chat() {
             </AnimatePresence>
 
             <div className="flex-1 flex flex-col relative h-full">
-                <Navbar currentUser={currentUser} userData={userData} />
+                <div className="relative z-[500]">
+                    <Navbar currentUser={currentUser} userData={userData} />
+                </div>
 
-                <div className="w-full max-w-3xl mx-auto px-4 mt-4 space-y-3 z-[100]">
-                    <div className={`flex items-center justify-between p-4 rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-md`}>
+                <div className="w-full max-w-3xl mx-auto px-4 mt-4 space-y-3 z-[400] sticky top-[72px]">
+                    <div className={`flex items-center justify-between p-4 rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-xl shadow-2xl`}>
                         <div className="flex items-center gap-3">
                             <FaHistory size={14} className="opacity-20 text-indigo-500"/>
                             {isEditingTitle ? (
-                                <input autoFocus value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} onBlur={() => setIsEditingTitle(false)} className="bg-transparent border-none focus:ring-0 text-xs font-black uppercase p-0 w-32" />
+                                <input autoFocus value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} onBlur={() => setIsEditingTitle(false)} className="bg-transparent border-none focus:ring-0 outline-none text-xs font-black uppercase p-0 w-32" />
                             ) : (
                                 <span onClick={() => setIsEditingTitle(true)} className="text-xs font-black uppercase tracking-tighter cursor-pointer hover:text-indigo-400 transition-colors">{sessionTitle}</span>
                             )}
@@ -279,22 +286,22 @@ export default function Chat() {
                         </div>
                     </div>
 
-                    <div className={`flex gap-3 p-2 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border}`}>
+                    <div className={`flex gap-3 p-2 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} backdrop-blur-md`}>
                         <div className="flex-1 relative">
-                            <select value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full bg-white/5 border-none focus:ring-1 focus:ring-indigo-500/50 rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer">
-                                {Object.keys(syllabusData[userData.board]?.[userData.class] || {}).map(s => <option key={s} value={s} className="bg-black">{s}</option>)}
+                            <select value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full bg-white/5 border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer">
+                                {Object.keys(syllabusData[userData.board]?.[userData.class] || {}).map(s => <option key={s} value={s} className="bg-black text-white">{s}</option>)}
                             </select>
                         </div>
                         <div className="flex-1 relative">
-                            <select value={chapter} onChange={(e) => setChapter(e.target.value)} className="w-full bg-white/5 border-none focus:ring-1 focus:ring-indigo-500/50 rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer">
-                                <option value="" className="bg-black">Select Chapter</option>
-                                {(syllabusData[userData.board]?.[userData.class]?.[subject] || []).map(ch => <option key={ch} value={ch} className="bg-black">{ch}</option>)}
+                            <select value={chapter} onChange={(e) => setChapter(e.target.value)} className="w-full bg-white/5 border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer">
+                                <option value="" className="bg-black text-white">Select Chapter</option>
+                                {(syllabusData[userData.board]?.[userData.class]?.[subject] || []).map(ch => <option key={ch} value={ch} className="bg-black text-white">{ch}</option>)}
                             </select>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar pb-64">
+                <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar pb-72 relative z-[100]">
                     <div className="max-w-3xl mx-auto space-y-10">
                         {messages.length === 0 && (
                             <div className="h-64 flex flex-col items-center justify-center">
@@ -308,8 +315,8 @@ export default function Chat() {
                             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`p-6 rounded-[2.5rem] max-w-[90%] shadow-2xl relative ${msg.role === 'user' ? `bg-indigo-600 text-white rounded-tr-none` : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`}`}>
                                     {msg.image && (
-                                        <div className="mb-4 overflow-hidden rounded-2xl border border-white/10">
-                                            <img src={msg.image} alt="analysis" className="w-full max-h-72 object-contain bg-black/20" />
+                                        <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-black/50">
+                                            <img src={msg.image} alt="analysis" className="w-full max-h-[500px] object-contain" />
                                         </div>
                                     )}
                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className={`prose ${activeTheme.isDark ? 'prose-invert' : 'prose-slate'} text-sm leading-relaxed prose-p:my-2`}>
@@ -327,34 +334,34 @@ export default function Chat() {
                     </div>
                 </div>
 
-                <div className={`absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t ${activeTheme.isDark ? 'from-black via-black/90' : 'from-white via-white/90'} to-transparent z-[500]`}>
+                <div className={`fixed bottom-0 left-0 w-full p-6 bg-gradient-to-t ${activeTheme.isDark ? 'from-black via-black/90' : 'from-white via-white/90'} to-transparent z-[600]`}>
                     <div className="max-w-3xl mx-auto space-y-4">
                         
                         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                             {quickReplies.map(q => (
-                                <button key={q} onClick={() => sendMessage(q)} className={`whitespace-nowrap px-6 py-3 rounded-2xl border ${activeTheme.border} ${activeTheme.card} text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all hover:scale-105 active:scale-95`}>
+                                <button key={q} onClick={() => sendMessage(q)} className={`whitespace-nowrap px-6 py-3 rounded-2xl border ${activeTheme.border} ${activeTheme.card} text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all hover:scale-105 active:scale-95 shadow-lg`}>
                                     {q}
                                 </button>
                             ))}
                         </div>
 
                         <div className="flex items-center justify-between">
-                            <div className={`flex gap-1 p-1.5 ${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-200'} rounded-2xl border ${activeTheme.border}`}>
+                            <div className={`flex gap-1 p-1.5 ${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-200'} rounded-2xl border ${activeTheme.border} backdrop-blur-md`}>
                                 {["Explain", "Quiz", "HW"].map(m => (
                                     <button key={m} onClick={() => setMode(m)} className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${mode === m ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'opacity-40 hover:opacity-100'}`}>{m}</button>
                                 ))}
                             </div>
                             <div className="flex gap-3">
-                                <button onClick={() => setShowSessionPicker(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:text-indigo-500 transition-colors`}><FaLayerGroup size={16}/></button>
-                                <button onClick={() => setShowSidebar(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:text-indigo-500 transition-colors`}><FaChartLine size={16}/></button>
+                                <button onClick={() => setShowSessionPicker(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:text-indigo-500 transition-colors shadow-xl`}><FaLayerGroup size={16}/></button>
+                                <button onClick={() => setShowSidebar(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:text-indigo-500 transition-colors shadow-xl`}><FaChartLine size={16}/></button>
                             </div>
                         </div>
 
                         <AnimatePresence>
                             {imagePreview && (
-                                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-20 h-20 ml-4 mb-2">
-                                    <img src={imagePreview} className="w-full h-full object-cover rounded-2xl border-2 border-indigo-500" alt="preview" />
-                                    <button onClick={() => {setImagePreview(null); setSelectedFile(null)}} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-xl"><FaTimes size={10}/></button>
+                                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-24 h-24 ml-4 mb-2">
+                                    <img src={imagePreview} className="w-full h-full object-cover rounded-2xl border-2 border-indigo-500 shadow-2xl shadow-indigo-500/40" alt="preview" />
+                                    <button onClick={() => {setImagePreview(null); setSelectedFile(null)}} className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-xl"><FaTimes size={10}/></button>
                                 </motion.div>
                             )}
                         </AnimatePresence>
@@ -369,7 +376,7 @@ export default function Chat() {
                                 onChange={(e) => setInput(e.target.value)} 
                                 placeholder={`Neural inquiry: ${chapter || subject}...`} 
                                 rows="1" 
-                                className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-5 resize-none no-scrollbar font-medium placeholder:opacity-20" 
+                                className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm py-5 resize-none no-scrollbar font-medium placeholder:opacity-20" 
                                 onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}}
                                 onInput={(e) => { 
                                     e.target.style.height = 'auto'; 
@@ -378,7 +385,7 @@ export default function Chat() {
                             />
                             <div className="flex gap-2 pr-2 pb-2">
                                 <button onClick={() => sendMessage()} disabled={isSending} className="p-5 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 active:scale-90 transition-all disabled:opacity-50">
-                                    <FaPaperPlane size={22}/>
+                                    {isSending ? <FaSyncAlt className="animate-spin" size={22}/> : <FaPaperPlane size={22}/>}
                                 </button>
                             </div>
                         </div>
@@ -402,13 +409,13 @@ export default function Chat() {
                                         placeholder="SEARCH NODES..." 
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-10 pr-4 text-[10px] font-black uppercase tracking-widest focus:border-indigo-500/50 focus:ring-0 transition-all"
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-10 pr-4 text-[10px] font-black uppercase tracking-widest focus:border-indigo-500/50 focus:ring-0 outline-none transition-all"
                                     />
                                 </div>
                                 <button onClick={() => {setShowSessionPicker(false); setSearchQuery("");}} className="p-6 bg-white/5 hover:bg-white/10 rounded-full transition-all"><FaTimes size={20}/></button>
                             </div>
                         </div>
-                        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto no-scrollbar">
+                        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto no-scrollbar pb-20">
                             {filteredSessions.map(s => (
                                 <div key={s.id} onClick={() => { setMessages(s.messages || []); setCurrentSessionId(s.id); setSessionTitle(s.title || "Untitled"); setShowSessionPicker(false); setSearchQuery(""); }} className={`p-8 rounded-[3rem] border ${activeTheme.border} ${activeTheme.card} hover:border-indigo-500/50 cursor-pointer transition-all flex justify-between items-center group relative overflow-hidden`}>
                                     <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-all"/>
