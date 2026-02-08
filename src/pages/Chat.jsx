@@ -5,11 +5,14 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import { 
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaMicrophone, 
-    FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaTrash, 
-    FaClock, FaPlay, FaStop, FaTrophy, FaMagic 
+    FaImage, FaPlus, FaHistory, FaYoutube, FaTrash, 
+    FaClock, FaPlay, FaStop, FaTrophy, FaMagic, FaCheckCircle 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import 'katex/dist/katex.min.css';
 import { doc, getDoc, setDoc, collection, query, getDocs, orderBy, deleteDoc, updateDoc, increment } from "firebase/firestore";
 import { db } from "../firebase";
 import imageCompression from "browser-image-compression";
@@ -17,7 +20,43 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-// --- STUDY TIMER (MOBILE OPTIMIZED) ---
+// ====================================================
+// MASTER SYLLABUS REGISTRY (LOCAL CONTEXT)
+// ====================================================
+const MASTER_SYLLABUS = `
+CBSE CLASS 8-12 & ICSE 8-10 Chapter Registry:
+CBSE 8 MATH: Rational Numbers, Linear Eq, Quadrilaterals, Practical Geo, Data Handling, Squares/Cubes, Comparing Quantities, Algebra, Mensuration, Exponents, Proportions, Factorisation.
+CBSE 9 MATH: Number Systems, Polynomials, Coordinate Geo, Euclid, Lines/Angles, Triangles, Circles, Heron, Surface Area, Stats.
+CBSE 10 MATH: Real Nos, Polynomials, Linear Eq, Quadratic, AP, Trig, Circles, Stats.
+CBSE 11/12 MATH: Sets, Relations, Trig Functions, Calculus, Vectors, 3D, Probability.
+Standardize all queries for 'Maths' to 'Mathematics'.
+`;
+
+// --- TYPEWRITER COMPONENT ---
+const Typewriter = ({ text }) => {
+    const [displayedText, setDisplayedText] = useState("");
+    useEffect(() => {
+        let i = 0;
+        const interval = setInterval(() => {
+            setDisplayedText(text.slice(0, i));
+            i++;
+            if (i > text.length) clearInterval(interval);
+        }, 5); 
+        return () => clearInterval(interval);
+    }, [text]);
+
+    return (
+        <ReactMarkdown 
+            remarkPlugins={[remarkGfm, remarkMath]} 
+            rehypePlugins={[rehypeKatex]}
+            className="prose prose-sm prose-invert max-w-none text-xs md:text-sm font-medium leading-relaxed space-y-4"
+        >
+            {displayedText}
+        </ReactMarkdown>
+    );
+};
+
+// --- STUDY TIMER COMPONENT ---
 const StudyTimer = ({ currentTheme, onComplete }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isActive, setIsActive] = useState(false);
@@ -29,8 +68,8 @@ const StudyTimer = ({ currentTheme, onComplete }) => {
             timerRef.current = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
         } else if (timeLeft === 0 && isActive) {
             setIsActive(false);
-            onComplete(true);
-            toast.success("Focus Session Complete! Rank Points Added! 🏆");
+            onComplete(50);
+            toast.success("Focus Session Complete! +50 XP 🏆");
         }
         return () => clearInterval(timerRef.current);
     }, [isActive, timeLeft, onComplete]);
@@ -44,7 +83,7 @@ const StudyTimer = ({ currentTheme, onComplete }) => {
     return (
         <motion.div drag dragMomentum={false} className="fixed z-[100] right-4 top-20 md:right-6 md:top-24 scale-90 md:scale-100">
             <motion.div 
-                animate={{ width: isOpen ? "220px" : "48px", height: isOpen ? "250px" : "48px", borderRadius: isOpen ? "28px" : "50%" }}
+                animate={{ width: isOpen ? "220px" : "48px", height: isOpen ? "250px" : "48px", borderRadius: isOpen ? "24px" : "50%" }}
                 className={`flex flex-col overflow-hidden border shadow-2xl backdrop-blur-3xl ${currentTheme.aiBubble} border-white/10 cursor-pointer`}
             >
                 {!isOpen ? (
@@ -53,9 +92,9 @@ const StudyTimer = ({ currentTheme, onComplete }) => {
                     <div className="p-4 flex flex-col h-full items-center justify-between">
                         <div className="flex justify-between w-full items-center"><span className="text-[9px] font-black uppercase opacity-40">Zen Mode</span><button onClick={() => setIsOpen(false)}><FaTimes size={12}/></button></div>
                         <h2 className="text-4xl font-black font-mono">{formatTime(timeLeft)}</h2>
-                        <div className="grid grid-cols-3 gap-1 w-full">{[10, 25, 45].map(m => (<button key={m} onClick={() => {setTimeLeft(m*60); setIsActive(true)}} className="py-1.5 rounded-lg bg-white/5 text-[8px] font-black">{m}m</button>))}</div>
+                        <div className="grid grid-cols-3 gap-1 w-full">{[15, 25, 45].map(m => (<button key={m} onClick={() => {setTimeLeft(m*60); setIsActive(true)}} className="py-2 rounded-lg bg-white/5 text-[8px] font-black">{m}m</button>))}</div>
                         <div className="flex gap-3">
-                            <button onClick={() => setIsActive(!isActive)} className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg">{isActive ? <FaStop size={12}/> : <FaPlay size={12}/>}</button>
+                            <button onClick={() => setIsActive(!isActive)} className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center">{isActive ? <FaStop size={12}/> : <FaPlay size={12}/>}</button>
                             <button onClick={() => setTimeLeft(0)} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10"><FaTrash size={12}/></button>
                         </div>
                     </div>
@@ -74,7 +113,7 @@ export default function Chat() {
     const [mode, setMode] = useState("Explain");
     const [isSending, setIsSending] = useState(false);
     const [theme, setTheme] = useState("DeepSpace");
-    const [userData, setUserData] = useState({ board: "", class: "", language: "English", xp: 0 });
+    const [userData, setUserData] = useState({ board: "CBSE", class: "10", language: "English", xp: 0 });
     const [showSidebar, setShowSidebar] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const [subjectInput, setSubjectInput] = useState("");
@@ -82,6 +121,7 @@ export default function Chat() {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isListening, setIsListening] = useState(false);
+    const [showLevelUp, setShowLevelUp] = useState(false);
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -90,14 +130,14 @@ export default function Chat() {
     const recognitionRef = useRef(null);
 
     const themes = {
-        DeepSpace: { container: "bg-[#050505] text-white", aiBubble: "bg-white/[0.03] border-white/10", userBubble: "bg-indigo-600", input: "bg-white/[0.02] border-white/10", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-white/5" },
+        DeepSpace: { container: "bg-[#050505] text-white", aiBubble: "bg-white/[0.04] border-white/10", userBubble: "bg-indigo-600", input: "bg-white/[0.03] border-white/10", button: "bg-indigo-600", sidebar: "bg-[#080808] border-white/5" },
         Light: { container: "bg-gray-50 text-gray-900", aiBubble: "bg-white border-gray-200 shadow-sm", userBubble: "bg-indigo-600 text-white", input: "bg-white border-gray-300 shadow-inner", button: "bg-indigo-600", sidebar: "bg-white border-gray-200" },
         Sakura: { container: "bg-[#1a0f12] text-rose-50", aiBubble: "bg-rose-500/10 border-rose-500/20", userBubble: "bg-rose-600", input: "bg-rose-500/5 border-rose-500/10", button: "bg-rose-600", sidebar: "bg-[#221418] border-rose-500/10" },
         Cyberpunk: { container: "bg-[#0a0512] text-cyan-50", aiBubble: "bg-cyan-500/10 border-cyan-500/30", userBubble: "bg-fuchsia-600", input: "bg-cyan-500/5 border-cyan-500/10", button: "bg-cyan-600", sidebar: "bg-[#120a1a] border-cyan-500/20" }
     };
     const currentTheme = themes[theme] || themes.DeepSpace;
+    const currentLevel = Math.floor((userData.xp || 0) / 500) + 1;
 
-    // --- CONTINUOUS VOICE LOOP ---
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
@@ -113,114 +153,143 @@ export default function Chat() {
         else { setInput(""); recognitionRef.current.start(); setIsListening(true); }
     };
 
+    const openCamera = async () => {
+        setIsCameraOpen(true);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+            if (videoRef.current) videoRef.current.srcObject = stream;
+        } catch (err) { toast.error("Camera access denied"); setIsCameraOpen(false); }
+    };
+
+    const closeCamera = () => {
+        if (videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+        setIsCameraOpen(false);
+    };
+
+    const capturePhoto = () => {
+        const ctx = canvasRef.current.getContext("2d");
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+        ctx.drawImage(videoRef.current, 0, 0);
+        canvasRef.current.toBlob(async (blob) => {
+            setSelectedFile(new File([blob], "capture.jpg", { type: "image/jpeg" }));
+            closeCamera();
+        }, "image/jpeg", 0.8);
+    };
+
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isSending]);
 
     useEffect(() => {
         if (!currentUser) return;
-        const init = async () => {
+        (async () => {
             const snap = await getDoc(doc(db, "users", currentUser.uid));
             if (snap.exists()) setUserData(snap.data());
-            fetchSessions();
-        };
-        init();
+            loadSessions();
+        })();
     }, [currentUser]);
 
-    const fetchSessions = async () => {
+    const loadSessions = async () => {
         const q = query(collection(db, `users/${currentUser.uid}/sessions`), orderBy("lastUpdate", "desc"));
         const snap = await getDocs(q);
         setSessions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     };
 
-    const handleAchievement = async (isTimer = false) => {
+    const awardXP = async (amt) => {
         const userRef = doc(db, "users", currentUser.uid);
-        const xpGain = isTimer ? 50 : 10;
-        await updateDoc(userRef, { xp: increment(xpGain) });
-        setUserData(prev => ({ ...prev, xp: prev.xp + xpGain }));
+        const oldLvl = Math.floor((userData.xp || 0) / 500) + 1;
+        const newXP = (userData.xp || 0) + amt;
+        const newLvl = Math.floor(newXP / 500) + 1;
+        await updateDoc(userRef, { xp: increment(amt) });
+        setUserData(prev => ({ ...prev, xp: newXP }));
+        if (newLvl > oldLvl) setShowLevelUp(true);
     };
 
-    const sendMessage = async (customInput = null) => {
-        const textToUse = customInput || input;
-        if (isSending || (!textToUse.trim() && !selectedFile)) return;
-        
+    const sendMessage = async (overrideText = null) => {
+        const text = overrideText || input;
+        if (isSending || (!text.trim() && !selectedFile)) return;
+
         setIsSending(true);
-        const textToSend = textToUse;
         const file = selectedFile;
         setInput(""); setSelectedFile(null);
 
-        const userMsg = { role: "user", content: textToSend || "Analyzing Image", image: file ? URL.createObjectURL(file) : null };
+        const userMsg = { role: "user", content: text || "Analyzing image...", image: file ? URL.createObjectURL(file) : null };
         const updatedMsgs = [...messages, userMsg];
         setMessages(updatedMsgs);
 
         try {
-            // Standardize Maths/Mathematics
-            const standardizedSubject = subjectInput.toLowerCase().startsWith("math") ? "Mathematics" : subjectInput;
-
-            const payload = { 
-                userId: currentUser.uid, 
-                message: textToSend, 
-                mode, 
-                subject: standardizedSubject, 
-                chapter: chapterInput, 
-                language: userData.language, 
-                classLevel: userData.class, 
-                board: userData.board,
-                systemContext: "Strictly follow CBSE/ICSE chapter list provided in history. Ensure accurate numbering."
-            };
+            const stdSub = subjectInput.toLowerCase().startsWith("math") ? "Mathematics" : subjectInput;
+            const payload = { userId: currentUser.uid, message: text, mode, subject: stdSub, chapter: chapterInput, language: userData.language, classLevel: userData.class, board: userData.board, syllabusRegistry: MASTER_SYLLABUS };
 
             let res;
             if (file) {
-                const compressed = await imageCompression(file, { maxSizeMB: 0.4 });
+                const comp = await imageCompression(file, { maxSizeMB: 0.4 });
                 const fd = new FormData();
-                fd.append("photo", compressed);
+                fd.append("photo", comp);
                 Object.keys(payload).forEach(k => fd.append(k, payload[k]));
                 res = await axios.post(`${API_BASE}/chat/photo`, fd);
             } else {
                 res = await axios.post(`${API_BASE}/chat`, payload);
             }
 
-            // SMART YOUTUBE LOGIC: Only for specific educational triggers
-            const eduTriggers = /(how|explain|steps|tutorial|visual|mechanism|derivation|diagram|experiment)/i;
-            const needsVideo = eduTriggers.test(textToSend) || mode === "Explain";
-            const ytQuery = `${userData.board} class ${userData.class} ${standardizedSubject} ${chapterInput} ${textToSend}`.trim();
-            
-            const aiMsg = { 
-                role: "ai", 
-                content: res.data.reply, 
-                ytLink: needsVideo ? `https://www.youtube.com/results?search_query=${encodeURIComponent(ytQuery)}` : null,
-                suggestions: ["Give Example", "Key Formula", "Quiz Me"]
+            // FIXED LOGIC: Only trigger YouTube if query is educational and long enough
+            const isGreeting = /^(hi|hello|hey|hola|greetings|morning|evening|bye|thanks|thank you)$/i.test(text.trim());
+            const eduTriggers = /(how|why|solve|explain|steps|formula|diagram|what is|define|derivation|theorem)/i;
+            const needsVisual = !isGreeting && (eduTriggers.test(text) || text.length > 15);
+
+            const aiMsg = {
+                role: "ai",
+                content: res.data.reply,
+                ytLink: needsVisual ? `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} ${userData.class} ${stdSub} ${text}`)}` : null,
+                suggestions: isGreeting ? ["Explain a Topic", "Take a Quiz"] : ["Show Example", "Concept Map", "Quiz Me"]
             };
-            
+
             const finalMsgs = [...updatedMsgs, aiMsg];
             setMessages(finalMsgs);
-            
-            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
-                messages: finalMsgs, lastUpdate: Date.now(), title: subjectInput || textToSend.slice(0, 15)
-            }, { merge: true });
-            fetchSessions();
-            handleAchievement();
-        } catch (e) { toast.error("Synthesis failed. Check connection."); }
+            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: finalMsgs, lastUpdate: Date.now(), title: stdSub || text.slice(0, 20) }, { merge: true });
+            loadSessions();
+            awardXP(20);
+        } catch (err) { toast.error("Synthesis failed."); }
         setIsSending(false);
+    };
+
+    const deleteSession = async (id, e) => {
+        e.stopPropagation();
+        await deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, id));
+        if (id === currentSessionId) { setMessages([]); setCurrentSessionId(Date.now().toString()); }
+        loadSessions();
     };
 
     return (
         <div className={`flex h-[100dvh] w-full overflow-hidden transition-all duration-500 ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" autoClose={2000} hideProgressBar />
-            
-            {/* SIDEBAR OVERLAY */}
+            <AnimatePresence>{showLevelUp && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-2xl">
+                    <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-indigo-600 p-12 rounded-[3rem] text-center shadow-3xl border-2 border-white/20">
+                        <div className="text-7xl mb-6">🎓</div>
+                        <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Level {currentLevel} Scholar!</h2>
+                        <button onClick={() => setShowLevelUp(false)} className="mt-8 px-10 py-4 bg-white text-indigo-600 rounded-full font-black uppercase text-xs tracking-widest active:scale-90 transition-all">Keep Evolving</button>
+                    </motion.div>
+                </motion.div>
+            )}</AnimatePresence>
+
             <AnimatePresence>
                 {showSidebar && (
                     <>
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSidebar(false)} className="fixed inset-0 bg-black/70 z-[150] backdrop-blur-md lg:hidden" />
-                        <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[200] w-[85%] md:w-72 h-full flex flex-col p-6 shadow-2xl ${currentTheme.sidebar}`}>
-                            <div className="flex justify-between items-center mb-8">
-                                <div className="flex items-center gap-2"><FaTrophy className="text-yellow-500"/><span className="text-xs font-black uppercase italic tracking-widest">{userData.xp} XP</span></div>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSidebar(false)} className="fixed inset-0 bg-black/80 z-[150] backdrop-blur-md lg:hidden" />
+                        <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[200] w-[85%] md:w-80 h-full flex flex-col p-6 border-r ${currentTheme.sidebar}`}>
+                            <div className="flex justify-between items-center mb-10">
+                                <div className="flex flex-col">
+                                    <div className="flex items-center gap-2"><FaTrophy className="text-yellow-500"/><span className="text-[10px] font-black uppercase text-white/50">XP: {userData.xp}</span></div>
+                                    <div className="w-32 h-1.5 bg-white/5 mt-2 rounded-full overflow-hidden"><div className="h-full bg-indigo-600 shadow-[0_0_10px_#4f46e5]" style={{ width: `${(userData.xp % 500) / 5}%` }} /></div>
+                                </div>
                                 <button onClick={() => setShowSidebar(false)} className="p-2 opacity-30"><FaTimes/></button>
                             </div>
-                            <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false)}} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest uppercase shadow-lg shadow-indigo-600/20"><FaPlus className="inline mr-2"/> New Session</button>
-                            <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
+                            <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false)}} className="w-full py-4 mb-8 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all"><FaPlus className="inline mr-2"/> New Brainstorm</button>
+                            <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
                                 {sessions.map(s => (
-                                    <div key={s.id} onClick={() => {setCurrentSessionId(s.id); setMessages(s.messages || []); setShowSidebar(false)}} className={`p-4 rounded-xl border transition-all ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-600/20' : 'border-transparent hover:bg-white/5'}`}>
-                                        <span className="text-[10px] font-black truncate block uppercase tracking-tighter">{s.title || "Study Session"}</span>
+                                    <div key={s.id} onClick={() => {setCurrentSessionId(s.id); setMessages(s.messages || []); setShowSidebar(false)}} className={`group p-4 rounded-2xl border transition-all cursor-pointer relative ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-600/30' : 'border-transparent hover:bg-white/5'}`}>
+                                        <span className="text-[10px] font-black truncate block uppercase tracking-tighter w-[80%]">{s.title || "Study Session"}</span>
+                                        <button onClick={(e) => deleteSession(s.id, e)} className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-30 transition-opacity"><FaTrash size={10}/></button>
                                     </div>
                                 ))}
                             </div>
@@ -231,92 +300,73 @@ export default function Chat() {
 
             <div className="flex-1 flex flex-col h-full relative min-w-0">
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} userData={userData}/>
-                <StudyTimer currentTheme={currentTheme} onComplete={handleAchievement} />
+                <StudyTimer currentTheme={currentTheme} onComplete={awardXP} />
 
-                {/* SELECTORS (NON-CONGESTED MOBILE UI) */}
-                <div className="w-full max-w-5xl mx-auto px-4 pt-4 flex flex-col gap-3">
-                    <div className={`flex items-center gap-2 p-1.5 rounded-xl border ${currentTheme.input} backdrop-blur-md shadow-sm`}>
-                        <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject" className="w-[35%] bg-transparent px-2 py-1 text-[10px] font-black uppercase outline-none placeholder:opacity-20" />
+                <div className="w-full max-w-5xl mx-auto px-4 pt-6 flex flex-col gap-4">
+                    <div className={`flex items-center gap-2 p-2 rounded-2xl border ${currentTheme.input} backdrop-blur-2xl shadow-xl`}>
+                        <div className="p-2 text-indigo-500/50"><FaMagic size={12}/></div>
+                        <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject" className="w-[30%] bg-transparent px-2 py-1 text-[11px] font-black uppercase outline-none" />
                         <div className="h-4 w-[1px] bg-white/10"/>
-                        <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Topic / Chapter" className="flex-1 bg-transparent px-2 py-1 text-[10px] font-black uppercase outline-none placeholder:opacity-20" />
-                        <button onClick={() => setIsLocked(!isLocked)} className={`p-2.5 rounded-lg transition-all ${isLocked ? 'bg-emerald-600 shadow-lg text-white' : 'bg-white/5 text-indigo-500'}`}><FaLock size={10}/></button>
+                        <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Chapter / Topic" className="flex-1 bg-transparent px-2 py-1 text-[11px] font-black uppercase outline-none" />
+                        <button onClick={() => setIsLocked(!isLocked)} className={`p-3 rounded-xl transition-all ${isLocked ? 'bg-emerald-600 text-white' : 'bg-white/5 text-indigo-500'}`}>{isLocked ? <FaLock size={12}/> : <FaCheckCircle size={12}/>}</button>
                     </div>
-                    <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                         {["Explain", "Quiz", "Summary", "Homework"].map(m => (
-                            <button key={m} onClick={() => setMode(m)} className={`px-5 py-2.5 text-[9px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${mode === m ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-white/5 opacity-40 hover:opacity-100'}`}>{m}</button>
+                            <button key={m} onClick={() => setMode(m)} className={`px-6 py-3 text-[10px] font-black uppercase rounded-xl border transition-all whitespace-nowrap ${mode === m ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white/5 opacity-40'}`}>{m}</button>
                         ))}
                     </div>
                 </div>
 
-                {/* MESSAGES (RESPONSIVE) */}
-                <div className="flex-1 overflow-y-auto px-4 py-6 no-scrollbar">
-                    <div className="max-w-4xl mx-auto space-y-8">
+                <div className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar">
+                    <div className="max-w-4xl mx-auto space-y-10">
                         {messages.length === 0 && (
-                            <div className="h-64 flex flex-col items-center justify-center opacity-10 text-center">
-                                <FaMagic size={32} className="mb-4"/><h3 className="font-black uppercase tracking-[0.3em] text-xs">Neural Engine Ready</h3>
-                            </div>
+                            <div className="flex flex-col items-center justify-center h-96 opacity-10 text-center uppercase tracking-[0.4em] text-xs"><FaMagic size={40} className="mb-4"/><p>Awaiting Neural Input</p></div>
                         )}
                         {messages.map((msg, i) => (
-                            <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                                <div className={`max-w-[94%] md:max-w-[85%] p-6 rounded-2xl md:rounded-[2.5rem] shadow-xl ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none text-white` : `${currentTheme.aiBubble} rounded-tl-none border-white/5 backdrop-blur-md`}`}>
-                                    {msg.image && <img src={msg.image} className="rounded-xl mb-4 max-h-64 w-full object-cover shadow-lg border border-white/10" alt="upload" />}
-                                    <div className="prose prose-sm prose-invert max-w-none text-xs md:text-sm font-medium leading-relaxed">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                                    </div>
+                            <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                                <div className={`max-w-[95%] md:max-w-[85%] p-6 md:p-8 rounded-3xl md:rounded-[3rem] shadow-2xl relative ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none text-white` : `${currentTheme.aiBubble} rounded-tl-none border-white/5 backdrop-blur-3xl`}`}>
+                                    {msg.image && <img src={msg.image} className="rounded-2xl mb-6 max-h-72 w-full object-cover shadow-2xl border border-white/10" alt="input" />}
+                                    {msg.role === "ai" && i === messages.length - 1 && !isSending ? <Typewriter text={msg.content} /> : <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className="prose prose-sm prose-invert max-w-none text-xs md:text-sm font-medium leading-relaxed space-y-5">{msg.content}</ReactMarkdown>}
                                     {msg.role === "ai" && msg.ytLink && (
-                                        <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-5 flex items-center justify-center gap-3 py-3.5 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-red-600/20 hover:brightness-110 transition-all">
-                                            <FaYoutube size={16}/> Stream Simulation
-                                        </a>
+                                        <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] shadow-xl shadow-red-600/20"><FaYoutube size={18}/> Access Visual Lab</a>
                                     )}
                                     {msg.role === "ai" && i === messages.length - 1 && (
-                                        <div className="mt-6 flex flex-wrap gap-2">
-                                            {msg.suggestions?.map((s, idx) => (<button key={idx} onClick={() => sendMessage(s)} className="px-4 py-2 rounded-lg border border-white/10 bg-white/5 text-[8px] font-black uppercase hover:bg-indigo-600 transition-all">{s}</button>))}
-                                        </div>
+                                        <div className="mt-8 flex flex-wrap gap-2">{msg.suggestions?.map((s, idx) => (<button key={idx} onClick={() => sendMessage(s)} className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-[9px] font-black uppercase hover:bg-indigo-600 transition-all">{s}</button>))}</div>
                                     )}
                                 </div>
                             </motion.div>
                         ))}
-                        {isSending && <div className="flex items-center gap-2 px-4 text-[8px] font-black uppercase tracking-[0.2em] text-indigo-500 animate-pulse"><FaSyncAlt className="animate-spin"/> Synthesis...</div>}
-                        <div ref={messagesEndRef} className="h-24" />
+                        {isSending && <div className="flex items-center gap-3 px-6 text-[9px] font-black uppercase tracking-[0.3em] text-indigo-500 animate-pulse"><FaSyncAlt className="animate-spin"/> Processing...</div>}
+                        <div ref={messagesEndRef} className="h-32" />
                     </div>
                 </div>
 
-                {/* BOTTOM ACTION BAR (MOBILE FIXED) */}
-                <div className="p-3 md:p-10 relative bg-gradient-to-t from-black/40 via-transparent to-transparent">
+                <div className="p-4 md:p-12 relative bg-gradient-to-t from-black/60 to-transparent backdrop-blur-sm">
                     <div className="max-w-3xl mx-auto relative">
-                        {isListening && <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-5 py-2 rounded-full text-[9px] font-black animate-bounce shadow-xl">LISTENING...</div>}
-                        <div className={`flex items-center gap-1 p-1.5 rounded-[2.5rem] border shadow-2xl backdrop-blur-3xl transition-all ${currentTheme.input}`}>
-                            <button onClick={() => setShowSidebar(true)} className="p-4 text-indigo-500 lg:hidden active:scale-75 transition-transform"><FaHistory size={18}/></button>
-                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Ask Dhruva AI..." className="flex-1 bg-transparent px-3 py-2 outline-none text-xs md:text-sm font-bold placeholder:opacity-20" />
+                        <div className={`flex items-center gap-2 p-2 rounded-[3rem] border shadow-3xl backdrop-blur-3xl ${currentTheme.input}`}>
+                            <button onClick={() => setShowSidebar(true)} className="p-4 text-indigo-500 lg:hidden rounded-full"><FaHistory size={20}/></button>
+                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Ask Dhruva anything..." className="flex-1 bg-transparent px-4 py-2 outline-none text-xs md:text-sm font-bold" />
                             <div className="flex items-center gap-1 pr-1">
-                                <button onClick={toggleVoice} className={`p-3 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' : 'text-indigo-500 hover:bg-white/5'}`}><FaMicrophone size={18}/></button>
-                                <button onClick={() => setIsCameraOpen(true)} className="p-3 text-indigo-500 hover:bg-white/5 rounded-full hidden xs:block"><FaCamera size={18}/></button>
-                                <input type="file" ref={fileInputRef} hidden onChange={e => setSelectedFile(e.target.files[0])} />
-                                <button onClick={() => fileInputRef.current.click()} className="p-3 text-indigo-500 hover:bg-white/5 rounded-full"><FaImage size={18}/></button>
-                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 rounded-full ${currentTheme.button} text-white shadow-xl flex items-center justify-center active:scale-75 transition-all hover:brightness-125`}>
-                                    {isSending ? <FaSyncAlt className="animate-spin" size={14}/> : <FaPaperPlane size={14}/>}
+                                <button onClick={toggleVoice} className={`p-4 rounded-full transition-all ${isListening ? 'bg-red-500 text-white' : 'text-indigo-500'}`}><FaMicrophone size={20}/></button>
+                                <button onClick={openCamera} className="p-4 text-indigo-500 hidden xs:block"><FaCamera size={20}/></button>
+                                <button onClick={() => fileInputRef.current.click()} className="p-4 text-indigo-500"><FaImage size={20}/><input type="file" ref={fileInputRef} hidden onChange={e => setSelectedFile(e.target.files[0])} /></button>
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-6 rounded-full ${currentTheme.button} text-white shadow-2xl active:scale-75 transition-all`}>
+                                    {isSending ? <FaSyncAlt className="animate-spin" size={16}/> : <FaPaperPlane size={16}/>}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* CAMERA OVERLAY */}
                 <AnimatePresence>
                     {isCameraOpen && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col">
                             <video ref={videoRef} autoPlay playsInline className="flex-1 object-cover" />
                             <canvas ref={canvasRef} className="hidden" />
-                            <div className="p-10 flex justify-between items-center bg-black/90 backdrop-blur-xl border-t border-white/10">
-                                <button onClick={() => setIsCameraOpen(false)} className="p-5 bg-white/10 rounded-full text-white hover:bg-red-500 transition-all"><FaTimes size={20}/></button>
-                                <button onClick={() => {
-                                    const ctx = canvasRef.current.getContext("2d");
-                                    canvasRef.current.width = videoRef.current.videoWidth;
-                                    canvasRef.current.height = videoRef.current.videoHeight;
-                                    ctx.drawImage(videoRef.current, 0, 0);
-                                    canvasRef.current.toBlob(b => { setSelectedFile(new File([b], "shot.jpg", {type: "image/jpeg"})); setIsCameraOpen(false); }, "image/jpeg", 0.8);
-                                }} className="w-20 h-20 bg-white rounded-full border-[6px] border-white/20 shadow-2xl active:scale-90 transition-all" />
-                                <div className="w-10" />
+                            <div className="p-12 flex justify-between items-center bg-black/90 backdrop-blur-2xl border-t border-white/10">
+                                <button onClick={closeCamera} className="p-6 bg-white/10 rounded-full text-white hover:bg-red-600 transition-all"><FaTimes size={24}/></button>
+                                <button onClick={capturePhoto} className="w-24 h-24 bg-white rounded-full border-[8px] border-white/20 shadow-3xl active:scale-90 transition-all" />
+                                <div className="w-16" />
                             </div>
                         </motion.div>
                     )}
