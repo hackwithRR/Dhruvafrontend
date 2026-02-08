@@ -66,9 +66,9 @@ export default function Chat() {
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
     
-    const activeTheme = useMemo(() => themes[userData.theme] || themes.DeepSpace, [userData.theme]);
+    // Safety added: Optional chaining for themes
+    const activeTheme = useMemo(() => themes[userData?.theme] || themes.DeepSpace, [userData?.theme]);
 
-    // PROTECT AGAINST RELOAD LOGOUT
     useEffect(() => {
         if (!authLoading && !currentUser) {
             navigate("/login");
@@ -88,7 +88,6 @@ export default function Chat() {
         try { await auth.signOut(); navigate("/login"); } catch (err) { toast.error("Logout Failed"); }
     };
 
-    // SAFE DATA SYNC
     useEffect(() => {
         if (!currentUser?.uid) return;
         const unsubUser = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
@@ -179,7 +178,6 @@ export default function Chat() {
         return sessions.filter(s => (s.title || "").toLowerCase().includes(searchQuery.toLowerCase()));
     }, [sessions, searchQuery]);
 
-    // LOADING SCREEN TO PREVENT BLACK BACKGROUND CRASH
     if (authLoading) return (
       <div className="h-screen w-full bg-[#050505] flex flex-col items-center justify-center space-y-4">
         <FaBrain className="text-indigo-500 animate-pulse" size={40}/>
@@ -266,14 +264,15 @@ export default function Chat() {
                     </div>
                     <div className={`flex gap-3 p-2 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} backdrop-blur-md`}>
                         <div className="flex-1 relative">
+                            {/* Safety added: Added null checks for syllabus lookups */}
                             <select value={subject} onChange={(e) => setSubject(e.target.value)} className={`${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-100'} w-full border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer`}>
-                                {Object.keys(syllabusData[userData.board]?.[userData.class] || {}).map(s => <option key={s} value={s} className="bg-black text-white">{s}</option>)}
+                                {Object.keys(syllabusData[userData?.board]?.[userData?.class] || {}).map(s => <option key={s} value={s} className="bg-black text-white">{s}</option>)}
                             </select>
                         </div>
                         <div className="flex-1 relative">
                             <select value={chapter} onChange={(e) => setChapter(e.target.value)} className={`${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-100'} w-full border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer`}>
                                 <option value="" className="bg-black text-white">Select Chapter</option>
-                                {(syllabusData[userData.board]?.[userData.class]?.[subject] || []).map(ch => <option key={ch} value={ch} className="bg-black text-white">{ch}</option>)}
+                                {(syllabusData[userData?.board]?.[userData?.class]?.[subject] || []).map(ch => <option key={ch} value={ch} className="bg-black text-white">{ch}</option>)}
                             </select>
                         </div>
                     </div>
@@ -361,9 +360,9 @@ export default function Chat() {
                                     <div className={`absolute top-0 left-0 w-1 h-full bg-${activeTheme.primary} opacity-0 group-hover:opacity-100 transition-all`}/>
                                     <div>
                                         <h4 className={`font-black uppercase text-sm tracking-tight group-hover:${activeTheme.accent} transition-colors`}>{s.title || "Untitled Lesson"}</h4>
-                                        <p className="text-[9px] opacity-30 mt-3 uppercase font-black tracking-widest">{s.subject} • {s.lastUpdate ? new Date(s.lastUpdate).toLocaleDateString() : 'New'}</p>
+                                        <p className="text-[9px] opacity-30 mt-3 uppercase font-black tracking-widest">{s?.subject} • {s.lastUpdate ? new Date(s.lastUpdate).toLocaleDateString() : 'New'}</p>
                                     </div>
-                                    <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)); }} className="opacity-0 group-hover:opacity-100 text-red-500 p-3 hover:bg-red-500/10 rounded-xl transition-all"><FaTrash size={14}/></button>
+                                    <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser?.uid}/sessions`, s.id)); }} className="opacity-0 group-hover:opacity-100 text-red-500 p-3 hover:bg-red-500/10 rounded-xl transition-all"><FaTrash size={14}/></button>
                                 </div>
                             ))}
                         </div>
