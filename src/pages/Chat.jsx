@@ -7,7 +7,7 @@ import {
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaMicrophone, 
     FaImage, FaPlus, FaHistory, FaYoutube, FaTrash, 
     FaClock, FaPlay, FaStop, FaTrophy, FaMagic, FaCheckCircle,
-    FaVolumeUp, FaVolumeMute 
+    FaVolumeUp, FaVolumeMute, FaWaveSquare
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -28,98 +28,98 @@ CBSE 8 MATH: Rational Numbers, Linear Eq, Quadrilaterals, Practical Geo, Data Ha
 Standardize all queries for 'Maths' to 'Mathematics'.
 `;
 
-const Typewriter = ({ text }) => {
-    const [displayedText, setDisplayedText] = useState("");
-    useEffect(() => {
-        let i = 0;
-        const interval = setInterval(() => {
-            setDisplayedText(text.slice(0, i));
-            i++;
-            if (i > text.length) clearInterval(interval);
-        }, 5); 
-        return () => clearInterval(interval);
-    }, [text]);
+// --- MODERN RANK COMPONENT ---
+const RankBadge = ({ xp, level }) => {
+    const progress = (xp % 500) / 5;
+    const ranks = ["Novice", "Scholar", "Sage", "Expert", "Master", "Grandmaster"];
+    const currentRank = ranks[Math.min(Math.floor((level - 1) / 2), ranks.length - 1)];
 
     return (
-        <ReactMarkdown 
-            remarkPlugins={[remarkGfm, remarkMath]} 
-            rehypePlugins={[rehypeKatex]}
-            className="prose prose-sm prose-invert max-w-none text-xs md:text-sm font-medium leading-relaxed prose-p:mb-5"
-        >
-            {displayedText}
-        </ReactMarkdown>
+        <div className="p-4 bg-gradient-to-br from-indigo-600/20 to-fuchsia-600/10 rounded-3xl border border-white/10 shadow-xl mb-6">
+            <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/40">
+                    <FaTrophy className="text-white" size={20}/>
+                </div>
+                <div>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400">{currentRank}</h4>
+                    <h3 className="text-lg font-black text-white leading-none">Level {level}</h3>
+                </div>
+            </div>
+            <div className="space-y-1">
+                <div className="flex justify-between text-[8px] font-black uppercase opacity-50">
+                    <span>{xp} Total XP</span>
+                    <span>{500 - (xp % 500)} XP to Next Level</span>
+                </div>
+                <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
+                    <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        className="h-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]"
+                    />
+                </div>
+            </div>
+        </div>
     );
 };
 
-// --- UPDATED PERSISTENT STUDY TIMER ---
+// --- PERSISTENT STRICT TIMER ---
 const StudyTimer = ({ currentTheme, onComplete }) => {
-    const [timeLeft, setTimeLeft] = useState(() => Number(localStorage.getItem("studyTimeLeft")) || 0);
-    const [isActive, setIsActive] = useState(() => localStorage.getItem("studyTimerActive") === "true");
-    const [initialDuration, setInitialDuration] = useState(() => Number(localStorage.getItem("studyInitialDuration")) || 0);
+    const [timeLeft, setTimeLeft] = useState(() => Number(localStorage.getItem("dhruva_timeLeft")) || 0);
+    const [isActive, setIsActive] = useState(() => localStorage.getItem("dhruva_timerActive") === "true");
+    const [initialTime, setInitialTime] = useState(() => Number(localStorage.getItem("dhruva_initialTime")) || 0);
     const [isOpen, setIsOpen] = useState(false);
     const timerRef = useRef(null);
 
     useEffect(() => {
-        localStorage.setItem("studyTimeLeft", timeLeft);
-        localStorage.setItem("studyTimerActive", isActive);
-        localStorage.setItem("studyInitialDuration", initialDuration);
+        localStorage.setItem("dhruva_timeLeft", timeLeft);
+        localStorage.setItem("dhruva_timerActive", isActive);
+        localStorage.setItem("dhruva_initialTime", initialTime);
 
         if (isActive && timeLeft > 0) {
             timerRef.current = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
         } else if (timeLeft === 0 && isActive) {
-            handleStop(true);
+            handleComplete(true);
         }
         return () => clearInterval(timerRef.current);
     }, [isActive, timeLeft]);
 
-    const handleStop = (isFinished = false) => {
-        const timeSpentSeconds = initialDuration - timeLeft;
-        const xpEarned = Math.floor(timeSpentSeconds / 60); // 1 XP per minute
-        
-        if (xpEarned > 0) {
-            onComplete(xpEarned);
-            toast.success(`Session ${isFinished ? 'Finished' : 'Ended'}: +${xpEarned} XP 🏆`);
+    const handleComplete = (isFinished) => {
+        const secondsStudied = initialTime - timeLeft;
+        const earnedXP = Math.floor(secondsStudied / 60);
+        if (earnedXP > 0) {
+            onComplete(earnedXP);
+            toast.success(`Focused for ${earnedXP}m! +${earnedXP} XP`);
         }
-        
         setIsActive(false);
         setTimeLeft(0);
-        setInitialDuration(0);
-        localStorage.removeItem("studyTimeLeft");
-        localStorage.removeItem("studyTimerActive");
-        localStorage.removeItem("studyInitialDuration");
+        setInitialTime(0);
     };
 
-    const startTimer = (minutes) => {
-        const seconds = minutes * 60;
-        setTimeLeft(seconds);
-        setInitialDuration(seconds);
+    const startTimer = (mins) => {
+        const secs = mins * 60;
+        setTimeLeft(secs);
+        setInitialTime(secs);
         setIsActive(true);
     };
 
-    const formatTime = (seconds) => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
-    };
-
     return (
-        <motion.div drag dragMomentum={false} className="fixed z-[100] right-4 top-20 md:right-6 md:top-24 scale-90 md:scale-100">
+        <motion.div drag dragMomentum={false} className="fixed z-[100] right-4 top-24 md:right-8 md:top-28">
             <motion.div 
-                animate={{ width: isOpen ? "220px" : "48px", height: isOpen ? "250px" : "48px", borderRadius: isOpen ? "24px" : "50%" }}
-                className={`flex flex-col overflow-hidden border shadow-2xl backdrop-blur-3xl ${currentTheme.aiBubble} border-white/10 cursor-pointer`}
+                animate={{ width: isOpen ? "240px" : "56px", height: isOpen ? "260px" : "56px", borderRadius: isOpen ? "28px" : "50%" }}
+                className={`flex flex-col overflow-hidden border shadow-2xl backdrop-blur-3xl ${currentTheme.aiBubble} border-white/10`}
             >
                 {!isOpen ? (
                     <button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-400">
-                        {isActive ? <span className="text-[10px] font-bold text-emerald-400 animate-pulse">{formatTime(timeLeft)}</span> : <FaClock size={18}/>}
+                        {isActive ? <span className="text-[10px] font-bold animate-pulse">{Math.ceil(timeLeft/60)}m</span> : <FaClock size={20}/>}
                     </button>
                 ) : (
-                    <div className="p-4 flex flex-col h-full items-center justify-between">
-                        <div className="flex justify-between w-full items-center"><span className="text-[9px] font-black uppercase opacity-40">Zen Mode</span><button onClick={() => setIsOpen(false)}><FaTimes size={12}/></button></div>
-                        <h2 className="text-4xl font-black font-mono">{formatTime(timeLeft)}</h2>
-                        <div className="grid grid-cols-3 gap-1 w-full">{[15, 25, 45].map(m => (<button key={m} onClick={() => startTimer(m)} className="py-2 rounded-lg bg-white/5 text-[8px] font-black">{m}m</button>))}</div>
-                        <div className="flex gap-3">
-                            <button onClick={() => setIsActive(!isActive)} className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center">{isActive ? <FaStop size={12}/> : <FaPlay size={12}/>}</button>
-                            <button onClick={() => handleStop(false)} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10"><FaTrash size={12}/></button>
+                    <div className="p-5 flex flex-col h-full justify-between">
+                        <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase tracking-widest opacity-40">Focus Session</span><button onClick={() => setIsOpen(false)}><FaTimes size={14}/></button></div>
+                        <div className="text-4xl font-mono font-black text-center py-4">{Math.floor(timeLeft/60)}:{String(timeLeft%60).padStart(2, '0')}</div>
+                        <div className="grid grid-cols-3 gap-2">{[15, 25, 45].map(m => (<button key={m} onClick={() => startTimer(m)} className="py-2 rounded-xl bg-white/5 text-[10px] font-black hover:bg-indigo-600 transition-colors">{m}m</button>))}</div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setIsActive(!isActive)} className="flex-1 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg">{isActive ? <FaStop/> : <FaPlay/>}</button>
+                            <button onClick={() => handleComplete(false)} className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10"><FaTrash/></button>
                         </div>
                     </div>
                 )}
@@ -145,8 +145,7 @@ export default function Chat() {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isListening, setIsListening] = useState(false);
-    const [showLevelUp, setShowLevelUp] = useState(false);
-    const [isVoiceActive, setIsVoiceActive] = useState(true);
+    const [isVoiceOn, setIsVoiceOn] = useState(true);
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -163,25 +162,26 @@ export default function Chat() {
     const currentTheme = themes[theme] || themes.DeepSpace;
     const currentLevel = Math.floor((userData.xp || 0) / 500) + 1;
 
+    // --- GEMINI/GPT VOICE MODE ---
     const speak = (text) => {
-        if (!isVoiceActive) return;
+        if (!isVoiceOn) return;
         window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text.replace(/[*#_~]/g, ""));
-        utterance.rate = 1.0;
-        window.speechSynthesis.speak(utterance);
+        const utter = new SpeechSynthesisUtterance(text.replace(/[*#_]/g, ""));
+        utter.rate = 1.1;
+        window.speechSynthesis.speak(utter);
     };
 
     useEffect(() => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognitionRef.current = new SpeechRecognition();
+        const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (Speech) {
+            recognitionRef.current = new Speech();
             recognitionRef.current.continuous = false;
             recognitionRef.current.onresult = (e) => setInput(e.results[0][0].transcript);
             recognitionRef.current.onend = () => setIsListening(false);
         }
     }, []);
 
-    const toggleVoice = () => {
+    const handleVoiceToggle = () => {
         if (isListening) { recognitionRef.current.stop(); setIsListening(false); }
         else { setInput(""); recognitionRef.current.start(); setIsListening(true); }
     };
@@ -191,11 +191,11 @@ export default function Chat() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
             if (videoRef.current) videoRef.current.srcObject = stream;
-        } catch (err) { toast.error("Camera access denied"); setIsCameraOpen(false); }
+        } catch (err) { toast.error("Camera denied"); setIsCameraOpen(false); }
     };
 
     const closeCamera = () => {
-        if (videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+        if (videoRef.current?.srcObject) videoRef.current.srcObject.getTracks().forEach(t => t.stop());
         setIsCameraOpen(false);
     };
 
@@ -204,10 +204,10 @@ export default function Chat() {
         canvasRef.current.width = videoRef.current.videoWidth;
         canvasRef.current.height = videoRef.current.videoHeight;
         ctx.drawImage(videoRef.current, 0, 0);
-        canvasRef.current.toBlob(async (blob) => {
-            setSelectedFile(new File([blob], "capture.jpg", { type: "image/jpeg" }));
+        canvasRef.current.toBlob(b => {
+            setSelectedFile(new File([b], "shot.jpg", { type: "image/jpeg" }));
             closeCamera();
-        }, "image/jpeg", 0.8);
+        }, "image/jpeg", 0.7);
     };
 
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isSending]);
@@ -229,23 +229,18 @@ export default function Chat() {
 
     const awardXP = async (amt) => {
         const userRef = doc(db, "users", currentUser.uid);
-        const oldLvl = Math.floor((userData.xp || 0) / 500) + 1;
-        const newXP = (userData.xp || 0) + amt;
-        const newLvl = Math.floor(newXP / 500) + 1;
         await updateDoc(userRef, { xp: increment(amt) });
-        setUserData(prev => ({ ...prev, xp: newXP }));
-        if (newLvl > oldLvl) setShowLevelUp(true);
+        setUserData(p => ({ ...p, xp: p.xp + amt }));
     };
 
-    const sendMessage = async (overrideText = null) => {
-        const text = overrideText || input;
+    const sendMessage = async (override = null) => {
+        const text = override || input;
         if (isSending || (!text.trim() && !selectedFile)) return;
-
         setIsSending(true);
         const file = selectedFile;
         setInput(""); setSelectedFile(null);
 
-        const userMsg = { role: "user", content: text || "Analyzing image...", image: file ? URL.createObjectURL(file) : null };
+        const userMsg = { role: "user", content: text || "Analyzing file...", image: file ? URL.createObjectURL(file) : null };
         const updatedMsgs = [...messages, userMsg];
         setMessages(updatedMsgs);
 
@@ -268,7 +263,7 @@ export default function Chat() {
                 role: "ai",
                 content: res.data.reply,
                 ytLink: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} ${userData.class} ${stdSub} ${text}`)}`,
-                suggestions: ["Show Example", "Concept Map", "Quiz Me"]
+                suggestions: ["Explain More", "Quiz Me", "Give Example"]
             };
 
             const finalMsgs = [...updatedMsgs, aiMsg];
@@ -276,46 +271,40 @@ export default function Chat() {
             speak(res.data.reply);
             await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: finalMsgs, lastUpdate: Date.now(), title: stdSub || text.slice(0, 20) }, { merge: true });
             loadSessions();
-            awardXP(10); // Standard message XP
-        } catch (err) { toast.error("Synthesis failed."); }
+            awardXP(10);
+        } catch (err) { toast.error("Connection failed."); }
         setIsSending(false);
     };
 
-    const deleteSession = async (id, e) => {
-        e.stopPropagation();
-        await deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, id));
-        if (id === currentSessionId) { setMessages([]); setCurrentSessionId(Date.now().toString()); }
-        loadSessions();
-    };
-
     return (
-        <div className={`flex h-[100dvh] w-full overflow-hidden transition-all duration-500 ${currentTheme.container}`}>
+        <div className={`flex h-[100dvh] w-full overflow-hidden ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" autoClose={2000} hideProgressBar />
-            
-            {/* PERSISTENT SIDEBAR - Works on Desktop and Mobile */}
+
+            {/* RESPONSIVE SIDEBAR */}
             <AnimatePresence>
                 {(showSidebar || window.innerWidth > 1024) && (
-                    <>
-                        {showSidebar && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSidebar(false)} className="fixed inset-0 bg-black/80 z-[150] backdrop-blur-md lg:hidden" />}
-                        <motion.div initial={{ x: -300 }} animate={{ x: 0 }} className={`fixed lg:relative z-[200] w-[85%] md:w-80 h-full flex flex-col p-6 border-r ${currentTheme.sidebar}`}>
-                            <div className="flex justify-between items-center mb-10">
-                                <div className="flex flex-col">
-                                    <div className="flex items-center gap-2"><FaTrophy className="text-yellow-500"/><span className="text-[10px] font-black uppercase text-white/50">Level {currentLevel}</span></div>
-                                    <div className="w-32 h-1.5 bg-white/5 mt-2 rounded-full overflow-hidden"><div className="h-full bg-indigo-600" style={{ width: `${(userData.xp % 500) / 5}%` }} /></div>
+                    <motion.div 
+                        initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }}
+                        className={`fixed lg:relative z-[200] w-72 md:w-80 h-full flex flex-col p-6 border-r ${currentTheme.sidebar} backdrop-blur-xl shadow-2xl`}
+                    >
+                        <div className="flex justify-between items-center mb-6 lg:hidden">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Library</span>
+                            <button onClick={() => setShowSidebar(false)} className="p-2"><FaTimes/></button>
+                        </div>
+                        
+                        <RankBadge xp={userData.xp} level={currentLevel} />
+
+                        <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false)}} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"><FaPlus/> New Brainstorm</button>
+                        
+                        <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
+                            {sessions.map(s => (
+                                <div key={s.id} onClick={() => {setCurrentSessionId(s.id); setMessages(s.messages || []); setShowSidebar(false)}} className={`group p-4 rounded-2xl border transition-all cursor-pointer relative ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-600/40' : 'border-transparent hover:bg-white/5'}`}>
+                                    <span className="text-[10px] font-black truncate block uppercase tracking-tighter w-[85%]">{s.title || "Study Session"}</span>
+                                    <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)).then(loadSessions); }} className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-40 transition-opacity"><FaTrash size={10}/></button>
                                 </div>
-                                <button onClick={() => setShowSidebar(false)} className="lg:hidden p-2 opacity-30"><FaTimes/></button>
-                            </div>
-                            <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString());}} className="w-full py-4 mb-8 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all"><FaPlus className="inline mr-2"/> New Brainstorm</button>
-                            <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
-                                {sessions.map(s => (
-                                    <div key={s.id} onClick={() => {setCurrentSessionId(s.id); setMessages(s.messages || []);}} className={`group p-4 rounded-2xl border transition-all cursor-pointer relative ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-600/30' : 'border-transparent hover:bg-white/5'}`}>
-                                        <span className="text-[10px] font-black truncate block uppercase tracking-tighter w-[80%]">{s.title || "Study Session"}</span>
-                                        <button onClick={(e) => deleteSession(s.id, e)} className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-30 transition-opacity"><FaTrash size={10}/></button>
-                                    </div>
-                                ))}
-                            </div>
-                        </motion.div>
-                    </>
+                            ))}
+                        </div>
+                    </motion.div>
                 )}
             </AnimatePresence>
 
@@ -323,21 +312,36 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} userData={userData}/>
                 <StudyTimer currentTheme={currentTheme} onComplete={awardXP} />
 
-                {/* MAIN CHAT CONTENT */}
-                <div className="flex-1 overflow-y-auto px-4 py-6 no-scrollbar">
-                    <div className="max-w-4xl mx-auto space-y-12">
+                {/* MODE & SUBJECT PICKER */}
+                <div className="w-full max-w-5xl mx-auto px-4 pt-6 space-y-4">
+                    <div className={`flex items-center gap-2 p-1.5 rounded-2xl border ${currentTheme.input} shadow-xl`}>
+                        <input value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Sub" className="w-20 md:w-32 bg-transparent px-3 py-1 text-[11px] font-black uppercase outline-none" />
+                        <div className="h-4 w-[1px] bg-white/10"/>
+                        <input value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Chapter Name..." className="flex-1 bg-transparent px-3 py-1 text-[11px] font-black uppercase outline-none" />
+                        <button onClick={() => setIsLocked(!isLocked)} className={`p-2.5 rounded-xl ${isLocked ? 'bg-emerald-600' : 'bg-white/5'}`}><FaCheckCircle size={12}/></button>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                        {["Explain", "Quiz", "Summary", "Homework"].map(m => (
+                            <button key={m} onClick={() => setMode(m)} className={`px-5 py-2.5 text-[10px] font-black uppercase rounded-xl border transition-all ${mode === m ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white/5 opacity-50'}`}>{m}</button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* CHAT DISPLAY */}
+                <div className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar">
+                    <div className="max-w-4xl mx-auto space-y-10">
                         {messages.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-96 opacity-10 text-center uppercase tracking-[0.4em] text-xs"><FaMagic size={40} className="mb-4"/><p>Select a Mode to Start</p></div>
+                            <div className="flex flex-col items-center justify-center h-64 opacity-10 text-center uppercase tracking-[0.4em] text-[10px]"><FaWaveSquare size={40} className="mb-4"/><p>Select a Mode to Begin</p></div>
                         )}
                         {messages.map((msg, i) => (
-                            <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                                <div className={`max-w-[95%] md:max-w-[85%] p-5 md:p-8 rounded-3xl md:rounded-[3rem] shadow-2xl relative ${msg.role === "user" ? `${currentTheme.userBubble} text-white` : `${currentTheme.aiBubble} backdrop-blur-3xl`}`}>
-                                    {msg.image && <img src={msg.image} className="rounded-2xl mb-6 max-h-72 w-full object-cover" alt="input" />}
-                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className="prose prose-sm prose-invert max-w-none text-xs md:text-sm prose-p:mb-4">
+                            <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                                <div className={`max-w-[92%] md:max-w-[80%] p-6 md:p-8 rounded-[2.5rem] shadow-2xl relative ${msg.role === "user" ? `${currentTheme.userBubble} text-white rounded-tr-none` : `${currentTheme.aiBubble} backdrop-blur-3xl rounded-tl-none`}`}>
+                                    {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-80 w-full object-cover shadow-xl" alt="input" />}
+                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className="prose prose-sm prose-invert max-w-none text-xs md:text-sm prose-p:mb-5 leading-relaxed">
                                         {msg.content}
                                     </ReactMarkdown>
                                     {msg.role === "ai" && msg.ytLink && (
-                                        <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase"><FaYoutube size={18}/> Watch Lesson</a>
+                                        <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl shadow-red-600/20"><FaYoutube size={18}/> Open Visual Lab</a>
                                     )}
                                 </div>
                             </motion.div>
@@ -346,22 +350,38 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* FOOTER INPUT */}
-                <div className="p-3 md:p-10 bg-gradient-to-t from-black/80 to-transparent">
+                {/* MODERN RESPONSIVE BOTTOM BAR */}
+                <div className="p-4 md:p-10 bg-gradient-to-t from-black via-black/80 to-transparent">
                     <div className="max-w-4xl mx-auto">
-                        <div className={`flex items-center gap-1 p-2 rounded-[4rem] border ${currentTheme.input} backdrop-blur-3xl`}>
-                            <button onClick={() => setShowSidebar(true)} className="p-4 text-indigo-500 rounded-full"><FaHistory size={20}/></button>
-                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Ask anything..." className="flex-1 bg-transparent px-4 py-2 outline-none text-sm font-bold" />
-                            <div className="flex items-center gap-1">
-                                <button onClick={toggleVoice} className={`p-4 rounded-full ${isListening ? 'bg-red-500 text-white' : 'text-indigo-500'}`}><FaMicrophone size={20}/></button>
-                                <button onClick={() => fileInputRef.current.click()} className="p-4 text-indigo-500"><FaImage size={20}/><input type="file" ref={fileInputRef} hidden onChange={e => setSelectedFile(e.target.files[0])} /></button>
-                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-6 rounded-full ${currentTheme.button} text-white`}>
+                        <div className={`flex items-center gap-1 md:gap-2 p-2 rounded-[3.5rem] border shadow-3xl backdrop-blur-3xl ${currentTheme.input} ring-1 ring-white/5`}>
+                            <button onClick={() => setShowSidebar(true)} className="p-3 text-indigo-400 lg:hidden"><FaHistory size={20}/></button>
+                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Ask Dhruva anything..." className="flex-1 bg-transparent px-2 md:px-5 py-3 outline-none text-sm font-bold min-w-0" />
+                            <div className="flex items-center gap-0.5 md:gap-1 px-1">
+                                <button onClick={() => setIsVoiceOn(!isVoiceOn)} className={`p-3 hidden md:block ${isVoiceOn ? 'text-indigo-400' : 'text-white/20'}`}><FaVolumeUp size={18}/></button>
+                                <button onClick={handleVoiceToggle} className={`p-4 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-indigo-400 hover:bg-white/5'}`}><FaMicrophone size={20}/></button>
+                                <button onClick={() => fileInputRef.current.click()} className="p-4 text-indigo-400 hover:bg-white/5 rounded-full"><FaImage size={20}/><input type="file" ref={fileInputRef} hidden onChange={e => setSelectedFile(e.target.files[0])} /></button>
+                                <button onClick={openCamera} className="p-4 text-indigo-400 hidden xs:block hover:bg-white/5 rounded-full"><FaCamera size={20}/></button>
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 md:p-6 rounded-full ${currentTheme.button} text-white shadow-2xl active:scale-90 transition-all ml-1`}>
                                     {isSending ? <FaSyncAlt className="animate-spin" size={16}/> : <FaPaperPlane size={16}/>}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <AnimatePresence>
+                    {isCameraOpen && (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col">
+                            <video ref={videoRef} autoPlay playsInline className="flex-1 object-cover" />
+                            <div className="p-10 flex justify-between items-center bg-black/90 border-t border-white/10">
+                                <button onClick={closeCamera} className="p-6 bg-white/10 rounded-full text-white"><FaTimes size={24}/></button>
+                                <button onClick={capturePhoto} className="w-24 h-24 bg-white rounded-full border-[8px] border-white/20 active:scale-95 shadow-2xl" />
+                                <div className="w-16" />
+                            </div>
+                            <canvas ref={canvasRef} className="hidden" />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
         </div>
     );
