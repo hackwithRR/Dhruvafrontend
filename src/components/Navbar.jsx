@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { FaUser, FaSignOutAlt, FaChevronDown, FaHourglassHalf } from "react-icons/fa";
-import { MdDarkMode, MdLightMode, MdGradient } from "react-icons/md";
+import { FaUser, FaSignOutAlt, FaChevronDown, FaHourglassHalf, FaPalette } from "react-icons/fa";
+import { MdDarkMode, MdLightMode, MdGradient, MdColorLens } from "react-icons/md";
 import { toast } from "react-toastify";
 
 export default function Navbar({ currentUser, theme, setTheme, logout }) {
@@ -14,81 +14,109 @@ export default function Navbar({ currentUser, theme, setTheme, logout }) {
     const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || "Student";
     const photoURL = currentUser?.photoURL || `https://ui-avatars.com/api/?name=${displayName}&background=6366f1&color=fff`;
 
+    // --- SYNCED WITH CHAT.JSX THEMES ---
     const themeConfigs = {
-        dark: { nav: "bg-[#0F172A]/80 border-white/5 text-white backdrop-blur-md", dropdown: "bg-[#1E293B] text-white", btnProfile: "bg-indigo-600/20 text-indigo-400 border-indigo-500/30 hover:bg-indigo-600", btnLogout: "bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500" },
-        light: { nav: "bg-white/60 border-white/40 text-slate-900 backdrop-blur-lg", dropdown: "bg-white text-slate-800", btnProfile: "bg-blue-500/10 text-blue-600 border-blue-500/20 hover:bg-blue-500", btnLogout: "bg-orange-500/10 text-orange-600 border-orange-500/20 hover:bg-orange-500" },
-        electric: { nav: "bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#FCB045] text-white", dropdown: "bg-[#833AB4] text-white", btnProfile: "bg-white/20 border-white/40", btnLogout: "bg-black/20 border-white/20" }
+        DeepSpace: { nav: "bg-[#050505]/80 border-white/10 text-white backdrop-blur-md", dropdown: "bg-[#0A0A0A] text-white border-white/10", btn: "hover:bg-indigo-600/20" },
+        Sakura: { nav: "bg-[#1a0f12]/80 border-rose-500/20 text-rose-100 backdrop-blur-md", dropdown: "bg-[#221418] text-rose-100 border-rose-500/20", btn: "hover:bg-rose-500/20" },
+        Forest: { nav: "bg-[#0a120a]/80 border-emerald-500/20 text-emerald-100 backdrop-blur-md", dropdown: "bg-[#0e1a0e] text-emerald-100 border-emerald-500/20", btn: "hover:bg-emerald-500/20" },
+        Cyberpunk: { nav: "bg-[#0a0512]/80 border-cyan-500/30 text-cyan-100 backdrop-blur-md", dropdown: "bg-[#120a1a] text-cyan-100 border-cyan-500/30", btn: "hover:bg-cyan-500/20" },
+        Midnight: { nav: "bg-black/80 border-blue-500/20 text-blue-100 backdrop-blur-md", dropdown: "bg-[#050510] text-blue-100 border-blue-500/20", btn: "hover:bg-blue-500/20" },
+        Sunset: { nav: "bg-[#120a05]/80 border-orange-500/20 text-orange-100 backdrop-blur-md", dropdown: "bg-[#1a0f0a] text-orange-100 border-orange-500/20", btn: "hover:bg-orange-500/20" },
+        Lavender: { nav: "bg-[#0f0a12]/80 border-purple-500/20 text-purple-100 backdrop-blur-md", dropdown: "bg-[#160e1c] text-purple-100 border-purple-500/20", btn: "hover:bg-purple-500/20" },
+        Ghost: { nav: "bg-[#0a0a0a]/80 border-white/5 text-gray-100 backdrop-blur-md", dropdown: "bg-[#111111] text-gray-100 border-white/10", btn: "hover:bg-white/5" }
     };
 
-    const config = themeConfigs[theme || "dark"];
+    const config = themeConfigs[theme] || themeConfigs.DeepSpace;
 
     const handleLogout = async () => {
         try {
-            toast.success("Logged out! Redirecting...");
+            toast.success("Logging out...");
             setIsLoggingOut(true);
             await logout();
-            setTimeout(() => navigate("/"), 2000);
-        } catch (e) { toast.error("Logout error"); }
+            setTimeout(() => navigate("/"), 1500);
+        } catch (e) { 
+            toast.error("Logout error"); 
+            setIsLoggingOut(false);
+        }
     };
 
     return (
-        <nav className={`sticky top-0 z-[100] flex items-center justify-between px-4 md:px-8 py-4 border-b transition-all duration-500 ${config.nav}`}>
-            {/* LEFT SECTION */}
+        <nav className={`sticky top-0 z-[100] flex items-center justify-between px-4 md:px-8 py-3 border-b transition-all duration-500 ${config.nav}`}>
+            
+            {/* LEFT: USER PROFILE */}
             <div
-                className="flex items-center gap-4 cursor-pointer active:scale-95 transition-transform"
+                className="flex items-center gap-3 cursor-pointer active:scale-95 transition-transform group"
                 onClick={() => !isLoggingOut && navigate("/profile")}
             >
-                <img src={photoURL} className={`w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-white/30 object-cover ${isLoggingOut ? "grayscale" : ""}`} alt="User" />
-                <div className="flex flex-col">
-                    {/* Increased font size to text-sm/text-base */}
-                    <span className="font-bold text-sm md:text-base tracking-tight">{displayName}</span>
-                    {/* Increased subtext size */}
-                    <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] opacity-60">
-                        {isLoggingOut ? "Session Ended" : isProfilePage ? "Account Settings" : "Dhruva Plus"}
+                <div className="relative">
+                    <img src={photoURL} className={`w-10 h-10 md:w-11 md:h-11 rounded-full border-2 border-white/20 object-cover shadow-lg transition-all ${isLoggingOut ? "grayscale" : "group-hover:border-indigo-500"}`} alt="User" />
+                    {!isLoggingOut && <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-black rounded-full" />}
+                </div>
+                <div className="hidden sm:flex flex-col">
+                    <span className="font-bold text-sm tracking-tight leading-tight">{displayName}</span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-50">
+                        {isLoggingOut ? "Ending..." : isProfilePage ? "Account" : "Dhruva Pro"}
                     </span>
                 </div>
             </div>
 
-            <div className="flex items-center gap-3 md:gap-5">
+            {/* RIGHT: TOOLS & ACTIONS */}
+            <div className="flex items-center gap-2 md:gap-4">
                 {isLoggingOut ? (
-                    <div className="flex items-center gap-2 text-sm font-bold animate-pulse text-white"><FaHourglassHalf className="animate-spin" /> Redirecting...</div>
+                    <div className="flex items-center gap-2 text-xs font-bold animate-pulse"><FaHourglassHalf className="animate-spin" /> Syncing...</div>
                 ) : (
-                    <div className="flex items-center gap-3">
-                        {/* PROFILE BUTTON: Hidden on Profile Page and Mobile */}
+                    <>
+                        {/* PROFILE LINK (DESKTOP) */}
                         {!isProfilePage && (
-                            <button onClick={() => navigate("/profile")} className={`hidden sm:flex items-center gap-2 px-5 py-2 rounded-full text-xs md:text-sm font-black border transition-all ${config.btnProfile}`}>
+                            <button onClick={() => navigate("/profile")} className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black tracking-widest border border-white/10 transition-all ${config.btn}`}>
                                 <FaUser /> PROFILE
                             </button>
                         )}
 
-                        {/* LOGOUT BUTTON */}
-                        <button onClick={handleLogout} className={`flex items-center gap-2 px-4 md:px-6 py-2 rounded-full text-xs md:text-sm font-black border transition-all active:scale-90 ${config.btnLogout}`}>
-                            <FaSignOutAlt /> <span className="hidden xs:inline uppercase tracking-widest">Logout</span>
-                        </button>
-                    </div>
-                )}
+                        {/* THEME DROPDOWN */}
+                        {!isProfilePage && (
+                            <div className="relative">
+                                <button 
+                                    onClick={() => setDropdownOpen(!dropdownOpen)} 
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 transition-all active:scale-90 text-xs font-bold ${config.dropdown}`}
+                                >
+                                    <MdColorLens className="text-base" />
+                                    <span className="hidden lg:inline uppercase tracking-tighter">{theme}</span>
+                                    <FaChevronDown className={`text-[10px] transition-transform duration-300 ${dropdownOpen ? "rotate-180" : ""}`} />
+                                </button>
 
-                {/* THEME SELECTOR: Hidden on Profile Page */}
-                {!isProfilePage && (
-                    <div className="relative">
-                        <button onClick={() => setDropdownOpen(!dropdownOpen)} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all active:scale-90 ${config.dropdown}`}>
-                            {theme === "light" ? <MdLightMode className="text-lg" /> : theme === "electric" ? <MdGradient className="text-lg" /> : <MdDarkMode className="text-lg" />}
-                            <FaChevronDown className={`transition-transform duration-300 ${dropdownOpen ? "rotate-180" : ""}`} />
-                        </button>
-
-                        {dropdownOpen && (
-                            <>
-                                <div className="fixed inset-0 z-[-1]" onClick={() => setDropdownOpen(false)} />
-                                <div className={`absolute right-0 mt-3 w-40 md:w-48 rounded-2xl shadow-2xl border p-1.5 z-50 animate-in fade-in slide-in-from-top-2 ${config.dropdown}`}>
-                                    {["light", "dark", "electric"].map(t => (
-                                        <button key={t} className="block w-full text-left px-5 py-3 text-xs md:text-sm font-black hover:bg-white/10 rounded-xl capitalize tracking-widest" onClick={() => { setTheme(t); setDropdownOpen(false); }}>
-                                            {t}
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
+                                {dropdownOpen && (
+                                    <>
+                                        <div className="fixed inset-0 z-[-1]" onClick={() => setDropdownOpen(false)} />
+                                        <div className={`absolute right-0 mt-2 w-44 rounded-2xl shadow-2xl border p-2 z-[110] grid grid-cols-1 gap-1 ${config.dropdown}`}>
+                                            <p className="text-[8px] font-black uppercase opacity-40 px-3 py-1">Select Theme</p>
+                                            <div className="max-h-[60vh] overflow-y-auto no-scrollbar">
+                                                {Object.keys(themeConfigs).map(t => (
+                                                    <button 
+                                                        key={t} 
+                                                        className={`flex items-center justify-between w-full text-left px-3 py-2.5 text-[10px] font-bold rounded-lg transition-all ${theme === t ? 'bg-white/10' : 'hover:bg-white/5'}`} 
+                                                        onClick={() => { setTheme(t); setDropdownOpen(false); }}
+                                                    >
+                                                        <span className="capitalize">{t}</span>
+                                                        {theme === t && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                         )}
-                    </div>
+
+                        {/* LOGOUT */}
+                        <button 
+                            onClick={handleLogout} 
+                            className="flex items-center justify-center w-10 h-10 md:w-auto md:px-5 md:py-2.5 rounded-xl text-xs font-black border border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white transition-all active:scale-90"
+                        >
+                            <FaSignOutAlt />
+                            <span className="hidden md:inline ml-2 uppercase tracking-widest">Exit</span>
+                        </button>
+                    </>
                 )}
             </div>
         </nav>
