@@ -86,12 +86,13 @@ export default function Chat() {
   const activeTheme = themes[theme] || themes.DeepSpace;
 
   // --- 🤖 GEMINI LIVE VOICE ENGINE ---
-  const handleStartLiveMode = () => {
+ const startLiveNeuralLink = () => {
+    // We pass the current state so the Live Page is "Context Aware"
     navigate("/live", { 
         state: { 
-            subject, 
-            chapter, 
-            userData 
+            subject: subject, 
+            chapter: chapter,
+            userData: userData 
         } 
     });
 };
@@ -485,9 +486,12 @@ export default function Chat() {
               />
               
               <div className="flex gap-2 pr-2 pb-2">
-                <button onClick={toggleLiveMode} className={`p-5 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 text-white animate-pulse' : 'bg-white/5'}`}>
-                  <FaHeadphones size={22}/>
-                </button>
+                <button 
+    onClick={startLiveNeuralLink} 
+    className="p-5 rounded-full bg-white/5 hover:bg-indigo-600 text-white transition-all shadow-xl hover:shadow-indigo-500/20 group"
+>
+    <FaHeadphones size={22} className="group-hover:scale-110 transition-transform" />
+</button>
                 <button onClick={() => sendMessage()} disabled={isSending} className="p-5 bg-indigo-600 text-white rounded-full shadow-xl disabled:opacity-50 hover:scale-105 active:scale-95 transition-all">
                   <FaPaperPlane size={22}/>
                 </button>
