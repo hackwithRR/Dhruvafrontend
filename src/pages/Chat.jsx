@@ -26,14 +26,11 @@ CBSE 8-10 MATH/SCIENCE: Full Syllabus Integrated.
 ICSE 8-10 MATH/SCIENCE: Full Syllabus Integrated.
 `;
 
-// Shield against external noise
 if (typeof window !== "undefined") {
     window.addEventListener('error', e => {
         if (e.message.toLowerCase().includes('neurolink')) e.stopImmediatePropagation();
     });
 }
-
-// --- UI COMPONENTS ---
 
 const RankBadge = ({ xp, level }) => {
     const progress = (xp % 500) / 5;
@@ -117,8 +114,6 @@ const VoiceWaveform = ({ isActive }) => (
     </div>
 );
 
-// --- MAIN CHAT COMPONENT ---
-
 export default function Chat() {
     const { currentUser, logout } = useAuth();
     const [messages, setMessages] = useState([]);
@@ -136,7 +131,7 @@ export default function Chat() {
     const [selectedFile, setSelectedFile] = useState(null);
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isListening, setIsListening] = useState(false);
-    const [isVoiceOn, setIsVoiceOn] = useState(true);
+    const [isVoiceOn, setIsVoiceOn] = useState(false); // Default to off
     const [isLiveMode, setIsLiveMode] = useState(false);
     const [isAiSpeaking, setIsAiSpeaking] = useState(false);
     const [editingSessionId, setEditingSessionId] = useState(null);
@@ -152,21 +147,31 @@ export default function Chat() {
         DeepSpace: { container: "bg-[#050505] text-white", aiBubble: "bg-white/[0.04] border-white/10", userBubble: "bg-indigo-600", input: "bg-[#111111] border-white/10", sidebar: "bg-[#080808] border-white/5" },
         Light: { container: "bg-gray-50 text-gray-900", aiBubble: "bg-white border-gray-200", userBubble: "bg-indigo-600 text-white", input: "bg-white border-gray-300", sidebar: "bg-white border-gray-200" },
         Sakura: { container: "bg-[#1a0f12] text-rose-50", aiBubble: "bg-rose-500/10 border-rose-500/20", userBubble: "bg-rose-600", input: "bg-[#221418] border-rose-500/10", sidebar: "bg-[#221418] border-rose-500/10" },
-        Cyberpunk: { container: "bg-[#0a0512] text-cyan-50", aiBubble: "bg-cyan-500/10 border-cyan-500/30", userBubble: "bg-fuchsia-600", input: "bg-[#120a1a] border-cyan-500/10", sidebar: "bg-[#120a1a] border-cyan-500/20" }
+        Cyberpunk: { container: "bg-[#0a0512] text-cyan-50", aiBubble: "bg-cyan-500/10 border-cyan-500/30", userBubble: "bg-fuchsia-600", input: "bg-[#120a1a] border-cyan-500/10", button: "bg-cyan-600", sidebar: "bg-[#120a1a] border-cyan-500/20" }
     };
     const currentTheme = themes[theme] || themes.DeepSpace;
     const currentLevel = Math.floor((userData.xp || 0) / 500) + 1;
 
     // --- VOICE ENGINE ---
     const speak = (text) => {
-        if (!isVoiceOn && !isLiveMode) return;
+        // ONLY speak if Live Mode is ON
+        if (!isLiveMode) return;
+        
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text.replace(/[*#_]/g, ""));
         utter.rate = 1.1;
-        utter.onstart = () => setIsAiSpeaking(true);
+        utter.onstart = () => {
+            setIsAiSpeaking(true);
+            if (isListening) recognitionRef.current?.stop(); // Ensure mic is off while AI talks
+        };
         utter.onend = () => {
             setIsAiSpeaking(false);
-            if (isLiveMode) handleVoiceToggle(true);
+            // AUTO-REACTIVATE MIC in Live Mode
+            if (isLiveMode) {
+                setTimeout(() => {
+                    handleVoiceToggle(true);
+                }, 500);
+            }
         };
         window.speechSynthesis.speak(utter);
     };
@@ -183,30 +188,34 @@ export default function Chat() {
             };
             recognitionRef.current.onend = () => setIsListening(false);
         }
-    }, []);
+    }, [isLiveMode]); // Dependencies updated for state capture
 
     const handleVoiceToggle = (forceStart = false) => {
         if (isListening && !forceStart) {
             recognitionRef.current.stop();
         } else {
-            try { recognitionRef.current.start(); setIsListening(true); } catch(e) {}
+            try { 
+                recognitionRef.current.start(); 
+                setIsListening(true); 
+            } catch(e) {
+                console.log("Mic busy or error", e);
+            }
         }
     };
 
     const toggleLiveMode = () => {
         if (!isLiveMode) {
             setIsLiveMode(true);
-            setIsVoiceOn(true);
             handleVoiceToggle(true);
             toast.info("Live Mode Active");
         } else {
             setIsLiveMode(false);
             window.speechSynthesis.cancel();
-            recognitionRef.current.stop();
+            recognitionRef.current?.stop();
+            toast.warn("Live Mode Disabled");
         }
     };
 
-    // --- SESSION OPS ---
     const loadSessions = async () => {
         const q = query(collection(db, `users/${currentUser.uid}/sessions`), orderBy("lastUpdate", "desc"));
         const snap = await getDocs(q);
@@ -259,9 +268,17 @@ export default function Chat() {
                 res = await axios.post(`${API_BASE}/chat`, payload);
             }
 
-            const aiMsg = { role: "ai", content: res.data.reply, ytLink: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} ${userData.class} ${subjectInput} ${text}`)}` };
+            // ONLY provide YouTube link if mode is "Explain"
+            const aiMsg = { 
+                role: "ai", 
+                content: res.data.reply, 
+                ytLink: mode === "Explain" ? `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} ${userData.class} ${subjectInput} ${text}`)}` : null 
+            };
+            
             const finalMsgs = [...updatedMsgs, aiMsg];
             setMessages(finalMsgs);
+            
+            // Speak automatically if in Live Mode
             speak(res.data.reply);
 
             const sessionTitle = messages.length === 0 ? text.slice(0, 25) : null;
@@ -304,7 +321,6 @@ export default function Chat() {
         <div className={`flex h-[100dvh] w-full overflow-hidden ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" autoClose={2000} />
 
-            {/* SIDEBAR */}
             <AnimatePresence>
                 {showSidebar && (
                     <motion.div initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }} className={`fixed lg:relative z-[200] w-72 h-full flex flex-col p-6 border-r ${currentTheme.sidebar} backdrop-blur-2xl shadow-2xl`}>
@@ -340,7 +356,6 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} userData={userData} />
                 <StudyTimer currentTheme={currentTheme} onComplete={awardXP} />
 
-                {/* HEADER INPUTS */}
                 <div className="w-full max-w-4xl mx-auto px-4 pt-6 space-y-4">
                     <div className={`flex items-center gap-2 p-1 rounded-2xl border ${currentTheme.input}`}>
                         <input value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject" className="w-24 bg-transparent px-4 py-2 text-[10px] font-black uppercase outline-none" />
@@ -355,7 +370,6 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* MESSAGES */}
                 <div className="flex-1 overflow-y-auto px-4 py-6 no-scrollbar">
                     <div className="max-w-4xl mx-auto space-y-8">
                         {messages.length === 0 && <div className="flex flex-col items-center justify-center h-48 opacity-10 text-[10px] uppercase tracking-widest"><FaWaveSquare size={30} className="mb-4" /> Start learning</div>}
@@ -372,7 +386,6 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* ADAPTIVE CHAT BAR */}
                 <div className="p-4 md:p-8 bg-gradient-to-t from-black to-transparent">
                     <div className="max-w-4xl mx-auto">
                         <div className={`relative flex flex-col w-full rounded-[2.5rem] border shadow-2xl transition-all ${currentTheme.input} focus-within:ring-1 ring-indigo-500/50`}>
@@ -394,7 +407,7 @@ export default function Chat() {
                                     value={input}
                                     onChange={e => setInput(e.target.value)}
                                     onKeyDown={e => { if(e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }}}
-                                    placeholder={isLiveMode ? "Listening..." : "Ask Dhruva..."}
+                                    placeholder={isLiveMode ? "Dhruva is listening..." : "Ask Dhruva..."}
                                     className="flex-1 bg-transparent py-3 px-2 outline-none text-sm font-medium resize-none max-h-32"
                                     onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                                 />
@@ -412,7 +425,6 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* CAMERA VIEW */}
                 <AnimatePresence>
                     {isCameraOpen && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col">
