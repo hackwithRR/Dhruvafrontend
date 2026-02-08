@@ -34,11 +34,12 @@ const syllabusData = {
     }
 };
 
+// ADDED: 'hex' property to sync the actual CSS background of the body
 const themes = {
-    DeepSpace: { bg: "bg-[#050505]", primary: "indigo-600", primaryHex: "#4f46e5", text: "text-white", accent: "text-indigo-400", card: "bg-white/[0.03]", border: "border-white/10", isDark: true },
-    Light: { bg: "bg-[#f8fafc]", primary: "indigo-600", primaryHex: "#4f46e5", text: "text-slate-900", accent: "text-indigo-600", card: "bg-white shadow-sm", border: "border-slate-200", isDark: false },
-    Sakura: { bg: "bg-[#1a0f12]", primary: "rose-500", primaryHex: "#f43f5e", text: "text-rose-50", accent: "text-rose-400", card: "bg-rose-950/20", border: "border-rose-500/20", isDark: true },
-    Cyberpunk: { bg: "bg-[#0a0a0f]", primary: "cyan-500", primaryHex: "#06b6d4", text: "text-cyan-50", accent: "text-cyan-400", card: "bg-cyan-950/20", border: "border-cyan-500/20", isDark: true }
+    DeepSpace: { bg: "bg-[#050505]", hex: "#050505", primary: "indigo-600", primaryHex: "#4f46e5", text: "text-white", accent: "text-indigo-400", card: "bg-white/[0.03]", border: "border-white/10", isDark: true },
+    Light: { bg: "bg-[#f8fafc]", hex: "#f8fafc", primary: "indigo-600", primaryHex: "#4f46e5", text: "text-slate-900", accent: "text-indigo-600", card: "bg-white shadow-sm", border: "border-slate-200", isDark: false },
+    Sakura: { bg: "bg-[#1a0f12]", hex: "#1a0f12", primary: "rose-500", primaryHex: "#f43f5e", text: "text-rose-50", accent: "text-rose-400", card: "bg-rose-950/20", border: "border-rose-500/20", isDark: true },
+    Cyberpunk: { bg: "bg-[#0a0a0f]", hex: "#0a0a0f", primary: "cyan-500", primaryHex: "#06b6d4", text: "text-cyan-50", accent: "text-cyan-400", card: "bg-cyan-950/20", border: "border-cyan-500/20", isDark: true }
 };
 
 export default function Chat() {
@@ -56,18 +57,7 @@ export default function Chat() {
     const [subject, setSubject] = useState("MATHEMATICS");
     const [chapter, setChapter] = useState("");
     const [isSending, setIsSending] = useState(false);
-    
-    // UPDATE: Set default theme in state to prevent black screen on first render
-    const [userData, setUserData] = useState({ 
-        board: "CBSE", 
-        class: "10", 
-        xp: 0, 
-        dailyXp: 0, 
-        streak: 0, 
-        theme: "DeepSpace", 
-        displayName: "" 
-    });
-
+    const [userData, setUserData] = useState({ board: "CBSE", class: "10", xp: 0, dailyXp: 0, streak: 0, theme: "DeepSpace", displayName: "" });
     const [timer, setTimer] = useState(0);
     const [showSidebar, setShowSidebar] = useState(false);
     const [showSessionPicker, setShowSessionPicker] = useState(false);
@@ -77,11 +67,19 @@ export default function Chat() {
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
     
-    // UPDATE: Use Nullish Coalescing and forced fallbacks for the active theme
     const activeTheme = useMemo(() => {
         const themeKey = userData?.theme || "DeepSpace";
         return themes[themeKey] || themes.DeepSpace;
     }, [userData?.theme]);
+
+    // FIX: This Effect forces the entire HTML body to match the theme background
+    // This removes the "black leak" or overlap issues.
+    useEffect(() => {
+        if (activeTheme?.hex) {
+            document.body.style.backgroundColor = activeTheme.hex;
+        }
+        return () => { document.body.style.backgroundColor = ""; };
+    }, [activeTheme]);
 
     useEffect(() => {
         if (!authLoading && !currentUser) {
@@ -102,7 +100,6 @@ export default function Chat() {
         try { await auth.signOut(); navigate("/login"); } catch (err) { toast.error("Logout Failed"); }
     };
 
-    // UPDATE: Robust Merge Logic in Snapshot to prevent theme being overwritten by null/undefined
     useEffect(() => {
         if (!currentUser?.uid) return;
         const unsubUser = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
@@ -206,7 +203,10 @@ export default function Chat() {
     );
 
     return (
-        <div className={`flex h-[100dvh] w-full ${activeTheme?.bg ?? 'bg-[#050505]'} ${activeTheme?.text ?? 'text-white'} overflow-hidden font-sans selection:bg-indigo-500/30 transition-colors duration-500`}>
+        <div className={`flex h-[100dvh] w-full ${activeTheme?.bg ?? 'bg-[#050505]'} ${activeTheme?.text ?? 'text-white'} overflow-hidden font-sans selection:bg-indigo-500/30 transition-colors duration-500 relative`}>
+            {/* Added a base layer div to ensure background fills the whole viewport regardless of content overflow */}
+            <div className={`absolute inset-0 -z-20 ${activeTheme?.bg ?? 'bg-[#050505]'}`} />
+            
             <ToastContainer theme={activeTheme?.isDark ? "dark" : "light"} />
             <AnimatePresence>
                 {showSidebar && (
