@@ -16,7 +16,7 @@ import rehypeKatex from "rehype-katex";
 import 'katex/dist/katex.min.css';
 import { 
     doc, setDoc, collection, query, updateDoc, increment, onSnapshot, 
-    orderBy, limit, deleteDoc
+    orderBy, limit, deleteDoc, getDoc
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,28 +25,15 @@ const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-produ
 
 const syllabusData = {
     CBSE: {
-        "8": {
-            "MATHEMATICS": ["Rational Numbers", "Linear Equations", "Understanding Quadrilaterals", "Data Handling", "Squares and Roots", "Cubes and Roots", "Comparing Quantities", "Algebraic Expressions", "Mensuration", "Exponents", "Factorisation"],
-            "SCIENCE": ["Crop Production", "Microorganisms", "Coal and Petroleum", "Combustion", "Cell Structure", "Force and Pressure", "Friction", "Sound", "Light"]
-        },
-        "10": {
-            "MATHEMATICS": ["Real Numbers", "Polynomials", "Linear Equations", "Quadratic Equations", "Arithmetic Progressions", "Triangles", "Coordinate Geometry", "Trigonometry", "Circles", "Surface Areas", "Statistics", "Probability"],
-            "SCIENCE": ["Chemical Reactions", "Acids, Bases and Salts", "Metals and Non-metals", "Carbon Compounds", "Life Processes", "Control and Coordination", "Reproduction", "Heredity", "Light Reflection", "Human Eye", "Electricity", "Magnetic Effects"]
-        },
-        "12": {
-            "PHYSICS": ["Electrostatics", "Current Electricity", "Magnetic Effects", "EMI", "Alternating Current", "EM Waves", "Ray Optics", "Wave Optics", "Dual Nature", "Atoms", "Nuclei", "Semiconductors"],
-            "CHEMISTRY": ["Solutions", "Electrochemistry", "Chemical Kinetics", "d & f Block", "Coordination Compounds", "Haloalkanes", "Alcohols & Phenols", "Aldehydes & Ketones", "Amines", "Biomolecules"]
-        }
+        "8": { "MATHEMATICS": ["Rational Numbers", "Linear Equations", "Understanding Quadrilaterals", "Data Handling", "Squares and Roots", "Cubes and Roots", "Comparing Quantities", "Algebraic Expressions", "Mensuration", "Exponents", "Factorisation"], "SCIENCE": ["Crop Production", "Microorganisms", "Coal and Petroleum", "Combustion", "Cell Structure", "Force and Pressure", "Friction", "Sound", "Light"] },
+        "10": { "MATHEMATICS": ["Real Numbers", "Polynomials", "Linear Equations", "Quadratic Equations", "Arithmetic Progressions", "Triangles", "Coordinate Geometry", "Trigonometry", "Circles", "Surface Areas", "Statistics", "Probability"], "SCIENCE": ["Chemical Reactions", "Acids, Bases and Salts", "Metals and Non-metals", "Carbon Compounds", "Life Processes", "Control and Coordination", "Reproduction", "Heredity", "Light Reflection", "Human Eye", "Electricity", "Magnetic Effects"] },
+        "12": { "PHYSICS": ["Electrostatics", "Current Electricity", "Magnetic Effects", "EMI", "Alternating Current", "EM Waves", "Ray Optics", "Wave Optics", "Dual Nature", "Atoms", "Nuclei", "Semiconductors"], "CHEMISTRY": ["Solutions", "Electrochemistry", "Chemical Kinetics", "d & f Block", "Coordination Compounds", "Haloalkanes", "Alcohols & Phenols", "Aldehydes & Ketones", "Amines", "Biomolecules"] }
     },
     ICSE: {
-        "10": {
-            "MATHEMATICS": ["Quadratic Equations", "Linear Inequations", "Ratio & Proportion", "Matrices", "Arithmetic Progression", "Similarity", "Trigonometry", "Statistics"],
-            "PHYSICS": ["Force", "Work, Power, Energy", "Machines", "Refraction", "Spectrum", "Sound", "Electricity", "Radioactivity"]
-        }
+        "10": { "MATHEMATICS": ["Quadratic Equations", "Linear Inequations", "Ratio & Proportion", "Matrices", "Arithmetic Progression", "Similarity", "Trigonometry", "Statistics"], "PHYSICS": ["Force", "Work, Power, Energy", "Machines", "Refraction", "Spectrum", "Sound", "Electricity", "Radioactivity"] }
     }
 };
 
-// --- UPDATED THEME ENGINE ---
 const themes = {
     DeepSpace: { bg: "bg-[#050505]", primary: "indigo-600", primaryHex: "#4f46e5", text: "text-white", accent: "text-indigo-400", card: "bg-white/[0.03]", border: "border-white/10", isDark: true },
     Light: { bg: "bg-[#f8fafc]", primary: "indigo-600", primaryHex: "#4f46e5", text: "text-slate-900", accent: "text-indigo-600", card: "bg-white shadow-sm", border: "border-slate-200", isDark: false },
@@ -55,7 +42,7 @@ const themes = {
 };
 
 export default function Chat() {
-    const { currentUser } = useAuth();
+    const { currentUser, loading: authLoading } = useAuth();
     const navigate = useNavigate();
     const [messages, setMessages] = useState([]);
     const [sessions, setSessions] = useState([]);
@@ -64,7 +51,6 @@ export default function Chat() {
     const [sessionTitle, setSessionTitle] = useState("New Lesson");
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    
     const [input, setInput] = useState("");
     const [mode, setMode] = useState("Explain");
     const [subject, setSubject] = useState("MATHEMATICS");
@@ -82,6 +68,13 @@ export default function Chat() {
     
     const activeTheme = useMemo(() => themes[userData.theme] || themes.DeepSpace, [userData.theme]);
 
+    // PROTECT AGAINST RELOAD LOGOUT
+    useEffect(() => {
+        if (!authLoading && !currentUser) {
+            navigate("/login");
+        }
+    }, [currentUser, authLoading, navigate]);
+
     useEffect(() => {
         const interval = setInterval(() => setTimer(prev => prev + 1), 1000);
         return () => clearInterval(interval);
@@ -95,10 +88,13 @@ export default function Chat() {
         try { await auth.signOut(); navigate("/login"); } catch (err) { toast.error("Logout Failed"); }
     };
 
+    // SAFE DATA SYNC
     useEffect(() => {
-        if (!currentUser) return;
+        if (!currentUser?.uid) return;
         const unsubUser = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
-            if (docSnap.exists()) setUserData(docSnap.data());
+            if (docSnap.exists()) {
+                setUserData(prev => ({ ...prev, ...docSnap.data() }));
+            }
         });
         const q = query(collection(db, "users"), orderBy("xp", "desc"), limit(5));
         const unsubLeader = onSnapshot(q, (snap) => {
@@ -119,7 +115,6 @@ export default function Chat() {
         const file = e.target.files[0];
         if (!file) return;
         if (file.size > 10 * 1024 * 1024) return toast.error("Image exceeds 10MB limit");
-        
         setSelectedFile(file);
         const reader = new FileReader();
         reader.onloadend = () => setImagePreview(reader.result);
@@ -129,17 +124,13 @@ export default function Chat() {
     const sendMessage = async (override = null) => {
         const text = override || input;
         if (isSending || (!text.trim() && !selectedFile)) return;
-        
         setIsSending(true);
         setInput("");
-        
         let imgBase64 = imagePreview;
         setImagePreview(null);
         setSelectedFile(null);
-
         const userMsg = { role: "user", content: text, image: imgBase64, timestamp: Date.now() };
         setMessages(prev => [...prev, userMsg]);
-
         try {
             const res = await axios.post(`${API_BASE}/chat`, {
                 userId: currentUser.uid,
@@ -151,17 +142,9 @@ export default function Chat() {
                 board: userData.board,
                 class: userData.class
             });
-
             const querySuffix = mode === "Quiz" ? "practice questions" : mode === "HW" ? "solved" : "tutorial";
             const ytLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} class ${userData.class} ${subject} ${chapter} ${querySuffix}`)}`;
-
-            const aiMsg = { 
-                role: "ai", 
-                content: res.data.reply, 
-                timestamp: Date.now(),
-                ytLink
-            };
-
+            const aiMsg = { role: "ai", content: res.data.reply, timestamp: Date.now(), ytLink };
             setMessages(prev => {
                 const updated = [...prev, aiMsg];
                 setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
@@ -172,12 +155,8 @@ export default function Chat() {
                 }, { merge: true });
                 return updated;
             });
-
             await incrementXP(imgBase64 ? 30 : 15);
-
-        } catch (err) {
-            toast.error("Signal Lost. Check Connection.");
-        }
+        } catch (err) { toast.error("Signal Lost. Check Connection."); }
         setIsSending(false);
     };
 
@@ -197,16 +176,20 @@ export default function Chat() {
     const calculateLevel = (xp) => Math.floor((xp || 0) / 1000) + 1;
 
     const filteredSessions = useMemo(() => {
-        return sessions.filter(s => 
-            (s.title || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (s.subject || "").toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        return sessions.filter(s => (s.title || "").toLowerCase().includes(searchQuery.toLowerCase()));
     }, [sessions, searchQuery]);
+
+    // LOADING SCREEN TO PREVENT BLACK BACKGROUND CRASH
+    if (authLoading) return (
+      <div className="h-screen w-full bg-[#050505] flex flex-col items-center justify-center space-y-4">
+        <FaBrain className="text-indigo-500 animate-pulse" size={40}/>
+        <h2 className="text-white text-xs font-black uppercase tracking-[0.5em]">Syncing Neural Link...</h2>
+      </div>
+    );
 
     return (
         <div className={`flex h-[100dvh] w-full ${activeTheme.bg} ${activeTheme.text} overflow-hidden font-sans selection:bg-indigo-500/30 transition-colors duration-500`}>
             <ToastContainer theme={activeTheme.isDark ? "dark" : "light"} />
-
             <AnimatePresence>
                 {showSidebar && (
                     <>
@@ -219,13 +202,10 @@ export default function Chat() {
                                 </div>
                                 <button onClick={() => setShowSidebar(false)} className="p-2 opacity-40 hover:opacity-100"><FaChevronLeft/></button>
                             </div>
-
                             <div className="space-y-8 flex-1 overflow-y-auto no-scrollbar">
                                 <div className={`p-6 rounded-[2rem] border ${activeTheme.border} ${activeTheme.card} bg-gradient-to-br from-indigo-600/5 to-transparent`}>
                                     <div className="flex justify-between items-start mb-4">
-                                        <div className={`p-3 ${activeTheme.isDark ? 'bg-white/5' : 'bg-indigo-600/20'} rounded-2xl text-indigo-500`}>
-                                            <FaTrophy size={20}/>
-                                        </div>
+                                        <div className={`p-3 ${activeTheme.isDark ? 'bg-white/5' : 'bg-indigo-600/20'} rounded-2xl text-indigo-500`}><FaTrophy size={20}/></div>
                                         <div className="text-right">
                                             <div className="text-3xl font-black tracking-tighter">LVL {calculateLevel(userData.xp)}</div>
                                             <div className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{userData.xp || 0} Total XP</div>
@@ -239,7 +219,6 @@ export default function Chat() {
                                         <p className="text-[9px] font-black uppercase opacity-40">{userData.dailyXp || 0} / 500 XP</p>
                                     </div>
                                 </div>
-
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30 px-2 flex items-center gap-2"><FaMedal/> Top Scholars</label>
                                     <div className="space-y-2">
@@ -247,7 +226,7 @@ export default function Chat() {
                                             <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border ${activeTheme.border} ${user.id === currentUser?.uid ? 'bg-indigo-600/10 border-indigo-500/30' : 'bg-white/[0.02]'}`}>
                                                 <div className="flex items-center gap-3">
                                                     <span className={`text-xs font-black ${idx === 0 ? 'text-yellow-500' : 'opacity-20'}`}>0{idx+1}</span>
-                                                    <span className="text-xs font-bold truncate w-24 uppercase tracking-tight">{user.displayName || user.email?.split('@')[0] || "Scholar"}</span>
+                                                    <span className="text-xs font-bold truncate w-24 uppercase tracking-tight">{user.displayName || "Scholar"}</span>
                                                 </div>
                                                 <div className="text-right">
                                                     <span className={`text-[10px] font-black ${activeTheme.accent} block leading-tight`}>{user.xp || 0}</span>
@@ -258,7 +237,6 @@ export default function Chat() {
                                     </div>
                                 </div>
                             </div>
-
                             <button onClick={handleLogout} className="mt-6 flex items-center justify-center gap-3 p-5 rounded-2xl bg-red-500/5 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all border border-red-500/10">
                                 <FaSignOutAlt /> Terminate Session
                             </button>
@@ -271,7 +249,6 @@ export default function Chat() {
                 <div className="relative z-[500]">
                     <Navbar currentUser={currentUser} userData={userData} theme={userData.theme} />
                 </div>
-
                 <div className="w-full max-w-3xl mx-auto px-4 mt-4 space-y-3 z-[400] sticky top-[72px]">
                     <div className={`flex items-center justify-between p-4 rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-xl shadow-2xl`}>
                         <div className="flex items-center gap-3">
@@ -287,7 +264,6 @@ export default function Chat() {
                             <span className={activeTheme.accent}>{userData.board} CLS {userData.class}</span>
                         </div>
                     </div>
-
                     <div className={`flex gap-3 p-2 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} backdrop-blur-md`}>
                         <div className="flex-1 relative">
                             <select value={subject} onChange={(e) => setSubject(e.target.value)} className={`${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-100'} w-full border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer`}>
@@ -307,28 +283,16 @@ export default function Chat() {
                     <div className="max-w-3xl mx-auto space-y-10">
                         {messages.length === 0 && (
                             <div className="h-64 flex flex-col items-center justify-center">
-                                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 10, ease: "linear" }} className="mb-6 opacity-10">
-                                    <FaWaveSquare size={60} className={activeTheme.accent}/>
-                                </motion.div>
+                                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 10, ease: "linear" }} className="mb-6 opacity-10"><FaWaveSquare size={60} className={activeTheme.accent}/></motion.div>
                                 <h2 className="text-lg font-black uppercase tracking-[0.8em] opacity-10">Neural Interface Ready</h2>
                             </div>
                         )}
                         {messages.map((msg, i) => (
                             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`p-6 rounded-[2.5rem] max-w-[90%] shadow-2xl relative ${msg.role === 'user' ? `bg-${activeTheme.primary} text-white rounded-tr-none shadow-${activeTheme.primary}/20` : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`}`}>
-                                    {msg.image && (
-                                        <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-black/50">
-                                            <img src={msg.image} alt="analysis" className="w-full max-h-[500px] object-contain" />
-                                        </div>
-                                    )}
-                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className={`prose ${activeTheme.isDark ? 'prose-invert' : 'prose-slate'} text-sm leading-relaxed prose-p:my-2`}>
-                                        {msg.content}
-                                    </ReactMarkdown>
-                                    {msg.ytLink && (
-                                        <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white text-[10px] font-black uppercase rounded-2xl hover:bg-red-700 transition-all shadow-lg shadow-red-600/20">
-                                            <FaYoutube size={16}/> Visual Supplement Found
-                                        </a>
-                                    )}
+                                <div className={`p-6 rounded-[2.5rem] max-w-[90%] shadow-2xl relative ${msg.role === 'user' ? `bg-${activeTheme.primary} text-white rounded-tr-none` : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`}`}>
+                                    {msg.image && <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-black/50"><img src={msg.image} alt="analysis" className="w-full max-h-[500px] object-contain" /></div>}
+                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className={`prose ${activeTheme.isDark ? 'prose-invert' : 'prose-slate'} text-sm leading-relaxed prose-p:my-2`}>{msg.content}</ReactMarkdown>
+                                    {msg.ytLink && <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white text-[10px] font-black uppercase rounded-2xl hover:bg-red-700 transition-all shadow-lg"><FaYoutube size={16}/> Visual Supplement Found</a>}
                                 </div>
                             </motion.div>
                         ))}
@@ -338,15 +302,11 @@ export default function Chat() {
 
                 <div className={`fixed bottom-0 left-0 w-full p-6 bg-gradient-to-t ${activeTheme.isDark ? 'from-black via-black/90' : 'from-white via-white/90'} to-transparent z-[600]`}>
                     <div className="max-w-3xl mx-auto space-y-4">
-                        
                         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                             {quickReplies.map(q => (
-                                <button key={q} onClick={() => sendMessage(q)} className={`whitespace-nowrap px-6 py-3 rounded-2xl border ${activeTheme.border} ${activeTheme.card} text-[10px] font-black uppercase tracking-widest hover:bg-${activeTheme.primary} hover:text-white transition-all hover:scale-105 active:scale-95 shadow-lg`}>
-                                    {q}
-                                </button>
+                                <button key={q} onClick={() => sendMessage(q)} className={`whitespace-nowrap px-6 py-3 rounded-2xl border ${activeTheme.border} ${activeTheme.card} text-[10px] font-black uppercase tracking-widest hover:bg-${activeTheme.primary} hover:text-white transition-all hover:scale-105 active:scale-95 shadow-lg`}>{q}</button>
                             ))}
                         </div>
-
                         <div className="flex items-center justify-between">
                             <div className={`flex gap-1 p-1.5 ${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-200'} rounded-2xl border ${activeTheme.border} backdrop-blur-md`}>
                                 {["Explain", "Quiz", "HW"].map(m => (
@@ -358,7 +318,6 @@ export default function Chat() {
                                 <button onClick={() => setShowSidebar(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:${activeTheme.accent} transition-colors shadow-xl`}><FaChartLine size={16}/></button>
                             </div>
                         </div>
-
                         <AnimatePresence>
                             {imagePreview && (
                                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-24 h-24 ml-4 mb-2">
@@ -367,24 +326,9 @@ export default function Chat() {
                                 </motion.div>
                             )}
                         </AnimatePresence>
-
-                        <div className={`${activeTheme.isDark ? 'bg-[#111] border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]' : 'bg-white border-slate-200 shadow-2xl'} border rounded-[2.5rem] p-2 flex items-end gap-2 transition-all focus-within:border-indigo-500/50`}>
-                            <button onClick={() => fileInputRef.current?.click()} className="p-5 opacity-30 hover:opacity-100 transition-all hover:text-indigo-500">
-                                <FaImage size={22}/>
-                                <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileSelect} />
-                            </button>
-                            <textarea 
-                                value={input} 
-                                onChange={(e) => setInput(e.target.value)} 
-                                placeholder={`Neural inquiry: ${chapter || subject}...`} 
-                                rows="1" 
-                                className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm py-5 resize-none no-scrollbar font-medium placeholder:opacity-20" 
-                                onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}}
-                                onInput={(e) => { 
-                                    e.target.style.height = 'auto'; 
-                                    e.target.style.height = Math.min(e.target.scrollHeight, 180) + 'px'; 
-                                }}
-                            />
+                        <div className={`${activeTheme.isDark ? 'bg-[#111] border-white/10' : 'bg-white border-slate-200'} border rounded-[2.5rem] p-2 flex items-end gap-2 shadow-2xl`}>
+                            <button onClick={() => fileInputRef.current?.click()} className="p-5 opacity-30 hover:opacity-100 transition-all hover:text-indigo-500"><FaImage size={22}/><input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileSelect} /></button>
+                            <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Neural inquiry: ${chapter || subject}...`} rows="1" className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm py-5 resize-none no-scrollbar font-medium" onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}} />
                             <div className="flex gap-2 pr-2 pb-2">
                                 <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 bg-${activeTheme.primary} text-white rounded-full shadow-lg active:scale-90 transition-all disabled:opacity-50`}>
                                     {isSending ? <FaSyncAlt className="animate-spin" size={22}/> : <FaPaperPlane size={22}/>}
@@ -406,13 +350,7 @@ export default function Chat() {
                             <div className="flex items-center gap-4 w-full md:w-auto">
                                 <div className="relative flex-1 md:w-64">
                                     <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={12}/>
-                                    <input 
-                                        type="text" 
-                                        placeholder="SEARCH NODES..." 
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-10 pr-4 text-[10px] font-black uppercase tracking-widest focus:border-indigo-500/50 focus:ring-0 outline-none transition-all"
-                                    />
+                                    <input type="text" placeholder="SEARCH NODES..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-10 pr-4 text-[10px] font-black uppercase tracking-widest focus:border-indigo-500/50 focus:ring-0 outline-none transition-all" />
                                 </div>
                                 <button onClick={() => {setShowSessionPicker(false); setSearchQuery("");}} className="p-6 bg-white/5 hover:bg-white/10 rounded-full transition-all"><FaTimes size={20}/></button>
                             </div>
@@ -425,16 +363,9 @@ export default function Chat() {
                                         <h4 className={`font-black uppercase text-sm tracking-tight group-hover:${activeTheme.accent} transition-colors`}>{s.title || "Untitled Lesson"}</h4>
                                         <p className="text-[9px] opacity-30 mt-3 uppercase font-black tracking-widest">{s.subject} • {s.lastUpdate ? new Date(s.lastUpdate).toLocaleDateString() : 'New'}</p>
                                     </div>
-                                    <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)); }} className="opacity-0 group-hover:opacity-100 text-red-500 p-3 hover:bg-red-500/10 rounded-xl transition-all">
-                                        <FaTrash size={14}/>
-                                    </button>
+                                    <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)); }} className="opacity-0 group-hover:opacity-100 text-red-500 p-3 hover:bg-red-500/10 rounded-xl transition-all"><FaTrash size={14}/></button>
                                 </div>
                             ))}
-                            {filteredSessions.length === 0 && (
-                                <div className="col-span-full py-20 text-center opacity-20">
-                                    <p className="text-xs font-black uppercase tracking-[0.5em]">No matching neural patterns found</p>
-                                </div>
-                            )}
                         </div>
                     </motion.div>
                 )}
