@@ -7,7 +7,7 @@ import {
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaMicrophone, 
     FaImage, FaPlus, FaHistory, FaYoutube, FaTrash, 
     FaClock, FaPlay, FaStop, FaTrophy, FaMagic, FaCheckCircle,
-    FaVolumeUp, FaVolumeMute, FaWaveSquare
+    FaVolumeUp, FaVolumeMute, FaWaveSquare, FaEdit, FaChevronLeft
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -146,6 +146,8 @@ export default function Chat() {
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [isVoiceOn, setIsVoiceOn] = useState(true);
+    const [editingSessionId, setEditingSessionId] = useState(null);
+    const [newSessionName, setNewSessionName] = useState("");
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -162,12 +164,16 @@ export default function Chat() {
     const currentTheme = themes[theme] || themes.DeepSpace;
     const currentLevel = Math.floor((userData.xp || 0) / 500) + 1;
 
-    // --- GEMINI/GPT VOICE MODE ---
+    // --- CONTINUOUS VOICE MODE LOGIC ---
     const speak = (text) => {
         if (!isVoiceOn) return;
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text.replace(/[*#_]/g, ""));
         utter.rate = 1.1;
+        utter.onend = () => {
+            // Auto-trigger mic after Dhruva finishes speaking for continuous chat
+            if (isVoiceOn) handleVoiceToggle(); 
+        };
         window.speechSynthesis.speak(utter);
     };
 
@@ -176,14 +182,29 @@ export default function Chat() {
         if (Speech) {
             recognitionRef.current = new Speech();
             recognitionRef.current.continuous = false;
-            recognitionRef.current.onresult = (e) => setInput(e.results[0][0].transcript);
+            recognitionRef.current.onresult = (e) => {
+                const transcript = e.results[0][0].transcript;
+                setInput(transcript);
+                // Automatically send if using continuous voice mode
+                if (transcript.length > 2) {
+                    setTimeout(() => sendMessage(transcript), 1000);
+                }
+            };
             recognitionRef.current.onend = () => setIsListening(false);
         }
-    }, []);
+    }, [isVoiceOn]);
 
     const handleVoiceToggle = () => {
         if (isListening) { recognitionRef.current.stop(); setIsListening(false); }
         else { setInput(""); recognitionRef.current.start(); setIsListening(true); }
+    };
+
+    // --- SESSION NAME EDITING ---
+    const renameSession = async (id) => {
+        if (!newSessionName.trim()) return setEditingSessionId(null);
+        await updateDoc(doc(db, `users/${currentUser.uid}/sessions`, id), { title: newSessionName });
+        setEditingSessionId(null);
+        loadSessions();
     };
 
     const openCamera = async () => {
@@ -269,7 +290,16 @@ export default function Chat() {
             const finalMsgs = [...updatedMsgs, aiMsg];
             setMessages(finalMsgs);
             speak(res.data.reply);
-            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: finalMsgs, lastUpdate: Date.now(), title: stdSub || text.slice(0, 20) }, { merge: true });
+            
+            // Auto-naming logic if it's the first message
+            const sessionTitle = messages.length === 0 ? (subjectInput || text.slice(0, 15)) : null;
+            
+            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { 
+                messages: finalMsgs, 
+                lastUpdate: Date.now(), 
+                ...(sessionTitle && { title: sessionTitle }) 
+            }, { merge: true });
+            
             loadSessions();
             awardXP(10);
         } catch (err) { toast.error("Connection failed."); }
@@ -280,27 +310,43 @@ export default function Chat() {
         <div className={`flex h-[100dvh] w-full overflow-hidden ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" autoClose={2000} hideProgressBar />
 
-            {/* RESPONSIVE SIDEBAR */}
+            {/* RESPONSIVE & CLOSABLE SIDEBAR */}
             <AnimatePresence>
-                {(showSidebar || window.innerWidth > 1024) && (
+                {showSidebar && (
                     <motion.div 
                         initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }}
                         className={`fixed lg:relative z-[200] w-72 md:w-80 h-full flex flex-col p-6 border-r ${currentTheme.sidebar} backdrop-blur-xl shadow-2xl`}
                     >
-                        <div className="flex justify-between items-center mb-6 lg:hidden">
-                            <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Library</span>
-                            <button onClick={() => setShowSidebar(false)} className="p-2"><FaTimes/></button>
+                        <div className="flex justify-between items-center mb-6">
+                            <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Learning History</span>
+                            <button onClick={() => setShowSidebar(false)} className="p-2 hover:bg-white/5 rounded-full"><FaChevronLeft/></button>
                         </div>
                         
                         <RankBadge xp={userData.xp} level={currentLevel} />
 
-                        <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false)}} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"><FaPlus/> New Brainstorm</button>
+                        <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString());}} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"><FaPlus/> New Session</button>
                         
                         <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
                             {sessions.map(s => (
-                                <div key={s.id} onClick={() => {setCurrentSessionId(s.id); setMessages(s.messages || []); setShowSidebar(false)}} className={`group p-4 rounded-2xl border transition-all cursor-pointer relative ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-600/40' : 'border-transparent hover:bg-white/5'}`}>
-                                    <span className="text-[10px] font-black truncate block uppercase tracking-tighter w-[85%]">{s.title || "Study Session"}</span>
-                                    <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)).then(loadSessions); }} className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-40 transition-opacity"><FaTrash size={10}/></button>
+                                <div key={s.id} onClick={() => {setCurrentSessionId(s.id); setMessages(s.messages || []);}} className={`group p-4 rounded-2xl border transition-all cursor-pointer relative ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-600/40' : 'border-transparent hover:bg-white/5'}`}>
+                                    {editingSessionId === s.id ? (
+                                        <input 
+                                            autoFocus 
+                                            className="bg-transparent text-[10px] font-black uppercase outline-none w-full"
+                                            value={newSessionName}
+                                            onChange={e => setNewSessionName(e.target.value)}
+                                            onBlur={() => renameSession(s.id)}
+                                            onKeyDown={e => e.key === 'Enter' && renameSession(s.id)}
+                                        />
+                                    ) : (
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-black truncate block uppercase tracking-tighter w-[70%]">{s.title || "Study Session"}</span>
+                                            <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={(e) => { e.stopPropagation(); setEditingSessionId(s.id); setNewSessionName(s.title || ""); }}><FaEdit size={10}/></button>
+                                                <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)).then(loadSessions); }} className="text-red-500/60"><FaTrash size={10}/></button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
@@ -315,9 +361,9 @@ export default function Chat() {
                 {/* MODE & SUBJECT PICKER */}
                 <div className="w-full max-w-5xl mx-auto px-4 pt-6 space-y-4">
                     <div className={`flex items-center gap-2 p-1.5 rounded-2xl border ${currentTheme.input} shadow-xl`}>
-                        <input value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Sub" className="w-20 md:w-32 bg-transparent px-3 py-1 text-[11px] font-black uppercase outline-none" />
+                        <input value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Sub" className="w-16 md:w-32 bg-transparent px-3 py-1 text-[11px] font-black uppercase outline-none" />
                         <div className="h-4 w-[1px] bg-white/10"/>
-                        <input value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Chapter Name..." className="flex-1 bg-transparent px-3 py-1 text-[11px] font-black uppercase outline-none" />
+                        <input value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Chapter # or Name..." className="flex-1 bg-transparent px-3 py-1 text-[11px] font-black uppercase outline-none" />
                         <button onClick={() => setIsLocked(!isLocked)} className={`p-2.5 rounded-xl ${isLocked ? 'bg-emerald-600' : 'bg-white/5'}`}><FaCheckCircle size={12}/></button>
                     </div>
                     <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
@@ -331,7 +377,7 @@ export default function Chat() {
                 <div className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar">
                     <div className="max-w-4xl mx-auto space-y-10">
                         {messages.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-64 opacity-10 text-center uppercase tracking-[0.4em] text-[10px]"><FaWaveSquare size={40} className="mb-4"/><p>Select a Mode to Begin</p></div>
+                            <div className="flex flex-col items-center justify-center h-64 opacity-10 text-center uppercase tracking-[0.4em] text-[10px]"><FaWaveSquare size={40} className="mb-4"/><p>Speak or Type to begin</p></div>
                         )}
                         {messages.map((msg, i) => (
                             <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
@@ -341,7 +387,7 @@ export default function Chat() {
                                         {msg.content}
                                     </ReactMarkdown>
                                     {msg.role === "ai" && msg.ytLink && (
-                                        <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl shadow-red-600/20"><FaYoutube size={18}/> Open Visual Lab</a>
+                                        <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl shadow-red-600/20"><FaYoutube size={18}/> Visual Lab</a>
                                     )}
                                 </div>
                             </motion.div>
@@ -354,10 +400,10 @@ export default function Chat() {
                 <div className="p-4 md:p-10 bg-gradient-to-t from-black via-black/80 to-transparent">
                     <div className="max-w-4xl mx-auto">
                         <div className={`flex items-center gap-1 md:gap-2 p-2 rounded-[3.5rem] border shadow-3xl backdrop-blur-3xl ${currentTheme.input} ring-1 ring-white/5`}>
-                            <button onClick={() => setShowSidebar(true)} className="p-3 text-indigo-400 lg:hidden"><FaHistory size={20}/></button>
-                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Ask Dhruva anything..." className="flex-1 bg-transparent px-2 md:px-5 py-3 outline-none text-sm font-bold min-w-0" />
+                            <button onClick={() => setShowSidebar(!showSidebar)} className="p-3 text-indigo-400"><FaHistory size={20}/></button>
+                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Talk to Dhruva..." className="flex-1 bg-transparent px-2 md:px-5 py-3 outline-none text-sm font-bold min-w-0" />
                             <div className="flex items-center gap-0.5 md:gap-1 px-1">
-                                <button onClick={() => setIsVoiceOn(!isVoiceOn)} className={`p-3 hidden md:block ${isVoiceOn ? 'text-indigo-400' : 'text-white/20'}`}><FaVolumeUp size={18}/></button>
+                                <button onClick={() => setIsVoiceOn(!isVoiceOn)} className={`p-3 hidden md:block ${isVoiceOn ? 'text-indigo-400' : 'text-white/20'}`} title="Continuous Voice Mode"><FaVolumeUp size={18}/></button>
                                 <button onClick={handleVoiceToggle} className={`p-4 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-indigo-400 hover:bg-white/5'}`}><FaMicrophone size={20}/></button>
                                 <button onClick={() => fileInputRef.current.click()} className="p-4 text-indigo-400 hover:bg-white/5 rounded-full"><FaImage size={20}/><input type="file" ref={fileInputRef} hidden onChange={e => setSelectedFile(e.target.files[0])} /></button>
                                 <button onClick={openCamera} className="p-4 text-indigo-400 hidden xs:block hover:bg-white/5 rounded-full"><FaCamera size={20}/></button>
@@ -383,6 +429,9 @@ export default function Chat() {
                     )}
                 </AnimatePresence>
             </div>
+        </div>
+    );
+}
         </div>
     );
 }
