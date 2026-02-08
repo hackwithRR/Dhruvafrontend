@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -86,12 +86,12 @@ export default function Chat() {
     const synthesisRef = useRef(window.speechSynthesis);
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
+    const sendMessageRef = useRef(null);
     const activeTheme = themes[theme] || themes.DeepSpace;
 
     // --- 🕒 SYSTEM INITIALIZATION ---
     useEffect(() => {
         const interval = setInterval(() => setTimer(prev => prev + 1), 1000);
-        // Load voices for speech
         const loadVoices = () => synthesisRef.current.getVoices();
         loadVoices();
         if (synthesisRef.current.onvoiceschanged !== undefined) {
@@ -108,61 +108,109 @@ export default function Chat() {
         try { await auth.signOut(); navigate("/login"); } catch (err) { toast.error("Logout Failed"); }
     };
 
-    // --- 🤖 GEMINI LIVE VOICE ENGINE ---
-    const getMaleVoice = () => {
+    // --- 🤖 GEMINI LIVE VOICE ENGINE (UPDATED) ---
+    const getMaleVoice = useCallback(() => {
         const voices = synthesisRef.current.getVoices();
-        return voices.find(v => v.name.toLowerCase().includes("google uk english male") || v.name.toLowerCase().includes("david") || v.lang === 'en-GB') || voices[0];
-    };
+        return voices.find(v => v.name.toLowerCase().includes("google uk english male") || v.name.toLowerCase().includes("david") || v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en')) || voices[0];
+    }, []);
 
-    const startListening = () => {
-        if (!isLiveMode) return;
+    const stopAllVoice = useCallback(() => {
+        if (synthesisRef.current) synthesisRef.current.cancel();
+        if (recognitionRef.current) {
+            try {
+                recognitionRef.current.onresult = null;
+                recognitionRef.current.onerror = null;
+                recognitionRef.current.onend = null;
+                recognitionRef.current.abort();
+            } catch (e) { console.warn("Mic Reset Info:", e); }
+        }
+        setIsAiSpeaking(false);
+        setIsListening(false);
+    }, []);
+
+    const startListening = useCallback(() => {
+        if (!isLiveMode || isAiSpeaking || synthesisRef.current.speaking) return;
+        
         const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!Speech) return toast.error("Speech not supported in this browser");
+
+        if (recognitionRef.current) {
+            try { recognitionRef.current.abort(); } catch(e) {}
+        }
 
         recognitionRef.current = new Speech();
         recognitionRef.current.continuous = false;
         recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = 'en-US';
         
         recognitionRef.current.onstart = () => setIsListening(true);
         recognitionRef.current.onend = () => setIsListening(false);
+        recognitionRef.current.onerror = (event) => {
+            setIsListening(false);
+            if (event.error === 'network') toast.error("Neural Link: Network Failure");
+            if (event.error === 'not-allowed') toast.warn("Neural Link: Mic Access Denied");
+        };
+
         recognitionRef.current.onresult = (e) => {
             const text = e.results[0][0].transcript;
-            if (text) sendMessage(text);
+            if (text && sendMessageRef.current) sendMessageRef.current(text);
         };
         
-        try { recognitionRef.current.start(); } catch(e) { console.log("Recognition already started"); }
-    };
+        try { recognitionRef.current.start(); } catch(e) { console.log("Engine busy..."); }
+    }, [isLiveMode, isAiSpeaking]);
 
-    const speak = (text) => {
+    const speak = useCallback((text) => {
         if (!isLiveMode) return;
         synthesisRef.current.cancel();
-        // Clean markdown for cleaner speech
-        const cleanText = text.replace(/[*#_~]/g, "").replace(/\[.*?\]/g, "");
+        
+        // Clean text for clearer speech
+        const cleanText = text
+            .replace(/[*#_~`]/g, "")
+            .replace(/\\\[.*?\\\]/g, "equation") 
+            .replace(/\n/g, " ")
+            .trim();
+
+        if (!cleanText) {
+            if (isLiveMode) setTimeout(startListening, 500);
+            return;
+        }
+
         const utter = new SpeechSynthesisUtterance(cleanText);
         utter.voice = getMaleVoice();
         utter.rate = 1.0;
-        utter.onstart = () => setIsAiSpeaking(true);
+        
+        utter.onstart = () => {
+            setIsAiSpeaking(true);
+            if (recognitionRef.current) {
+                try { recognitionRef.current.abort(); } catch(e) {}
+            }
+        };
+
         utter.onend = () => {
             setIsAiSpeaking(false);
-            if (isLiveMode) setTimeout(startListening, 600);
+            if (isLiveMode) setTimeout(startListening, 800);
         };
-        synthesisRef.current.speak(utter);
-    };
 
-    const toggleLiveMode = () => {
+        utter.onerror = () => {
+            setIsAiSpeaking(false);
+            if (isLiveMode) startListening();
+        };
+
+        synthesisRef.current.speak(utter);
+    }, [isLiveMode, getMaleVoice, startListening]);
+
+    const toggleLiveMode = useCallback(() => {
         if (!isLiveMode) {
+            stopAllVoice();
             setIsLiveMode(true);
+            toast.success("Neural Link: Established");
             const intro = `Neural Link Established. I am Dhruva. Analyzing ${subject}. Go ahead.`;
-            const utter = new SpeechSynthesisUtterance(intro);
-            utter.voice = getMaleVoice();
-            utter.onend = () => startListening();
-            synthesisRef.current.speak(utter);
+            speak(intro);
         } else {
             setIsLiveMode(false);
-            synthesisRef.current.cancel();
-            recognitionRef.current?.stop();
+            stopAllVoice();
         }
-    };
+    }, [isLiveMode, subject, speak, stopAllVoice]);
 
     // --- 🏆 XP & LEADERBOARD SYSTEM ---
     useEffect(() => {
@@ -210,7 +258,7 @@ export default function Chat() {
             const res = await axios.post(`${API_BASE}/chat`, {
                 userId: currentUser.uid,
                 message: text,
-                mode, // This ensures the backend handles "Quiz", "HW", etc.
+                mode,
                 subject,
                 chapter,
                 image: imgBase64,
@@ -245,6 +293,10 @@ export default function Chat() {
         }
         setIsSending(false);
     };
+
+    useEffect(() => {
+        sendMessageRef.current = sendMessage;
+    }, [input, mode, subject, chapter, imagePreview, messages, isLiveMode, currentSessionId, sessionTitle]);
 
     const quickReplies = useMemo(() => {
         if (mode === "Quiz") return ["Start 5 MCQ Quiz", "Hard Mode", "Summary of Progress"];
