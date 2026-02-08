@@ -1,14 +1,20 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  darkMode: 'class',
+  // 1. Path to all your components
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
+
+  // 2. Enable class-based dark mode
+  darkMode: 'class',
+
   theme: {
     extend: {
+      // 3. Custom Animations
       animation: {
         blob: "blob 7s infinite",
         scan: "scan 3s linear infinite",
         shine: "shine 3s ease-in-out infinite",
       },
+      // 4. Custom Keyframes
       keyframes: {
         blob: {
           "0%": { transform: "translate(0px, 0px) scale(1)" },
@@ -21,9 +27,21 @@ module.exports = {
       },
     },
   },
+
+  // 5. Critical Safelist (Forces Tailwind to keep these colors)
   safelist: [
-    'bg-[#050505]', 'bg-[#1a0f12]', 'bg-[#0a0a0f]', 'bg-[#f8fafc]',
-    { pattern: /(bg|text|border)-(indigo|rose|cyan|emerald)-(400|500|600)/ }
+    { 
+      pattern: /(bg|text|border|from|to)-(indigo|rose|cyan|amber|slate|emerald)-(400|500|600|700|800|900|950)/ 
+    },
+    { 
+      pattern: /bg-opacity-(10|20|30|40|50)/ 
+    },
+    // Specific theme hex backgrounds used in your Chat.js logic
+    'bg-[#050505]', 
+    'bg-[#f8fafc]', 
+    'bg-[#1a0f12]', 
+    'bg-[#0a0a0f]'
   ],
+
   plugins: [],
 };
