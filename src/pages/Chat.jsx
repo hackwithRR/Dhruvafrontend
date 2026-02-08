@@ -21,14 +21,17 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
+// --- FULL SYLLABUS REGISTRY ---
 const MASTER_SYLLABUS = `
-CBSE CLASS 8-12 & ICSE 8-10 Chapter Registry:
-CBSE 8 MATH: Rational Numbers, Linear Eq, Quadrilaterals, Practical Geo, Data Handling, Squares/Cubes, Comparing Quantities, Algebra, Mensuration, Exponents, Proportions, Factorisation.
-...
-Standardize all queries for 'Maths' to 'Mathematics'.
+CBSE 8 MATH: 1.Rational Numbers, 2.Linear Eq, 3.Quadrilaterals, 4.Practical Geo, 5.Data Handling, 6.Squares, 7.Cubes, 8.Comparing Quantities, 9.Algebra, 10.Solid Shapes, 11.Mensuration, 12.Exponents, 13.Proportions, 14.Factorisation, 15.Graphs, 16.Numbers.
+CBSE 9 MATH: 1.Number Systems, 2.Polynomials, 3.Coordinate Geo, 4.Linear Eq 2 Var, 5.Euclid Geo, 6.Lines/Angles, 7.Triangles, 8.Quadrilaterals, 9.Areas, 10.Circles, 11.Constructions, 12.Heron's, 13.Surface Area, 14.Statistics, 15.Probability.
+CBSE 10 MATH: 1.Real Numbers, 2.Polynomials, 3.Linear Eq Pair, 4.Quadratic, 5.AP, 6.Triangles, 7.Coordinate, 8.Trig Identities, 9.Heights/Distances, 10.Circles, 11.Constructions, 12.Circle Areas, 13.Surface Areas, 14.Statistics, 15.Probability.
+ICSE 8 MATH: 1.Rational, 2.Exponents, 3.Squares, 4.Cubes, 5.Algebra, 6.Linear Eq, 7.Factorisation, 8.Ratio, 9.Percentages, 10.Profit/Loss, 11.SI, 12.Polygons, 13.Quadrilaterals, 14.Construction, 15.Area/Perimeter, 16.Volume, 17.Data, 18.Graphs.
+ICSE 9 MATH: 1.Rational/Irrational, 2.Indices, 3.Algebra, 4.Factorisation, 5.Linear Eq, 6.Expansions, 7.Coordinate, 8.Triangles, 9.Pythagoras, 10.Rectilinear, 11.Circles, 12.Mensuration, 13.Statistics, 14.Trigonometry.
+ICSE 10 MATH: 1.Quadratic, 2.Linear Ineq, 3.Ratio, 4.Matrices, 5.AP, 6.Coordinate, 7.Similarity, 8.Trig, 9.Heights, 10.Mensuration, 11.Probability, 12.Statistics.
+(Note: Treat "Maths", "Mathematics", and "Math" as the same subject).
 `;
 
-// --- MODERN RANK COMPONENT ---
 const RankBadge = ({ xp, level }) => {
     const progress = (xp % 500) / 5;
     const ranks = ["Novice", "Scholar", "Sage", "Expert", "Master", "Grandmaster"];
@@ -51,18 +54,13 @@ const RankBadge = ({ xp, level }) => {
                     <span>{500 - (xp % 500)} XP to Next Level</span>
                 </div>
                 <div className="w-full h-2 bg-white/5 rounded-full overflow-hidden">
-                    <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${progress}%` }}
-                        className="h-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]"
-                    />
+                    <motion.div initial={{ width: 0 }} animate={{ width: `${progress}%` }} className="h-full bg-gradient-to-r from-indigo-500 to-fuchsia-500 shadow-[0_0_15px_rgba(99,102,241,0.5)]"/>
                 </div>
             </div>
         </div>
     );
 };
 
-// --- PERSISTENT STRICT TIMER ---
 const StudyTimer = ({ currentTheme, onComplete }) => {
     const [timeLeft, setTimeLeft] = useState(() => Number(localStorage.getItem("dhruva_timeLeft")) || 0);
     const [isActive, setIsActive] = useState(() => localStorage.getItem("dhruva_timerActive") === "true");
@@ -74,7 +72,6 @@ const StudyTimer = ({ currentTheme, onComplete }) => {
         localStorage.setItem("dhruva_timeLeft", timeLeft);
         localStorage.setItem("dhruva_timerActive", isActive);
         localStorage.setItem("dhruva_initialTime", initialTime);
-
         if (isActive && timeLeft > 0) {
             timerRef.current = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
         } else if (timeLeft === 0 && isActive) {
@@ -86,37 +83,22 @@ const StudyTimer = ({ currentTheme, onComplete }) => {
     const handleComplete = (isFinished) => {
         const secondsStudied = initialTime - timeLeft;
         const earnedXP = Math.floor(secondsStudied / 60);
-        if (earnedXP > 0) {
-            onComplete(earnedXP);
-            toast.success(`Focused for ${earnedXP}m! +${earnedXP} XP`);
-        }
-        setIsActive(false);
-        setTimeLeft(0);
-        setInitialTime(0);
-    };
-
-    const startTimer = (mins) => {
-        const secs = mins * 60;
-        setTimeLeft(secs);
-        setInitialTime(secs);
-        setIsActive(true);
+        if (earnedXP > 0) { onComplete(earnedXP); toast.success(`Focused for ${earnedXP}m! +${earnedXP} XP`); }
+        setIsActive(false); setTimeLeft(0); setInitialTime(0);
     };
 
     return (
         <motion.div drag dragMomentum={false} className="fixed z-[100] right-4 top-24 md:right-8 md:top-28">
-            <motion.div 
-                animate={{ width: isOpen ? "240px" : "56px", height: isOpen ? "260px" : "56px", borderRadius: isOpen ? "28px" : "50%" }}
-                className={`flex flex-col overflow-hidden border shadow-2xl backdrop-blur-3xl ${currentTheme.aiBubble} border-white/10`}
-            >
+            <motion.div animate={{ width: isOpen ? "240px" : "56px", height: isOpen ? "260px" : "56px", borderRadius: isOpen ? "28px" : "50%" }} className={`flex flex-col overflow-hidden border shadow-2xl backdrop-blur-3xl ${currentTheme.aiBubble} border-white/10`}>
                 {!isOpen ? (
                     <button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-400">
                         {isActive ? <span className="text-[10px] font-bold animate-pulse">{Math.ceil(timeLeft/60)}m</span> : <FaClock size={20}/>}
                     </button>
                 ) : (
                     <div className="p-5 flex flex-col h-full justify-between">
-                        <div className="flex justify-between items-center"><span className="text-[9px] font-black uppercase tracking-widest opacity-40">Focus Session</span><button onClick={() => setIsOpen(false)}><FaTimes size={14}/></button></div>
+                        <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest opacity-40"><span>Focus Session</span><button onClick={() => setIsOpen(false)}><FaTimes/></button></div>
                         <div className="text-4xl font-mono font-black text-center py-4">{Math.floor(timeLeft/60)}:{String(timeLeft%60).padStart(2, '0')}</div>
-                        <div className="grid grid-cols-3 gap-2">{[15, 25, 45].map(m => (<button key={m} onClick={() => startTimer(m)} className="py-2 rounded-xl bg-white/5 text-[10px] font-black hover:bg-indigo-600 transition-colors">{m}m</button>))}</div>
+                        <div className="grid grid-cols-3 gap-2">{[15, 25, 45].map(m => (<button key={m} onClick={() => {setTimeLeft(m*60); setInitialTime(m*60); setIsActive(true);}} className="py-2 rounded-xl bg-white/5 text-[10px] font-black hover:bg-indigo-600 transition-colors">{m}m</button>))}</div>
                         <div className="flex gap-2">
                             <button onClick={() => setIsActive(!isActive)} className="flex-1 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg">{isActive ? <FaStop/> : <FaPlay/>}</button>
                             <button onClick={() => handleComplete(false)} className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center border border-white/10"><FaTrash/></button>
@@ -164,16 +146,13 @@ export default function Chat() {
     const currentTheme = themes[theme] || themes.DeepSpace;
     const currentLevel = Math.floor((userData.xp || 0) / 500) + 1;
 
-    // --- CONTINUOUS VOICE MODE LOGIC ---
+    // --- CONTINUOUS VOICE & NORMALIZATION ---
     const speak = (text) => {
         if (!isVoiceOn) return;
         window.speechSynthesis.cancel();
         const utter = new SpeechSynthesisUtterance(text.replace(/[*#_]/g, ""));
         utter.rate = 1.1;
-        utter.onend = () => {
-            // Auto-trigger mic after Dhruva finishes speaking for continuous chat
-            if (isVoiceOn) handleVoiceToggle(); 
-        };
+        utter.onend = () => { if (isVoiceOn) handleVoiceToggle(); };
         window.speechSynthesis.speak(utter);
     };
 
@@ -183,12 +162,9 @@ export default function Chat() {
             recognitionRef.current = new Speech();
             recognitionRef.current.continuous = false;
             recognitionRef.current.onresult = (e) => {
-                const transcript = e.results[0][0].transcript;
-                setInput(transcript);
-                // Automatically send if using continuous voice mode
-                if (transcript.length > 2) {
-                    setTimeout(() => sendMessage(transcript), 1000);
-                }
+                const t = e.results[0][0].transcript;
+                setInput(t);
+                if (t.length > 2) setTimeout(() => sendMessage(t), 1000);
             };
             recognitionRef.current.onend = () => setIsListening(false);
         }
@@ -199,12 +175,10 @@ export default function Chat() {
         else { setInput(""); recognitionRef.current.start(); setIsListening(true); }
     };
 
-    // --- SESSION NAME EDITING ---
     const renameSession = async (id) => {
         if (!newSessionName.trim()) return setEditingSessionId(null);
         await updateDoc(doc(db, `users/${currentUser.uid}/sessions`, id), { title: newSessionName });
-        setEditingSessionId(null);
-        loadSessions();
+        setEditingSessionId(null); loadSessions();
     };
 
     const openCamera = async () => {
@@ -266,7 +240,10 @@ export default function Chat() {
         setMessages(updatedMsgs);
 
         try {
-            const stdSub = subjectInput.toLowerCase().startsWith("math") ? "Mathematics" : subjectInput;
+            // Subject Normalization: Maths/Mathematics/Math -> Mathematics
+            let stdSub = subjectInput.trim();
+            if (/^(math|maths|mathematics)$/i.test(stdSub)) stdSub = "Mathematics";
+
             const payload = { userId: currentUser.uid, message: text, mode, subject: stdSub, chapter: chapterInput, language: userData.language, classLevel: userData.class, board: userData.board, syllabusRegistry: MASTER_SYLLABUS };
 
             let res;
@@ -283,22 +260,15 @@ export default function Chat() {
             const aiMsg = {
                 role: "ai",
                 content: res.data.reply,
-                ytLink: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} ${userData.class} ${stdSub} ${text}`)}`,
-                suggestions: ["Explain More", "Quiz Me", "Give Example"]
+                ytLink: `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} ${userData.class} ${stdSub} ${text}`)}`
             };
 
             const finalMsgs = [...updatedMsgs, aiMsg];
             setMessages(finalMsgs);
             speak(res.data.reply);
             
-            // Auto-naming logic if it's the first message
-            const sessionTitle = messages.length === 0 ? (subjectInput || text.slice(0, 15)) : null;
-            
-            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { 
-                messages: finalMsgs, 
-                lastUpdate: Date.now(), 
-                ...(sessionTitle && { title: sessionTitle }) 
-            }, { merge: true });
+            const sessionTitle = messages.length === 0 ? (stdSub || text.slice(0, 15)) : null;
+            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: finalMsgs, lastUpdate: Date.now(), ...(sessionTitle && { title: sessionTitle }) }, { merge: true });
             
             loadSessions();
             awardXP(10);
@@ -310,40 +280,24 @@ export default function Chat() {
         <div className={`flex h-[100dvh] w-full overflow-hidden ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" autoClose={2000} hideProgressBar />
 
-            {/* RESPONSIVE & CLOSABLE SIDEBAR */}
+            {/* CLOSABLE SIDEBAR (DESKTOP + MOBILE) */}
             <AnimatePresence>
                 {showSidebar && (
-                    <motion.div 
-                        initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }}
-                        className={`fixed lg:relative z-[200] w-72 md:w-80 h-full flex flex-col p-6 border-r ${currentTheme.sidebar} backdrop-blur-xl shadow-2xl`}
-                    >
-                        <div className="flex justify-between items-center mb-6">
-                            <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Learning History</span>
-                            <button onClick={() => setShowSidebar(false)} className="p-2 hover:bg-white/5 rounded-full"><FaChevronLeft/></button>
-                        </div>
-                        
+                    <motion.div initial={{ x: -320 }} animate={{ x: 0 }} exit={{ x: -320 }} className={`fixed lg:relative z-[200] w-72 md:w-80 h-full flex flex-col p-6 border-r ${currentTheme.sidebar} backdrop-blur-xl shadow-2xl`}>
+                        <div className="flex justify-between items-center mb-6"><span className="text-[10px] font-black uppercase tracking-widest opacity-40">Library</span><button onClick={() => setShowSidebar(false)} className="p-2 hover:bg-white/5 rounded-full"><FaChevronLeft/></button></div>
                         <RankBadge xp={userData.xp} level={currentLevel} />
-
-                        <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString());}} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2"><FaPlus/> New Session</button>
-                        
+                        <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString());}} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2"><FaPlus/> New Brainstorm</button>
                         <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
                             {sessions.map(s => (
                                 <div key={s.id} onClick={() => {setCurrentSessionId(s.id); setMessages(s.messages || []);}} className={`group p-4 rounded-2xl border transition-all cursor-pointer relative ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-600/40' : 'border-transparent hover:bg-white/5'}`}>
                                     {editingSessionId === s.id ? (
-                                        <input 
-                                            autoFocus 
-                                            className="bg-transparent text-[10px] font-black uppercase outline-none w-full"
-                                            value={newSessionName}
-                                            onChange={e => setNewSessionName(e.target.value)}
-                                            onBlur={() => renameSession(s.id)}
-                                            onKeyDown={e => e.key === 'Enter' && renameSession(s.id)}
-                                        />
+                                        <input autoFocus className="bg-transparent text-[10px] font-black uppercase outline-none w-full" value={newSessionName} onChange={e => setNewSessionName(e.target.value)} onBlur={() => renameSession(s.id)} onKeyDown={e => e.key === 'Enter' && renameSession(s.id)}/>
                                     ) : (
                                         <div className="flex justify-between items-center">
-                                            <span className="text-[10px] font-black truncate block uppercase tracking-tighter w-[70%]">{s.title || "Study Session"}</span>
+                                            <span className="text-[10px] font-black truncate block uppercase w-[70%]">{s.title || "Untitled Session"}</span>
                                             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button onClick={(e) => { e.stopPropagation(); setEditingSessionId(s.id); setNewSessionName(s.title || ""); }}><FaEdit size={10}/></button>
-                                                <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)).then(loadSessions); }} className="text-red-500/60"><FaTrash size={10}/></button>
+                                                <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)).then(loadSessions); }}><FaTrash size={10}/></button>
                                             </div>
                                         </div>
                                     )}
@@ -358,13 +312,13 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} userData={userData}/>
                 <StudyTimer currentTheme={currentTheme} onComplete={awardXP} />
 
-                {/* MODE & SUBJECT PICKER */}
+                {/* MODE & SYLLABUS PICKER */}
                 <div className="w-full max-w-5xl mx-auto px-4 pt-6 space-y-4">
                     <div className={`flex items-center gap-2 p-1.5 rounded-2xl border ${currentTheme.input} shadow-xl`}>
-                        <input value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Sub" className="w-16 md:w-32 bg-transparent px-3 py-1 text-[11px] font-black uppercase outline-none" />
+                        <input value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject" className="w-20 md:w-32 bg-transparent px-3 py-1 text-[11px] font-black uppercase outline-none" />
                         <div className="h-4 w-[1px] bg-white/10"/>
-                        <input value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Chapter # or Name..." className="flex-1 bg-transparent px-3 py-1 text-[11px] font-black uppercase outline-none" />
-                        <button onClick={() => setIsLocked(!isLocked)} className={`p-2.5 rounded-xl ${isLocked ? 'bg-emerald-600' : 'bg-white/5'}`}><FaCheckCircle size={12}/></button>
+                        <input value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Ch # (e.g. 1)" className="flex-1 bg-transparent px-3 py-1 text-[11px] font-black uppercase outline-none" />
+                        <button onClick={() => setIsLocked(!isLocked)} className={`p-2.5 rounded-xl ${isLocked ? 'bg-emerald-600 shadow-[0_0_10px_#10b981]' : 'bg-white/5'}`}><FaCheckCircle size={12}/></button>
                     </div>
                     <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                         {["Explain", "Quiz", "Summary", "Homework"].map(m => (
@@ -373,22 +327,17 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* CHAT DISPLAY */}
                 <div className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar">
                     <div className="max-w-4xl mx-auto space-y-10">
                         {messages.length === 0 && (
-                            <div className="flex flex-col items-center justify-center h-64 opacity-10 text-center uppercase tracking-[0.4em] text-[10px]"><FaWaveSquare size={40} className="mb-4"/><p>Speak or Type to begin</p></div>
+                            <div className="flex flex-col items-center justify-center h-64 opacity-10 text-center uppercase tracking-[0.4em] text-[10px]"><FaWaveSquare size={40} className="mb-4"/><p>Speak to Dhruva to begin</p></div>
                         )}
                         {messages.map((msg, i) => (
                             <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                                 <div className={`max-w-[92%] md:max-w-[80%] p-6 md:p-8 rounded-[2.5rem] shadow-2xl relative ${msg.role === "user" ? `${currentTheme.userBubble} text-white rounded-tr-none` : `${currentTheme.aiBubble} backdrop-blur-3xl rounded-tl-none`}`}>
-                                    {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-80 w-full object-cover shadow-xl" alt="input" />}
-                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className="prose prose-sm prose-invert max-w-none text-xs md:text-sm prose-p:mb-5 leading-relaxed">
-                                        {msg.content}
-                                    </ReactMarkdown>
-                                    {msg.role === "ai" && msg.ytLink && (
-                                        <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl shadow-red-600/20"><FaYoutube size={18}/> Visual Lab</a>
-                                    )}
+                                    {msg.image && <img src={msg.image} className="rounded-2xl mb-4 max-h-80 w-full object-cover" alt="input" />}
+                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className="prose prose-sm prose-invert max-w-none text-xs md:text-sm leading-relaxed">{msg.content}</ReactMarkdown>
+                                    {msg.role === "ai" && msg.ytLink && (<a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase shadow-xl shadow-red-600/20"><FaYoutube size={18}/> Visual Lab</a>)}
                                 </div>
                             </motion.div>
                         ))}
@@ -396,16 +345,16 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* MODERN RESPONSIVE BOTTOM BAR */}
+                {/* GEMINI STYLE BOTTOM BAR */}
                 <div className="p-4 md:p-10 bg-gradient-to-t from-black via-black/80 to-transparent">
                     <div className="max-w-4xl mx-auto">
                         <div className={`flex items-center gap-1 md:gap-2 p-2 rounded-[3.5rem] border shadow-3xl backdrop-blur-3xl ${currentTheme.input} ring-1 ring-white/5`}>
                             <button onClick={() => setShowSidebar(!showSidebar)} className="p-3 text-indigo-400"><FaHistory size={20}/></button>
-                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Talk to Dhruva..." className="flex-1 bg-transparent px-2 md:px-5 py-3 outline-none text-sm font-bold min-w-0" />
+                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Ask Dhruva..." className="flex-1 bg-transparent px-2 md:px-5 py-3 outline-none text-sm font-bold min-w-0" />
                             <div className="flex items-center gap-0.5 md:gap-1 px-1">
-                                <button onClick={() => setIsVoiceOn(!isVoiceOn)} className={`p-3 hidden md:block ${isVoiceOn ? 'text-indigo-400' : 'text-white/20'}`} title="Continuous Voice Mode"><FaVolumeUp size={18}/></button>
+                                <button onClick={() => setIsVoiceOn(!isVoiceOn)} className={`p-3 hidden md:block ${isVoiceOn ? 'text-indigo-400' : 'text-white/20'}`} title="Continuous Talk Mode"><FaVolumeUp size={18}/></button>
                                 <button onClick={handleVoiceToggle} className={`p-4 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-indigo-400 hover:bg-white/5'}`}><FaMicrophone size={20}/></button>
-                                <button onClick={() => fileInputRef.current.click()} className="p-4 text-indigo-400 hover:bg-white/5 rounded-full"><FaImage size={20}/><input type="file" ref={fileInputRef} hidden onChange={e => setSelectedFile(e.target.files[0])} /></button>
+                                <button onClick={() => fileInputRef.current.click()} className="p-4 text-indigo-400 hover:bg-white/5 rounded-full"><FaImage size={20}/><input type="file" ref={fileInputRef} hidden onChange={e => setSelectedFile(e.target.files[0])}/></button>
                                 <button onClick={openCamera} className="p-4 text-indigo-400 hidden xs:block hover:bg-white/5 rounded-full"><FaCamera size={20}/></button>
                                 <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 md:p-6 rounded-full ${currentTheme.button} text-white shadow-2xl active:scale-90 transition-all ml-1`}>
                                     {isSending ? <FaSyncAlt className="animate-spin" size={16}/> : <FaPaperPlane size={16}/>}
@@ -429,6 +378,9 @@ export default function Chat() {
                     )}
                 </AnimatePresence>
             </div>
+        </div>
+    );
+}
         </div>
     );
 }
