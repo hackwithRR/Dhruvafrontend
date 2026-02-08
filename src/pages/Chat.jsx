@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +23,7 @@ import { db, auth } from "../firebase";
 import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
+const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\\/$/, "");
 
 const syllabusData = {
     CBSE: {
@@ -88,80 +88,175 @@ export default function Chat() {
     const fileInputRef = useRef(null);
     const activeTheme = themes[theme] || themes.DeepSpace;
 
+    // --- 🤖 GEMINI LIVE VOICE ENGINE (Fixed) ---
+    const getMaleVoice = useCallback(() => {
+        const voices = synthesisRef.current.getVoices();
+        return voices.find(v => 
+            v.name.toLowerCase().includes("google uk english male") || 
+            v.name.toLowerCase().includes("david") || 
+            v.lang === 'en-GB'
+        ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+    }, []);
+
+    const startListening = useCallback(() => {
+        if (!isLiveMode || isAiSpeaking) return;
+        
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            toast.error("Speech Recognition not supported. Try Chrome.");
+            return;
+        }
+
+        // Stop any existing recognition
+        if (recognitionRef.current) {
+            recognitionRef.current.stop();
+        }
+
+        recognitionRef.current = new SpeechRecognition();
+        recognitionRef.current.continuous = true;
+        recognitionRef.current.interimResults = false;
+        recognitionRef.current.lang = 'en-US';
+        
+        recognitionRef.current.onstart = () => {
+            setIsListening(true);
+            console.log('🔴 Listening started');
+        };
+        
+        recognitionRef.current.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            setIsListening(false);
+            if (event.error !== 'aborted') {
+                toast.error(`Recognition error: ${event.error}`);
+            }
+        };
+        
+        recognitionRef.current.onend = () => {
+            setIsListening(false);
+            console.log('🔴 Listening ended');
+            if (isLiveMode && !isAiSpeaking) {
+                setTimeout(startListening, 500);
+            }
+        };
+        
+        recognitionRef.current.onresult = (event) => {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            if (transcript) {
+                console.log('🎤 Captured:', transcript);
+                sendMessage(transcript);
+            }
+        };
+        
+        try {
+            recognitionRef.current.start();
+        } catch (error) {
+            console.error('Start recognition failed:', error);
+            toast.error("Microphone access denied or failed");
+        }
+    }, [isLiveMode, isAiSpeaking, sendMessage]);
+
+    const speak = useCallback((text) => {
+        if (!isLiveMode) return;
+        
+        synthesisRef.current.cancel();
+        
+        const cleanText = text
+            .replace(/[*_`~]/g, '')
+            .replace(/\\\[.*?\\\]/g, '')
+            .replace(/\n/g, ' ')
+            .trim();
+            
+        if (!cleanText) return;
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        const voice = getMaleVoice();
+        utterance.voice = voice;
+        utterance.rate = 1.0;
+        utterance.pitch = 0.9;
+        utterance.volume = 1;
+        
+        utterance.onstart = () => {
+            setIsAiSpeaking(true);
+            console.log('🔊 Speaking started');
+        };
+        
+        utterance.onend = () => {
+            setIsAiSpeaking(false);
+            console.log('🔊 Speaking ended');
+            if (isLiveMode) {
+                setTimeout(startListening, 800);
+            }
+        };
+        
+        utterance.onerror = (event) => {
+            console.error('Speech synthesis error:', event);
+            setIsAiSpeaking(false);
+            if (isLiveMode) {
+                setTimeout(startListening, 500);
+            }
+        };
+        
+        synthesisRef.current.speak(utterance);
+    }, [isLiveMode, getMaleVoice]);
+
+    const toggleLiveMode = useCallback(() => {
+        if (!isLiveMode) {
+            setIsLiveMode(true);
+            toast.info("🔴 Neural Link Active - Speak now!");
+            
+            const intro = `Neural Link established. I am Dhruva. Ready for ${subject} ${chapter || 'concepts'}. Begin speaking.`;
+            speak(intro);
+            
+        } else {
+            setIsLiveMode(false);
+            setIsListening(false);
+            setIsAiSpeaking(false);
+            
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
+            synthesisRef.current.cancel();
+            
+            toast.info("🔴 Neural Link Disconnected");
+        }
+    }, [isLiveMode, subject, chapter, speak]);
+
     // --- 🕒 SYSTEM INITIALIZATION ---
     useEffect(() => {
         const interval = setInterval(() => setTimer(prev => prev + 1), 1000);
-        // Load voices for speech
-        const loadVoices = () => synthesisRef.current.getVoices();
+        
+        const loadVoices = () => {
+            const voices = synthesisRef.current.getVoices();
+            if (voices.length > 0) {
+                console.log('Voices loaded:', voices.length);
+            }
+        };
+        
         loadVoices();
-        if (synthesisRef.current.onvoiceschanged !== undefined) {
-            synthesisRef.current.onvoiceschanged = loadVoices;
-        }
-        return () => clearInterval(interval);
+        synthesisRef.current.onvoiceschanged = loadVoices;
+        
+        return () => {
+            clearInterval(interval);
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
+            synthesisRef.current.cancel();
+        };
     }, []);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    // Voice mode effect
+    useEffect(() => {
+        if (isLiveMode && !isAiSpeaking && !isListening) {
+            const timeout = setTimeout(startListening, 1000);
+            return () => clearTimeout(timeout);
+        }
+    }, [isLiveMode, isAiSpeaking, isListening, startListening]);
+
     const handleLogout = async () => {
         try { await auth.signOut(); navigate("/login"); } catch (err) { toast.error("Logout Failed"); }
-    };
-
-    // --- 🤖 GEMINI LIVE VOICE ENGINE ---
-    const getMaleVoice = () => {
-        const voices = synthesisRef.current.getVoices();
-        return voices.find(v => v.name.toLowerCase().includes("google uk english male") || v.name.toLowerCase().includes("david") || v.lang === 'en-GB') || voices[0];
-    };
-
-    const startListening = () => {
-        if (!isLiveMode) return;
-        const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!Speech) return toast.error("Speech not supported in this browser");
-
-        recognitionRef.current = new Speech();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
-        
-        recognitionRef.current.onstart = () => setIsListening(true);
-        recognitionRef.current.onend = () => setIsListening(false);
-        recognitionRef.current.onresult = (e) => {
-            const text = e.results[0][0].transcript;
-            if (text) sendMessage(text);
-        };
-        
-        try { recognitionRef.current.start(); } catch(e) { console.log("Recognition already started"); }
-    };
-
-    const speak = (text) => {
-        if (!isLiveMode) return;
-        synthesisRef.current.cancel();
-        // Clean markdown for cleaner speech
-        const cleanText = text.replace(/[*#_~]/g, "").replace(/\[.*?\]/g, "");
-        const utter = new SpeechSynthesisUtterance(cleanText);
-        utter.voice = getMaleVoice();
-        utter.rate = 1.0;
-        utter.onstart = () => setIsAiSpeaking(true);
-        utter.onend = () => {
-            setIsAiSpeaking(false);
-            if (isLiveMode) setTimeout(startListening, 600);
-        };
-        synthesisRef.current.speak(utter);
-    };
-
-    const toggleLiveMode = () => {
-        if (!isLiveMode) {
-            setIsLiveMode(true);
-            const intro = `Neural Link Established. I am Dhruva. Analyzing ${subject}. Go ahead.`;
-            const utter = new SpeechSynthesisUtterance(intro);
-            utter.voice = getMaleVoice();
-            utter.onend = () => startListening();
-            synthesisRef.current.speak(utter);
-        } else {
-            setIsLiveMode(false);
-            synthesisRef.current.cancel();
-            recognitionRef.current?.stop();
-        }
     };
 
     // --- 🏆 XP & LEADERBOARD SYSTEM ---
@@ -210,7 +305,7 @@ export default function Chat() {
             const res = await axios.post(`${API_BASE}/chat`, {
                 userId: currentUser.uid,
                 message: text,
-                mode, // This ensures the backend handles "Quiz", "HW", etc.
+                mode,
                 subject,
                 chapter,
                 image: imgBase64,
@@ -252,7 +347,6 @@ export default function Chat() {
         return [`Summarize ${chapter || 'this'}`, "Real-world application?", "Simplified explanation"];
     }, [mode, chapter]);
 
-    // Archive Loader
     useEffect(() => {
         if (!currentUser) return;
         const q = query(collection(db, `users/${currentUser.uid}/sessions`), orderBy("lastUpdate", "desc"), limit(10));
@@ -332,7 +426,6 @@ export default function Chat() {
                             </div>
 
                             <div className="space-y-8 flex-1 overflow-y-auto no-scrollbar">
-                                {/* XP Card */}
                                 <div className={`p-6 rounded-[2rem] border ${activeTheme.border} ${activeTheme.card} bg-gradient-to-br from-indigo-600/5 to-transparent`}>
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="p-3 bg-indigo-600/20 rounded-2xl text-indigo-500">
@@ -352,7 +445,6 @@ export default function Chat() {
                                     </div>
                                 </div>
 
-                                {/* Leaderboard */}
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30 px-2 flex items-center gap-2"><FaMedal/> Top Scholars</label>
                                     <div className="space-y-2">
@@ -380,7 +472,6 @@ export default function Chat() {
             <div className="flex-1 flex flex-col relative h-full">
                 <Navbar currentUser={currentUser} userData={userData} />
 
-                {/* --- 📟 CONTEXT HEADER --- */}
                 <div className="w-full max-w-3xl mx-auto px-4 mt-4 space-y-3 z-[100]">
                     <div className={`flex items-center justify-between p-4 rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-md`}>
                         <div className="flex items-center gap-3">
@@ -412,7 +503,6 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* --- 💬 CHAT MESSAGES --- */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar pb-64">
                     <div className="max-w-3xl mx-auto space-y-10">
                         {messages.length === 0 && (
@@ -446,7 +536,6 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* --- 🚀 ACTION POD --- */}
                 <div className={`absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t ${activeTheme.isDark ? 'from-black via-black/90' : 'from-white via-white/90'} to-transparent z-[500]`}>
                     <div className="max-w-3xl mx-auto space-y-4">
                         
@@ -470,7 +559,6 @@ export default function Chat() {
                             </div>
                         </div>
 
-                        {/* Image Preview Bubble */}
                         <AnimatePresence>
                             {imagePreview && (
                                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-20 h-20 ml-4 mb-2">
@@ -507,7 +595,6 @@ export default function Chat() {
                 </div>
             </div>
 
-            {/* --- 📁 VAULT MODAL --- */}
             <AnimatePresence>
                 {showSessionPicker && (
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-3xl p-8 flex flex-col items-center">
