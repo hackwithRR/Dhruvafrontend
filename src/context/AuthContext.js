@@ -1,66 +1,30 @@
-import { createContext, useContext, useState, useEffect } from "react";
-import { auth, provider, db } from "../firebase"; 
-import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signInWithPopup, 
-  onAuthStateChanged, 
-  signOut, 
-  updateProfile 
-} from "firebase/auth";
-import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
-
-const AuthContext = createContext();
-
-export const AuthProvider = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [theme, setThemeState] = useState(localStorage.getItem("theme") || "DeepSpace");
-
-  const setTheme = (newTheme) => {
-    setThemeState(newTheme);
-    localStorage.setItem("theme", newTheme);
-  };
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Sync user doc if missing
-        const userRef = doc(db, "users", user.uid);
-        const snap = await getDoc(userRef);
-        if (!snap.exists()) {
-          await setDoc(userRef, {
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName || "Scholar",
-            theme: "DeepSpace",
-            xp: 0,
-            board: "CBSE",
-            class: "10"
-          }, { merge: true });
-        }
-      }
-      setCurrentUser(user);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const register = async (email, password, name) => {
-    const res = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(res.user, { displayName: name });
-    return res.user;
-  };
-
-  const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
-  const googleLogin = () => signInWithPopup(auth, provider);
-  const logout = () => signOut(auth);
-
-  return (
-    <AuthContext.Provider value={{ currentUser, register, login, logout, googleLogin, theme, setTheme, loading }}>
-      {children}
-    </AuthContext.Provider>
-  );
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  content: ["./src/**/*.{js,jsx,ts,tsx}"],
+  darkMode: 'class',
+  theme: {
+    extend: {
+      animation: {
+        blob: "blob 7s infinite",
+        scan: "scan 3s linear infinite",
+        shine: "shine 3s ease-in-out infinite",
+      },
+      keyframes: {
+        blob: {
+          "0%": { transform: "translate(0px, 0px) scale(1)" },
+          "33%": { transform: "translate(30px, -50px) scale(1.1)" },
+          "66%": { transform: "translate(-20px, 20px) scale(0.9)" },
+          "100%": { transform: "translate(0px, 0px) scale(1)" },
+        },
+        scan: { "0%": { top: "-10%" }, "100%": { top: "110%" } },
+        shine: { "0%": { left: "-100%" }, "100%": { left: "200%" } }
+      },
+    },
+  },
+  // This tells Tailwind to NEVER delete these color classes
+  safelist: [
+    { pattern: /(bg|text|border|from|to)-(indigo|rose|cyan|amber|slate|emerald)-(400|500|600|700|800|900|950)/ },
+    { pattern: /bg-opacity-(10|20|30|40|50)/ },
+  ],
+  plugins: [],
 };
-
-export const useAuth = () => useContext(AuthContext);
