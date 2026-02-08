@@ -1,21 +1,17 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBOFHLJwdanETImp6TlPT8U7GdouprQfnc",
-  authDomain: "ai-tutor-b89dd.firebaseapp.com",
-  projectId: "ai-tutor-b89dd",
-  storageBucket: "ai-tutor-b89dd.firebasestorage.app",
-  messagingSenderId: "764592312268",
-  appId: "1:764592312268:web:9f011cb05ebaa984575769"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "your-app.firebaseapp.com",
+  projectId: "your-app",
+  storageBucket: "your-app.appspot.com",
+  messagingSenderId: "...",
+  appId: "..."
 };
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const storage = getStorage(app);
-export const provider = new GoogleAuthProvider(); 
-
-export default app;
+export const googleProvider = new GoogleAuthProvider();
