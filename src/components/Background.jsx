@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-export default function Background() {
+export default function Background({ theme }) {
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
     useEffect(() => {
@@ -9,26 +9,70 @@ export default function Background() {
         return () => window.removeEventListener("mousemove", handleMove);
     }, []);
 
+    // --- 🎨 DYNAMIC BACKGROUND ENGINE ---
+    const configs = {
+        DeepSpace: {
+            bg: "bg-[#020202]",
+            glow: "rgba(79, 70, 229, 0.15)", // Indigo
+            blobs: ["bg-blue-600/20", "bg-indigo-600/20"],
+            grid: "rgba(255,255,255,0.03)",
+            scan: "via-blue-500/20"
+        },
+        Light: {
+            bg: "bg-[#f8fafc]",
+            glow: "rgba(79, 70, 229, 0.08)",
+            blobs: ["bg-blue-200/40", "bg-indigo-200/40"],
+            grid: "rgba(0,0,0,0.03)",
+            scan: "via-indigo-500/10"
+        },
+        Sakura: {
+            bg: "bg-[#0f0508]",
+            glow: "rgba(244, 63, 94, 0.15)", // Rose
+            blobs: ["bg-rose-600/20", "bg-pink-600/20"],
+            grid: "rgba(244, 63, 94, 0.05)",
+            scan: "via-rose-500/20"
+        },
+        Cyberpunk: {
+            bg: "bg-[#020617]",
+            glow: "rgba(6, 182, 212, 0.15)", // Cyan
+            blobs: ["bg-cyan-600/20", "bg-fuchsia-600/20"],
+            grid: "rgba(6, 182, 212, 0.05)",
+            scan: "via-cyan-500/30"
+        }
+    };
+
+    const active = configs[theme] || configs.DeepSpace;
+
     return (
-        <div className="fixed inset-0 -z-50 overflow-hidden bg-[#020202]">
+        <div className={`fixed inset-0 -z-50 overflow-hidden transition-colors duration-1000 ${active.bg}`}>
+            
             {/* Interactive Radial Glow */}
             <div
                 className="pointer-events-none absolute inset-0 z-10 transition-opacity duration-300"
                 style={{
-                    background: `radial-gradient(800px at ${mousePos.x}px ${mousePos.y}px, rgba(79, 70, 229, 0.15), transparent 80%)`
+                    background: `radial-gradient(800px at ${mousePos.x}px ${mousePos.y}px, ${active.glow}, transparent 80%)`
                 }}
             />
 
-            {/* Animated Mesh Gradients */}
-            <div className="absolute top-[-10%] left-[-10%] w-[70%] h-[70%] bg-blue-600/20 blur-[130px] rounded-full animate-blob" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] bg-indigo-600/20 blur-[130px] rounded-full animate-blob animation-delay-2000" />
+            {/* Animated Mesh Gradients (Blobs) */}
+            <div className={`absolute top-[-10%] left-[-10%] w-[70%] h-[70%] blur-[130px] rounded-full animate-blob transition-colors duration-1000 ${active.blobs[0]}`} />
+            <div className={`absolute bottom-[-10%] right-[-10%] w-[70%] h-[70%] blur-[130px] rounded-full animate-blob animation-delay-2000 transition-colors duration-1000 ${active.blobs[1]}`} />
 
-            {/* Cyber Grid */}
-            <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,#ffffff03_1px,transparent_1px),linear-gradient(to_bottom,#ffffff03_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_60%,transparent_100%)]" />
+            {/* Dynamic Grid */}
+            <div 
+                className="absolute inset-0 z-0 [mask-image:radial-gradient(ellipse_80%_80%_at_50%_50%,#000_60%,transparent_100%)]" 
+                style={{
+                    backgroundImage: `
+                        linear-gradient(to right, ${active.grid} 1px, transparent 1px),
+                        linear-gradient(to bottom, ${active.grid} 1px, transparent 1px)
+                    `,
+                    backgroundSize: '40px 40px'
+                }}
+            />
 
             {/* Scanning Line */}
             <div className="absolute inset-0 z-20 pointer-events-none">
-                <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-blue-500/20 to-transparent absolute top-0 animate-scan" />
+                <div className={`w-full h-[1px] bg-gradient-to-r from-transparent ${active.scan} to-transparent absolute top-0 animate-scan`} />
             </div>
 
             {/* Film Grain Texture */}
