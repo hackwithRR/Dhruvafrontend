@@ -46,9 +46,11 @@ const syllabusData = {
     }
 };
 
+// --- UPDATED THEME ENGINE ---
 const themes = {
     DeepSpace: { bg: "bg-[#050505]", primary: "indigo-600", primaryHex: "#4f46e5", text: "text-white", accent: "text-indigo-400", card: "bg-white/[0.03]", border: "border-white/10", isDark: true },
     Light: { bg: "bg-[#f8fafc]", primary: "indigo-600", primaryHex: "#4f46e5", text: "text-slate-900", accent: "text-indigo-600", card: "bg-white shadow-sm", border: "border-slate-200", isDark: false },
+    Sakura: { bg: "bg-[#1a0f12]", primary: "rose-500", primaryHex: "#f43f5e", text: "text-rose-50", accent: "text-rose-400", card: "bg-rose-950/20", border: "border-rose-500/20", isDark: true },
     Cyberpunk: { bg: "bg-[#0a0a0f]", primary: "cyan-500", primaryHex: "#06b6d4", text: "text-cyan-50", accent: "text-cyan-400", card: "bg-cyan-950/20", border: "border-cyan-500/20", isDark: true }
 };
 
@@ -212,7 +214,7 @@ export default function Chat() {
                         <motion.div initial={{ x: -400 }} animate={{ x: 0 }} exit={{ x: -400 }} className={`fixed inset-y-0 left-0 w-80 ${activeTheme.isDark ? 'bg-[#080808]' : 'bg-white'} border-r ${activeTheme.border} z-[801] p-8 flex flex-col`}>
                             <div className="flex justify-between items-center mb-10">
                                 <div className="flex items-center gap-2">
-                                    <FaBrain className="text-indigo-500"/>
+                                    <FaBrain className={activeTheme.accent}/>
                                     <h3 className="text-xl font-black italic uppercase tracking-tighter">Dhruva OS</h3>
                                 </div>
                                 <button onClick={() => setShowSidebar(false)} className="p-2 opacity-40 hover:opacity-100"><FaChevronLeft/></button>
@@ -221,7 +223,7 @@ export default function Chat() {
                             <div className="space-y-8 flex-1 overflow-y-auto no-scrollbar">
                                 <div className={`p-6 rounded-[2rem] border ${activeTheme.border} ${activeTheme.card} bg-gradient-to-br from-indigo-600/5 to-transparent`}>
                                     <div className="flex justify-between items-start mb-4">
-                                        <div className="p-3 bg-indigo-600/20 rounded-2xl text-indigo-500">
+                                        <div className={`p-3 ${activeTheme.isDark ? 'bg-white/5' : 'bg-indigo-600/20'} rounded-2xl text-indigo-500`}>
                                             <FaTrophy size={20}/>
                                         </div>
                                         <div className="text-right">
@@ -230,10 +232,10 @@ export default function Chat() {
                                         </div>
                                     </div>
                                     <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-2">
-                                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(((userData.dailyXp || 0) / 500) * 100, 100)}%` }} className="h-full bg-indigo-500" />
+                                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(((userData.dailyXp || 0) / 500) * 100, 100)}%` }} className={`h-full bg-${activeTheme.primary}`} />
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <p className="text-[9px] font-black uppercase text-indigo-400">Daily Session</p>
+                                        <p className={`text-[9px] font-black uppercase ${activeTheme.accent}`}>Daily Session</p>
                                         <p className="text-[9px] font-black uppercase opacity-40">{userData.dailyXp || 0} / 500 XP</p>
                                     </div>
                                 </div>
@@ -248,7 +250,7 @@ export default function Chat() {
                                                     <span className="text-xs font-bold truncate w-24 uppercase tracking-tight">{user.displayName || user.email?.split('@')[0] || "Scholar"}</span>
                                                 </div>
                                                 <div className="text-right">
-                                                    <span className="text-[10px] font-black text-indigo-500 block leading-tight">{user.xp || 0}</span>
+                                                    <span className={`text-[10px] font-black ${activeTheme.accent} block leading-tight`}>{user.xp || 0}</span>
                                                     <span className="text-[7px] opacity-30 font-black uppercase tracking-tighter">Global XP</span>
                                                 </div>
                                             </div>
@@ -267,33 +269,33 @@ export default function Chat() {
 
             <div className="flex-1 flex flex-col relative h-full">
                 <div className="relative z-[500]">
-                    <Navbar currentUser={currentUser} userData={userData} />
+                    <Navbar currentUser={currentUser} userData={userData} theme={userData.theme} />
                 </div>
 
                 <div className="w-full max-w-3xl mx-auto px-4 mt-4 space-y-3 z-[400] sticky top-[72px]">
                     <div className={`flex items-center justify-between p-4 rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-xl shadow-2xl`}>
                         <div className="flex items-center gap-3">
-                            <FaHistory size={14} className="opacity-20 text-indigo-500"/>
+                            <FaHistory size={14} className={`opacity-20 ${activeTheme.accent}`}/>
                             {isEditingTitle ? (
                                 <input autoFocus value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} onBlur={() => setIsEditingTitle(false)} className="bg-transparent border-none focus:ring-0 outline-none text-xs font-black uppercase p-0 w-32" />
                             ) : (
-                                <span onClick={() => setIsEditingTitle(true)} className="text-xs font-black uppercase tracking-tighter cursor-pointer hover:text-indigo-400 transition-colors">{sessionTitle}</span>
+                                <span onClick={() => setIsEditingTitle(true)} className={`text-xs font-black uppercase tracking-tighter cursor-pointer hover:${activeTheme.accent} transition-colors`}>{sessionTitle}</span>
                             )}
                         </div>
                         <div className="flex items-center gap-4 text-[10px] font-black opacity-40 uppercase tracking-widest">
-                            <span className="flex items-center gap-1.5 px-3 py-1 bg-white/5 rounded-full"><FaClock className="text-indigo-500"/> {formatTime(timer)}</span>
-                            <span className="text-indigo-500">{userData.board} CLS {userData.class}</span>
+                            <span className="flex items-center gap-1.5 px-3 py-1 bg-white/5 rounded-full"><FaClock className={activeTheme.accent}/> {formatTime(timer)}</span>
+                            <span className={activeTheme.accent}>{userData.board} CLS {userData.class}</span>
                         </div>
                     </div>
 
                     <div className={`flex gap-3 p-2 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} backdrop-blur-md`}>
                         <div className="flex-1 relative">
-                            <select value={subject} onChange={(e) => setSubject(e.target.value)} className="w-full bg-white/5 border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer">
+                            <select value={subject} onChange={(e) => setSubject(e.target.value)} className={`${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-100'} w-full border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer`}>
                                 {Object.keys(syllabusData[userData.board]?.[userData.class] || {}).map(s => <option key={s} value={s} className="bg-black text-white">{s}</option>)}
                             </select>
                         </div>
                         <div className="flex-1 relative">
-                            <select value={chapter} onChange={(e) => setChapter(e.target.value)} className="w-full bg-white/5 border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer">
+                            <select value={chapter} onChange={(e) => setChapter(e.target.value)} className={`${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-100'} w-full border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer`}>
                                 <option value="" className="bg-black text-white">Select Chapter</option>
                                 {(syllabusData[userData.board]?.[userData.class]?.[subject] || []).map(ch => <option key={ch} value={ch} className="bg-black text-white">{ch}</option>)}
                             </select>
@@ -306,14 +308,14 @@ export default function Chat() {
                         {messages.length === 0 && (
                             <div className="h-64 flex flex-col items-center justify-center">
                                 <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 10, ease: "linear" }} className="mb-6 opacity-10">
-                                    <FaWaveSquare size={60} className="text-indigo-500"/>
+                                    <FaWaveSquare size={60} className={activeTheme.accent}/>
                                 </motion.div>
                                 <h2 className="text-lg font-black uppercase tracking-[0.8em] opacity-10">Neural Interface Ready</h2>
                             </div>
                         )}
                         {messages.map((msg, i) => (
                             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`p-6 rounded-[2.5rem] max-w-[90%] shadow-2xl relative ${msg.role === 'user' ? `bg-indigo-600 text-white rounded-tr-none` : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`}`}>
+                                <div className={`p-6 rounded-[2.5rem] max-w-[90%] shadow-2xl relative ${msg.role === 'user' ? `bg-${activeTheme.primary} text-white rounded-tr-none shadow-${activeTheme.primary}/20` : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`}`}>
                                     {msg.image && (
                                         <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-black/50">
                                             <img src={msg.image} alt="analysis" className="w-full max-h-[500px] object-contain" />
@@ -339,7 +341,7 @@ export default function Chat() {
                         
                         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                             {quickReplies.map(q => (
-                                <button key={q} onClick={() => sendMessage(q)} className={`whitespace-nowrap px-6 py-3 rounded-2xl border ${activeTheme.border} ${activeTheme.card} text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all hover:scale-105 active:scale-95 shadow-lg`}>
+                                <button key={q} onClick={() => sendMessage(q)} className={`whitespace-nowrap px-6 py-3 rounded-2xl border ${activeTheme.border} ${activeTheme.card} text-[10px] font-black uppercase tracking-widest hover:bg-${activeTheme.primary} hover:text-white transition-all hover:scale-105 active:scale-95 shadow-lg`}>
                                     {q}
                                 </button>
                             ))}
@@ -348,19 +350,19 @@ export default function Chat() {
                         <div className="flex items-center justify-between">
                             <div className={`flex gap-1 p-1.5 ${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-200'} rounded-2xl border ${activeTheme.border} backdrop-blur-md`}>
                                 {["Explain", "Quiz", "HW"].map(m => (
-                                    <button key={m} onClick={() => setMode(m)} className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${mode === m ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' : 'opacity-40 hover:opacity-100'}`}>{m}</button>
+                                    <button key={m} onClick={() => setMode(m)} className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${mode === m ? `bg-${activeTheme.primary} text-white shadow-lg` : 'opacity-40 hover:opacity-100'}`}>{m}</button>
                                 ))}
                             </div>
                             <div className="flex gap-3">
-                                <button onClick={() => setShowSessionPicker(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:text-indigo-500 transition-colors shadow-xl`}><FaLayerGroup size={16}/></button>
-                                <button onClick={() => setShowSidebar(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:text-indigo-500 transition-colors shadow-xl`}><FaChartLine size={16}/></button>
+                                <button onClick={() => setShowSessionPicker(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:${activeTheme.accent} transition-colors shadow-xl`}><FaLayerGroup size={16}/></button>
+                                <button onClick={() => setShowSidebar(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:${activeTheme.accent} transition-colors shadow-xl`}><FaChartLine size={16}/></button>
                             </div>
                         </div>
 
                         <AnimatePresence>
                             {imagePreview && (
                                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-24 h-24 ml-4 mb-2">
-                                    <img src={imagePreview} className="w-full h-full object-cover rounded-2xl border-2 border-indigo-500 shadow-2xl shadow-indigo-500/40" alt="preview" />
+                                    <img src={imagePreview} className={`w-full h-full object-cover rounded-2xl border-2 border-${activeTheme.primary} shadow-2xl`} alt="preview" />
                                     <button onClick={() => {setImagePreview(null); setSelectedFile(null)}} className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-xl"><FaTimes size={10}/></button>
                                 </motion.div>
                             )}
@@ -384,7 +386,7 @@ export default function Chat() {
                                 }}
                             />
                             <div className="flex gap-2 pr-2 pb-2">
-                                <button onClick={() => sendMessage()} disabled={isSending} className="p-5 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 active:scale-90 transition-all disabled:opacity-50">
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 bg-${activeTheme.primary} text-white rounded-full shadow-lg active:scale-90 transition-all disabled:opacity-50`}>
                                     {isSending ? <FaSyncAlt className="animate-spin" size={22}/> : <FaPaperPlane size={22}/>}
                                 </button>
                             </div>
@@ -398,7 +400,7 @@ export default function Chat() {
                     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-3xl p-8 flex flex-col items-center">
                         <div className="w-full max-w-4xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
                             <div>
-                                <h2 className="text-4xl font-black uppercase italic tracking-tighter text-indigo-500">The Vault</h2>
+                                <h2 className={`text-4xl font-black uppercase italic tracking-tighter ${activeTheme.accent}`}>The Vault</h2>
                                 <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em] mt-2">Historical Neural Patterns</p>
                             </div>
                             <div className="flex items-center gap-4 w-full md:w-auto">
@@ -418,9 +420,9 @@ export default function Chat() {
                         <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto no-scrollbar pb-20">
                             {filteredSessions.map(s => (
                                 <div key={s.id} onClick={() => { setMessages(s.messages || []); setCurrentSessionId(s.id); setSessionTitle(s.title || "Untitled"); setShowSessionPicker(false); setSearchQuery(""); }} className={`p-8 rounded-[3rem] border ${activeTheme.border} ${activeTheme.card} hover:border-indigo-500/50 cursor-pointer transition-all flex justify-between items-center group relative overflow-hidden`}>
-                                    <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-all"/>
+                                    <div className={`absolute top-0 left-0 w-1 h-full bg-${activeTheme.primary} opacity-0 group-hover:opacity-100 transition-all`}/>
                                     <div>
-                                        <h4 className="font-black uppercase text-sm tracking-tight group-hover:text-indigo-400 transition-colors">{s.title || "Untitled Lesson"}</h4>
+                                        <h4 className={`font-black uppercase text-sm tracking-tight group-hover:${activeTheme.accent} transition-colors`}>{s.title || "Untitled Lesson"}</h4>
                                         <p className="text-[9px] opacity-30 mt-3 uppercase font-black tracking-widest">{s.subject} • {s.lastUpdate ? new Date(s.lastUpdate).toLocaleDateString() : 'New'}</p>
                                     </div>
                                     <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)); }} className="opacity-0 group-hover:opacity-100 text-red-500 p-3 hover:bg-red-500/10 rounded-xl transition-all">
