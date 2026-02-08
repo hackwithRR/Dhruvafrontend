@@ -1,7 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { auth, provider } from "../firebase"; // Adjusted path
-import { db } from "../firebase"; // Ensure db is exported from your firebase.js
-import { doc, onSnapshot } from "firebase/firestore";
+import { auth, provider, db } from "../firebase"; 
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -10,6 +8,7 @@ import {
   signOut, 
   updateProfile 
 } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
 
 const AuthContext = createContext();
 
@@ -17,7 +16,7 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- UNIFIED THEME STATE ---
+  // Initialize theme from localStorage or default
   const [theme, setThemeState] = useState(() => {
     return localStorage.getItem("theme") || "DeepSpace";
   });
@@ -27,7 +26,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem("theme", newTheme);
   };
 
-  // Listen for Auth Changes
+  // Sync Auth State
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
@@ -36,15 +35,13 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  // --- NEW: Real-time Cloud Theme Sync ---
+  // Sync Theme from Firestore
   useEffect(() => {
     if (!currentUser) return;
-
-    const userRef = doc(db, "users", currentUser.uid);
-    const unsub = onSnapshot(userRef, (docSnap) => {
-      if (docSnap.exists()) {
+    const unsub = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
+      if (docSnap.exists() && docSnap.data().theme) {
         const cloudTheme = docSnap.data().theme;
-        if (cloudTheme && cloudTheme !== theme) {
+        if (cloudTheme !== theme) {
           setThemeState(cloudTheme);
           localStorage.setItem("theme", cloudTheme);
         }
@@ -63,16 +60,9 @@ export const AuthProvider = ({ children }) => {
   const googleLogin = () => signInWithPopup(auth, provider);
   const logout = () => signOut(auth);
 
-  const reloadUser = async () => {
-    if (auth.currentUser) {
-      await auth.currentUser.reload();
-      setCurrentUser({ ...auth.currentUser });
-    }
-  };
-
   return (
     <AuthContext.Provider value={{ 
-      currentUser, register, login, logout, googleLogin, reloadUser, 
+      currentUser, register, login, logout, googleLogin, 
       theme, setTheme, loading 
     }}>
       {!loading && children}
