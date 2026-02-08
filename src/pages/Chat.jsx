@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
@@ -6,9 +6,8 @@ import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import {
     FaPaperPlane, FaSyncAlt, FaTimes, FaImage, FaHistory, FaYoutube, FaTrash,
-    FaPlay, FaStop, FaTrophy, FaChevronLeft, FaHeadphones, FaChartLine, 
-    FaLayerGroup, FaBookOpen, FaHashtag, FaFolderOpen, FaMicrophone, FaVolumeUp, 
-    FaFire, FaWaveSquare, FaSun, FaEdit, FaCheck, FaClock, FaSignOutAlt, FaMedal, FaBrain
+    FaTrophy, FaChevronLeft, FaChartLine, FaLayerGroup, FaWaveSquare, 
+    FaClock, FaSignOutAlt, FaMedal, FaBrain
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -17,10 +16,9 @@ import rehypeKatex from "rehype-katex";
 import 'katex/dist/katex.min.css';
 import { 
     doc, setDoc, collection, query, updateDoc, increment, onSnapshot, 
-    orderBy, limit, deleteDoc, getDocs, where 
+    orderBy, limit, deleteDoc
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
-import imageCompression from "browser-image-compression";
 import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
@@ -77,26 +75,13 @@ export default function Chat() {
     const [selectedFile, setSelectedFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
 
-    // Voice States
-    const [isLiveMode, setIsLiveMode] = useState(false);
-    const [isListening, setIsListening] = useState(false);
-    const [isAiSpeaking, setIsAiSpeaking] = useState(false);
-
-    const recognitionRef = useRef(null);
-    const synthesisRef = useRef(window.speechSynthesis);
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
-    const sendMessageRef = useRef(null);
     const activeTheme = themes[theme] || themes.DeepSpace;
 
     // --- 🕒 SYSTEM INITIALIZATION ---
     useEffect(() => {
         const interval = setInterval(() => setTimer(prev => prev + 1), 1000);
-        const loadVoices = () => synthesisRef.current.getVoices();
-        loadVoices();
-        if (synthesisRef.current.onvoiceschanged !== undefined) {
-            synthesisRef.current.onvoiceschanged = loadVoices;
-        }
         return () => clearInterval(interval);
     }, []);
 
@@ -107,110 +92,6 @@ export default function Chat() {
     const handleLogout = async () => {
         try { await auth.signOut(); navigate("/login"); } catch (err) { toast.error("Logout Failed"); }
     };
-
-    // --- 🤖 GEMINI LIVE VOICE ENGINE (UPDATED) ---
-    const getMaleVoice = useCallback(() => {
-        const voices = synthesisRef.current.getVoices();
-        return voices.find(v => v.name.toLowerCase().includes("google uk english male") || v.name.toLowerCase().includes("david") || v.lang === 'en-GB') || voices.find(v => v.lang.startsWith('en')) || voices[0];
-    }, []);
-
-    const stopAllVoice = useCallback(() => {
-        if (synthesisRef.current) synthesisRef.current.cancel();
-        if (recognitionRef.current) {
-            try {
-                recognitionRef.current.onresult = null;
-                recognitionRef.current.onerror = null;
-                recognitionRef.current.onend = null;
-                recognitionRef.current.abort();
-            } catch (e) { console.warn("Mic Reset Info:", e); }
-        }
-        setIsAiSpeaking(false);
-        setIsListening(false);
-    }, []);
-
-    const startListening = useCallback(() => {
-        if (!isLiveMode || isAiSpeaking || synthesisRef.current.speaking) return;
-        
-        const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!Speech) return toast.error("Speech not supported in this browser");
-
-        if (recognitionRef.current) {
-            try { recognitionRef.current.abort(); } catch(e) {}
-        }
-
-        recognitionRef.current = new Speech();
-        recognitionRef.current.continuous = false;
-        recognitionRef.current.interimResults = false;
-        recognitionRef.current.lang = 'en-US';
-        
-        recognitionRef.current.onstart = () => setIsListening(true);
-        recognitionRef.current.onend = () => setIsListening(false);
-        recognitionRef.current.onerror = (event) => {
-            setIsListening(false);
-            if (event.error === 'network') toast.error("Neural Link: Network Failure");
-            if (event.error === 'not-allowed') toast.warn("Neural Link: Mic Access Denied");
-        };
-
-        recognitionRef.current.onresult = (e) => {
-            const text = e.results[0][0].transcript;
-            if (text && sendMessageRef.current) sendMessageRef.current(text);
-        };
-        
-        try { recognitionRef.current.start(); } catch(e) { console.log("Engine busy..."); }
-    }, [isLiveMode, isAiSpeaking]);
-
-    const speak = useCallback((text) => {
-        if (!isLiveMode) return;
-        synthesisRef.current.cancel();
-        
-        // Clean text for clearer speech
-        const cleanText = text
-            .replace(/[*#_~`]/g, "")
-            .replace(/\\\[.*?\\\]/g, "equation") 
-            .replace(/\n/g, " ")
-            .trim();
-
-        if (!cleanText) {
-            if (isLiveMode) setTimeout(startListening, 500);
-            return;
-        }
-
-        const utter = new SpeechSynthesisUtterance(cleanText);
-        utter.voice = getMaleVoice();
-        utter.rate = 1.0;
-        
-        utter.onstart = () => {
-            setIsAiSpeaking(true);
-            if (recognitionRef.current) {
-                try { recognitionRef.current.abort(); } catch(e) {}
-            }
-        };
-
-        utter.onend = () => {
-            setIsAiSpeaking(false);
-            if (isLiveMode) setTimeout(startListening, 800);
-        };
-
-        utter.onerror = () => {
-            setIsAiSpeaking(false);
-            if (isLiveMode) startListening();
-        };
-
-        synthesisRef.current.speak(utter);
-    }, [isLiveMode, getMaleVoice, startListening]);
-
-    const toggleLiveMode = useCallback(() => {
-        if (!isLiveMode) {
-            stopAllVoice();
-            setIsLiveMode(true);
-            toast.success("Neural Link: Established");
-            const intro = `Neural Link Established. I am Dhruva. Analyzing ${subject}. Go ahead.`;
-            speak(intro);
-        } else {
-            setIsLiveMode(false);
-            stopAllVoice();
-        }
-    }, [isLiveMode, subject, speak, stopAllVoice]);
 
     // --- 🏆 XP & LEADERBOARD SYSTEM ---
     useEffect(() => {
@@ -276,15 +157,17 @@ export default function Chat() {
                 ytLink
             };
 
-            setMessages(prev => [...prev, aiMsg]);
-            if (isLiveMode) speak(res.data.reply);
-
-            await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
-                messages: [...messages, userMsg, aiMsg],
-                lastUpdate: Date.now(),
-                title: messages.length === 0 ? text.slice(0, 20) : sessionTitle,
-                subject, chapter
-            }, { merge: true });
+            setMessages(prev => {
+                const updated = [...prev, aiMsg];
+                // Save session in background after AI replies
+                setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
+                    messages: updated,
+                    lastUpdate: Date.now(),
+                    title: sessionTitle === "New Lesson" ? text.slice(0, 20) : sessionTitle,
+                    subject, chapter
+                }, { merge: true });
+                return updated;
+            });
 
             await incrementXP(imgBase64 ? 30 : 15);
 
@@ -293,10 +176,6 @@ export default function Chat() {
         }
         setIsSending(false);
     };
-
-    useEffect(() => {
-        sendMessageRef.current = sendMessage;
-    }, [input, mode, subject, chapter, imagePreview, messages, isLiveMode, currentSessionId, sessionTitle]);
 
     const quickReplies = useMemo(() => {
         if (mode === "Quiz") return ["Start 5 MCQ Quiz", "Hard Mode", "Summary of Progress"];
@@ -318,57 +197,6 @@ export default function Chat() {
         <div className={`flex h-[100dvh] w-full ${activeTheme.bg} ${activeTheme.text} overflow-hidden font-sans selection:bg-indigo-500/30`}>
             <ToastContainer theme={activeTheme.isDark ? "dark" : "light"} />
 
-            {/* --- 💎 FULL VOICE OVERLAY --- */}
-            <AnimatePresence>
-                {isLiveMode && (
-                    <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-between py-20 px-6">
-                        <div className="text-center">
-                            <div className="flex items-center justify-center gap-2 mb-4">
-                                <motion.div animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 2 }} className="w-2 h-2 bg-indigo-500 rounded-full" />
-                                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40">Neural Stream: {mode}</span>
-                            </div>
-                            <h1 className="text-4xl font-black italic tracking-tighter uppercase text-white mb-2">{subject}</h1>
-                            <p className="text-xs font-bold text-white/20 uppercase tracking-widest">{chapter || "Core Concepts"}</p>
-                        </div>
-
-                        <div className="relative flex items-center justify-center">
-                            <motion.div 
-                                animate={{ 
-                                    scale: isAiSpeaking ? [1, 1.05, 1] : 1,
-                                    borderColor: isAiSpeaking ? "rgba(79,70,229,1)" : "rgba(255,255,255,0.1)"
-                                }} 
-                                transition={{ repeat: Infinity, duration: 1.5 }}
-                                className={`w-72 h-72 rounded-full border-[1px] flex items-center justify-center bg-white/[0.01] backdrop-blur-3xl shadow-[0_0_100px_rgba(79,70,229,0.1)]`}
-                            >
-                                <div className="flex items-end gap-2 h-16">
-                                    {[...Array(7)].map((_, i) => (
-                                        <motion.div 
-                                            key={i} 
-                                            animate={{ 
-                                                height: isAiSpeaking ? [15, 80, 15] : isListening ? [15, 40, 15] : 6,
-                                                backgroundColor: isAiSpeaking ? "#6366f1" : "#312e81"
-                                            }} 
-                                            transition={{ repeat: Infinity, duration: 0.4, delay: i * 0.05 }} 
-                                            className="w-2 rounded-full" 
-                                        />
-                                    ))}
-                                </div>
-                            </motion.div>
-                        </div>
-
-                        <div className="flex flex-col items-center gap-8 w-full max-w-xs">
-                            <p className="text-xs font-black tracking-[0.2em] uppercase text-indigo-400">
-                                {isAiSpeaking ? "Dhruva is communicating..." : isListening ? "Neural Input Active..." : "Standing By"}
-                            </p>
-                            <button onClick={toggleLiveMode} className="w-full py-6 bg-white/5 hover:bg-red-500/20 rounded-3xl border border-white/10 text-white transition-all active:scale-95 flex items-center justify-center gap-4 group">
-                                <FaTimes className="group-hover:rotate-90 transition-transform"/>
-                                <span className="text-[10px] font-black uppercase tracking-widest">Disconnect Link</span>
-                            </button>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
             {/* --- 🛠️ SIDEBAR --- */}
             <AnimatePresence>
                 {showSidebar && (
@@ -384,7 +212,6 @@ export default function Chat() {
                             </div>
 
                             <div className="space-y-8 flex-1 overflow-y-auto no-scrollbar">
-                                {/* XP Card */}
                                 <div className={`p-6 rounded-[2rem] border ${activeTheme.border} ${activeTheme.card} bg-gradient-to-br from-indigo-600/5 to-transparent`}>
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="p-3 bg-indigo-600/20 rounded-2xl text-indigo-500">
@@ -404,7 +231,6 @@ export default function Chat() {
                                     </div>
                                 </div>
 
-                                {/* Leaderboard */}
                                 <div className="space-y-4">
                                     <label className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30 px-2 flex items-center gap-2"><FaMedal/> Top Scholars</label>
                                     <div className="space-y-2">
@@ -522,7 +348,6 @@ export default function Chat() {
                             </div>
                         </div>
 
-                        {/* Image Preview Bubble */}
                         <AnimatePresence>
                             {imagePreview && (
                                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-20 h-20 ml-4 mb-2">
@@ -547,9 +372,6 @@ export default function Chat() {
                                 onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
                             />
                             <div className="flex gap-2 pr-2 pb-2">
-                                <button onClick={toggleLiveMode} className={`p-5 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 text-white animate-pulse' : 'bg-white/5 hover:bg-white/10'}`}>
-                                    <FaHeadphones size={22}/>
-                                </button>
                                 <button onClick={() => sendMessage()} disabled={isSending} className="p-5 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 active:scale-90 transition-all disabled:opacity-50">
                                     <FaPaperPlane size={22}/>
                                 </button>
