@@ -11,36 +11,46 @@ export default function Navbar({ userData }) {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
 
-    const environments = ["DeepSpace", "Light", "Sakura", "Cyberpunk"];
+    // Mapping variables from userData to fix 'not defined' errors
     const theme = userData?.theme || "DeepSpace";
+    const photoURL = userData?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData?.uid || 'default'}`;
+    const displayName = userData?.displayName || "Scholar";
+    const environments = ["DeepSpace", "Light", "Sakura", "Cyberpunk"];
 
     const setTheme = async (newTheme) => {
         if (!auth.currentUser) return;
         try {
             await updateDoc(doc(db, "users", auth.currentUser.uid), { theme: newTheme });
-        } catch (err) { console.error("Theme Error", err); }
+        } catch (err) { 
+            console.error("Theme Error", err); 
+        }
     };
 
     const handleLogout = async () => {
         setIsLoggingOut(true);
-        try { await auth.signOut(); navigate("/login"); } catch (err) { setIsLoggingOut(false); }
+        try { 
+            await auth.signOut(); 
+            navigate("/login"); 
+        } catch (err) { 
+            setIsLoggingOut(false); 
+        }
     };
 
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setDropdownOpen(false);
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+                setDropdownOpen(false);
+            }
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const photoURL = userData?.photoURL || "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix";
-    const displayName = userData?.displayName || "Scholar";
-
     return (
         <nav className="sticky top-0 z-[500] w-full border-b border-white/10 bg-black/10 backdrop-blur-xl transition-all duration-500">
             <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
                 
+                {/* User Profile Section */}
                 <motion.div 
                     whileHover={{ x: 4 }}
                     className="flex items-center gap-4 cursor-pointer group"
@@ -48,7 +58,11 @@ export default function Navbar({ userData }) {
                 >
                     <div className="relative">
                         <div className="absolute -inset-1 rounded-full bg-indigo-500/20 blur-md opacity-0 group-hover:opacity-100 transition-opacity" />
-                        <img src={photoURL} className="relative w-10 h-10 rounded-full object-cover border border-white/10 group-hover:border-indigo-500/50 transition-all" alt="Avatar" />
+                        <img 
+                            src={photoURL} 
+                            className="relative w-10 h-10 rounded-full object-cover border border-white/10 group-hover:border-indigo-500/50 transition-all" 
+                            alt="Avatar" 
+                        />
                         <div className="absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-black bg-emerald-500" />
                     </div>
                     <div className="hidden sm:block">
@@ -57,6 +71,7 @@ export default function Navbar({ userData }) {
                     </div>
                 </motion.div>
 
+                {/* Theme & Logout Controls */}
                 <div className="flex items-center gap-3" ref={dropdownRef}>
                     <div className="relative">
                         <button 
@@ -91,7 +106,10 @@ export default function Navbar({ userData }) {
                         </AnimatePresence>
                     </div>
 
-                    <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all">
+                    <button 
+                        onClick={handleLogout} 
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all"
+                    >
                         {isLoggingOut ? <FaHourglassHalf className="animate-spin text-xs" /> : <FaSignOutAlt className="text-xs" />}
                         <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest">Exit</span>
                     </button>
