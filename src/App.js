@@ -5,7 +5,7 @@ import { ToastContainer } from "react-toastify";
 import { AnimatePresence, motion } from "framer-motion";
 import "react-toastify/dist/ReactToastify.css";
 import { HelmetProvider } from 'react-helmet-async';
-
+import LiveMode from "./pages/LiveMode"; // Import the new page
 import LoginPage from "./pages/LoginPage";
 import Register from "./pages/Register";
 import Chat from "./pages/Chat";
@@ -75,7 +75,8 @@ function AppContent() {
         )}
       </AnimatePresence>
 
-          <Route path="/live" element={<LiveMode />} />
+          <Route path="/chat" element={<Chat />} />
+<Route path="/live" element={<LiveMode />} />
 
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
