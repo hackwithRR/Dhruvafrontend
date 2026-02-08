@@ -1,138 +1,186 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { FaUser, FaSignOutAlt, FaChevronDown, FaHourglassHalf, FaMedal } from "react-icons/fa";
-import { MdColorLens } from "react-icons/md";
+import { FaUser, FaSignOutAlt, FaChevronDown, FaHourglassHalf, FaMedal, FaPalette, FaRocket, FaShieldAlt } from "react-icons/fa";
 import { toast } from "react-toastify";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function Navbar({ currentUser, theme, setTheme, logout, userData }) {
     const navigate = useNavigate();
     const location = useLocation();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const dropdownRef = useRef(null);
 
     const isProfilePage = location.pathname === "/profile";
-    const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || "Student";
-    const photoURL = currentUser?.photoURL || `https://ui-avatars.com/api/?name=${displayName}&background=6366f1&color=fff`;
+    const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || "Scholar";
+    const photoURL = currentUser?.photoURL || `https://ui-avatars.com/api/?name=${displayName}&background=6366f1&color=fff&bold=true`;
 
-    // --- SYNCED WITH MASTER THEMES ---
+    // --- 🎨 DYNAMIC THEME ENGINE ---
     const themeConfigs = {
-        DeepSpace: { nav: "bg-[#050505]/80 border-white/10 text-white backdrop-blur-md", dropdown: "bg-[#0A0A0A] text-white border-white/10", btn: "hover:bg-indigo-600/20" },
-        Light: { nav: "bg-white/90 border-gray-200 text-gray-900 backdrop-blur-md shadow-sm", dropdown: "bg-white text-gray-900 border-gray-200 shadow-xl", btn: "hover:bg-gray-100 border-gray-200 text-gray-700" },
-        Sakura: { nav: "bg-[#1a0f12]/80 border-rose-500/20 text-rose-100 backdrop-blur-md", dropdown: "bg-[#221418] text-rose-100 border-rose-500/20", btn: "hover:bg-rose-500/20" },
-        Forest: { nav: "bg-[#0a120a]/80 border-emerald-500/20 text-emerald-100 backdrop-blur-md", dropdown: "bg-[#0e1a0e] text-emerald-100 border-emerald-500/20", btn: "hover:bg-emerald-500/20" },
-        Cyberpunk: { nav: "bg-[#0a0512]/80 border-cyan-500/30 text-cyan-100 backdrop-blur-md", dropdown: "bg-[#120a1a] text-cyan-100 border-cyan-500/30", btn: "hover:bg-cyan-500/20" }
+        DeepSpace: { 
+            nav: "bg-[#050505]/80 border-white/5 text-white backdrop-blur-2xl", 
+            dropdown: "bg-[#0c0c0c] border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.7)]",
+            accent: "text-indigo-400",
+            glow: "bg-indigo-500/20",
+            border: "border-indigo-500/30",
+            dot: "bg-indigo-500",
+            btn: "hover:bg-indigo-500/10 text-indigo-100",
+            subtext: "text-indigo-400/50"
+        },
+        Light: { 
+            nav: "bg-white/80 border-slate-200 text-slate-900 backdrop-blur-2xl shadow-sm", 
+            dropdown: "bg-white border-slate-200 shadow-xl",
+            accent: "text-indigo-600",
+            glow: "bg-slate-100",
+            border: "border-slate-200",
+            dot: "bg-indigo-600",
+            btn: "hover:bg-slate-100 text-slate-600",
+            subtext: "text-slate-400"
+        },
+        Sakura: { 
+            nav: "bg-[#1a0f12]/80 border-rose-500/20 text-rose-50 backdrop-blur-2xl", 
+            dropdown: "bg-[#221418] border-rose-500/20 shadow-[0_20px_50px_rgba(255,50,100,0.15)]",
+            accent: "text-rose-400",
+            glow: "bg-rose-500/10",
+            border: "border-rose-500/30",
+            dot: "bg-rose-500",
+            btn: "hover:bg-rose-500/10 text-rose-200",
+            subtext: "text-rose-400/50"
+        },
+        Cyberpunk: { 
+            nav: "bg-[#050a12]/80 border-cyan-500/20 text-cyan-50 backdrop-blur-2xl", 
+            dropdown: "bg-[#0a101f] border-cyan-500/20 shadow-[0_20px_50px_rgba(0,255,255,0.1)]",
+            accent: "text-cyan-400",
+            glow: "bg-cyan-500/10",
+            border: "border-cyan-500/30",
+            dot: "bg-cyan-500",
+            btn: "hover:bg-cyan-500/10 text-cyan-200",
+            subtext: "text-cyan-400/50"
+        }
     };
 
     const config = themeConfigs[theme] || themeConfigs.DeepSpace;
-    const isLightTheme = theme === "Light";
 
     const handleLogout = async () => {
+        setIsLoggingOut(true);
         try {
-            toast.success("Logging out...");
-            setIsLoggingOut(true);
             await logout();
-            setTimeout(() => navigate("/"), 1500);
-        } catch (e) { 
-            toast.error("Logout error"); 
+            toast.success("Session Ended");
+            navigate("/login");
+        } catch (e) {
+            toast.error("Exit Failed");
             setIsLoggingOut(false);
         }
     };
 
+    useEffect(() => {
+        const handleClick = (e) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setDropdownOpen(false);
+        };
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, []);
+
     return (
-        <nav className={`sticky top-0 z-[100] flex items-center justify-between px-4 md:px-8 py-3 border-b transition-all duration-500 ${config.nav}`}>
-            
-            {/* LEFT: USER PROFILE & DISPLAY NAME */}
-            <div
-                className="flex items-center gap-3 cursor-pointer active:scale-95 transition-transform group"
-                onClick={() => !isLoggingOut && navigate("/profile")}
-            >
-                <div className="relative">
-                    <img 
-                        src={photoURL} 
-                        className={`w-10 h-10 md:w-11 md:h-11 rounded-full border-2 object-cover shadow-lg transition-all 
-                            ${isLoggingOut ? "grayscale" : "group-hover:border-indigo-500"} 
-                            ${isLightTheme ? 'border-gray-200 shadow-gray-200' : 'border-white/20 shadow-black/40'}`} 
-                        alt="User" 
-                    />
-                    {!isLoggingOut && <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-black rounded-full" />}
-                </div>
-                <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                        <span className={`font-black text-sm md:text-base tracking-tight leading-tight transition-colors ${isLightTheme ? 'text-gray-900' : 'text-white'}`}>
-                            {displayName}
-                        </span>
-                        {/* XP Badge next to name */}
-                        {userData?.xp > 0 && (
-                            <div className="flex items-center gap-1 bg-yellow-500/10 px-1.5 py-0.5 rounded border border-yellow-500/20">
-                                <FaMedal className="text-yellow-500 text-[8px]" />
-                                <span className="text-[8px] font-black text-yellow-500">{userData.xp}</span>
-                            </div>
-                        )}
+        <nav className={`sticky top-0 z-[100] w-full border-b transition-all duration-700 ${config.nav}`}>
+            <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
+                
+                {/* --- LEFT: USER HUD --- */}
+                <div 
+                    className="flex items-center gap-4 cursor-pointer group"
+                    onClick={() => !isLoggingOut && navigate("/profile")}
+                >
+                    <div className="relative">
+                        {/* Dynamic Theme Glow */}
+                        <div className={`absolute -inset-1 rounded-full blur-md opacity-0 group-hover:opacity-40 transition-opacity duration-500 ${config.dot}`}></div>
+                        
+                        <img 
+                            src={photoURL} 
+                            className={`relative w-10 h-10 rounded-full object-cover border-2 transition-transform group-hover:scale-105 duration-300 ${config.border}`} 
+                            alt="Avatar" 
+                        />
+                        
+                        <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${theme === 'Light' ? 'border-white' : 'border-black'} bg-emerald-500`} />
                     </div>
-                    <span className={`text-[9px] font-black uppercase tracking-[0.15em] ${isLightTheme ? 'text-indigo-600' : 'text-indigo-400 opacity-70'}`}>
-                        {isLoggingOut ? "Ending Session..." : isProfilePage ? "Account Settings" : "Dhruva Intelligence"}
-                    </span>
+
+                    <div className="hidden sm:block">
+                        <div className="flex items-center gap-2">
+                            <span className="font-black text-[13px] uppercase tracking-wider">{displayName}</span>
+                            {userData?.xp > 0 && (
+                                <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black border transition-colors ${config.border} ${config.glow}`}>
+                                    <FaRocket className={config.accent} size={8}/> 
+                                    <span className={config.accent}>{userData.xp}</span>
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                            <FaShieldAlt className={`text-[8px] ${config.accent} opacity-50`} />
+                            <p className={`text-[8px] font-black uppercase tracking-[0.25em] ${config.subtext}`}>
+                                System Authenticated
+                            </p>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            {/* RIGHT: TOOLS & ACTIONS */}
-            <div className="flex items-center gap-2 md:gap-4">
-                {isLoggingOut ? (
-                    <div className="flex items-center gap-2 text-xs font-bold animate-pulse"><FaHourglassHalf className="animate-spin" /> Syncing...</div>
-                ) : (
-                    <>
-                        {/* PROFILE LINK (DESKTOP) */}
-                        {!isProfilePage && (
-                            <button onClick={() => navigate("/profile")} className={`hidden md:flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black tracking-widest border transition-all ${config.btn} ${isLightTheme ? 'border-gray-200' : 'border-white/10'}`}>
-                                <FaUser /> PROFILE
-                            </button>
-                        )}
-
-                        {/* THEME DROPDOWN */}
-                        {!isProfilePage && (
-                            <div className="relative">
-                                <button 
-                                    onClick={() => setDropdownOpen(!dropdownOpen)} 
-                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all active:scale-90 text-xs font-bold ${config.dropdown} ${isLightTheme ? 'border-gray-200' : 'border-white/10'}`}
-                                >
-                                    <MdColorLens className="text-base" />
-                                    <span className="hidden lg:inline uppercase tracking-tighter">{theme}</span>
-                                    <FaChevronDown className={`text-[10px] transition-transform duration-300 ${dropdownOpen ? "rotate-180" : ""}`} />
-                                </button>
-
-                                {dropdownOpen && (
-                                    <>
-                                        <div className="fixed inset-0 z-[-1]" onClick={() => setDropdownOpen(false)} />
-                                        <div className={`absolute right-0 mt-2 w-44 rounded-2xl shadow-2xl border p-2 z-[110] grid grid-cols-1 gap-1 ${config.dropdown} ${isLightTheme ? 'border-gray-200' : 'border-white/10'}`}>
-                                            <p className={`text-[8px] font-black uppercase px-3 py-1 ${isLightTheme ? 'text-gray-400' : 'opacity-40'}`}>Select Environment</p>
-                                            <div className="max-h-[60vh] overflow-y-auto no-scrollbar">
-                                                {Object.keys(themeConfigs).map(t => (
-                                                    <button 
-                                                        key={t} 
-                                                        className={`flex items-center justify-between w-full text-left px-3 py-2.5 text-[10px] font-bold rounded-lg transition-all ${theme === t ? (isLightTheme ? 'bg-indigo-50 text-indigo-600' : 'bg-white/10') : (isLightTheme ? 'hover:bg-gray-50' : 'hover:bg-white/5')}`} 
-                                                        onClick={() => { setTheme(t); setDropdownOpen(false); }}
-                                                    >
-                                                        <span className="capitalize">{t}</span>
-                                                        {theme === t && <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        )}
-
-                        {/* EXIT BUTTON */}
+                {/* --- RIGHT: HUD CONTROLS --- */}
+                <div className="flex items-center gap-2 md:gap-4" ref={dropdownRef}>
+                    
+                    {/* Theme Portal */}
+                    <div className="relative">
                         <button 
-                            onClick={handleLogout} 
-                            className={`flex items-center justify-center w-10 h-10 md:w-auto md:px-5 md:py-2.5 rounded-xl text-xs font-black border transition-all active:scale-90 ${isLightTheme ? 'border-rose-200 text-rose-500 hover:bg-rose-500 hover:text-white' : 'border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white'}`}
+                            onClick={() => setDropdownOpen(!dropdownOpen)}
+                            className={`group flex items-center gap-2 px-3 py-2 rounded-xl border transition-all active:scale-95 ${config.border} ${config.glow} hover:border-opacity-100 border-opacity-40`}
                         >
-                            <FaSignOutAlt />
-                            <span className="hidden md:inline ml-2 uppercase tracking-widest">Exit</span>
+                            <FaPalette className={`text-xs transition-transform group-hover:rotate-12 ${config.accent}`} />
+                            <span className={`hidden lg:inline text-[9px] font-black uppercase tracking-widest ${config.accent}`}>Environment</span>
+                            <FaChevronDown className={`text-[8px] opacity-40 transition-transform duration-300 ${dropdownOpen ? 'rotate-180' : ''}`} />
                         </button>
-                    </>
-                )}
+
+                        <AnimatePresence>
+                            {dropdownOpen && (
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                                    className={`absolute right-0 mt-3 w-44 p-1.5 rounded-2xl border backdrop-blur-3xl z-[110] ${config.dropdown}`}
+                                >
+                                    <p className="px-3 py-2 text-[7px] font-black uppercase opacity-30 tracking-[0.2em]">Switch Link</p>
+                                    {Object.entries(themeConfigs).map(([key, cfg]) => (
+                                        <button 
+                                            key={key}
+                                            onClick={() => { setTheme(key); setDropdownOpen(false); }}
+                                            className={`flex items-center justify-between w-full p-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${theme === key ? 'bg-white/5 opacity-100' : 'opacity-40 hover:opacity-100 hover:bg-white/5'}`}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${cfg.dot} shadow-[0_0_8px_rgba(0,0,0,0.5)]`} />
+                                                {key}
+                                            </div>
+                                            {theme === key && <div className={`w-1 h-3 rounded-full ${cfg.dot}`} />}
+                                        </button>
+                                    ))}
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
+                    {/* Exit Matrix */}
+                    <button 
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        className={`flex items-center gap-2.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border group
+                            ${theme === 'Light' 
+                                ? 'border-red-200 text-red-500 hover:bg-red-500 hover:text-white' 
+                                : 'border-red-500/20 text-red-500 bg-red-500/5 hover:bg-red-500/20 hover:border-red-500/50'
+                            }`}
+                    >
+                        {isLoggingOut ? (
+                            <FaHourglassHalf className="animate-spin" />
+                        ) : (
+                            <FaSignOutAlt className="group-hover:translate-x-0.5 transition-transform" />
+                        )}
+                        <span className="hidden md:inline">Terminate</span>
+                    </button>
+                </div>
             </div>
         </nav>
     );
