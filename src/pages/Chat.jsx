@@ -24,7 +24,6 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // --- 🔧 FIXED API BASE DEFINITION ---
 const API_URL = process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app";
-// Fix: Use string slicing instead of Regex to prevent build errors
 const API_BASE = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 
 const syllabusData = {
@@ -85,7 +84,11 @@ export default function Chat() {
   const fileInputRef = useRef(null);
   const activeTheme = themes[theme] || themes.DeepSpace;
 
-  // --- 🤖 GEMINI LIVE VOICE ENGINE ---
+  // --- 🛠️ FIXED NEURAL LINK LOGIC ---
+  // Using refs to hold function references to break circular dependency loops
+  const sendMessageRef = useRef();
+  const startListeningRef = useRef();
+
   const getMaleVoice = useCallback(() => {
     const voices = synthesisRef.current.getVoices();
     return voices.find(v => 
@@ -101,7 +104,7 @@ export default function Chat() {
     
     const cleanText = text
         .replace(/[*_`~]/g, '')
-        .replace(/\\\[.*?\\\]/g, '') // Remove LaTeX brackets
+        .replace(/\\\[.*?\\\]/g, '') 
         .replace(/\n/g, ' ')
         .trim();
         
@@ -114,25 +117,24 @@ export default function Chat() {
     
     utterance.onstart = () => {
         setIsAiSpeaking(true);
-        if (recognitionRef.current) recognitionRef.current.stop(); // Ensure mic is off while speaking
+        // Kill mic immediately when AI starts talking to prevent echo/errors
+        if (recognitionRef.current) {
+            try { recognitionRef.current.stop(); } catch(e) {}
+        }
     };
     
     utterance.onend = () => {
         setIsAiSpeaking(false);
-        if (isLiveMode) {
-             // Small delay before listening again to avoid picking up echo
-            setTimeout(startListening, 500);
+        if (isLiveMode && startListeningRef.current) {
+            // Small delay ensures the hardware is released before mic starts
+            setTimeout(() => startListeningRef.current(), 600);
         }
     };
     
     utterance.onerror = () => setIsAiSpeaking(false);
     synthesisRef.current.speak(utterance);
-  }, [isLiveMode, getMaleVoice]); // Added dependencies
+  }, [isLiveMode, getMaleVoice]);
 
-  // Define startListening AFTER speak to avoid circular dependency, or use ref for speak if needed.
-  // Ideally, define startListening first, but it calls sendMessage, which calls speak.
-  // To resolve: we can pass `speak` into sendMessage or rely on the stable reference.
-  
   const sendMessage = async (override = null) => {
     const text = override || input;
     if (isSending || (!text.trim() && !imagePreview)) return;
@@ -168,12 +170,10 @@ export default function Chat() {
 
       setMessages(prev => [...prev, aiMsg]);
       
-      // Trigger Voice if Live Mode is active
       if (isLiveMode) {
         speak(res.data.reply);
       }
 
-      // Save Session
       await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
         messages: [...messages, userMsg, aiMsg],
         lastUpdate: Date.now(),
@@ -181,7 +181,6 @@ export default function Chat() {
         subject, chapter
       }, { merge: true });
 
-      // XP Update
       await updateDoc(doc(db, "users", currentUser.uid), { 
         xp: increment(img ? 30 : 15), 
         dailyXp: increment(img ? 30 : 15) 
@@ -198,28 +197,24 @@ export default function Chat() {
     if (!isLiveMode || isAiSpeaking) return;
     
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        toast.error("Speech Recognition not supported.");
-        return;
+    if (!SpeechRecognition) return;
+
+    if (recognitionRef.current) {
+        try { recognitionRef.current.stop(); } catch(e) {}
     }
 
-    if (recognitionRef.current) recognitionRef.current.stop();
-
     recognitionRef.current = new SpeechRecognition();
-    recognitionRef.current.continuous = false; // False is often more stable for turn-based chat
+    recognitionRef.current.continuous = false; 
     recognitionRef.current.interimResults = false;
     recognitionRef.current.lang = 'en-US';
     
     recognitionRef.current.onstart = () => setIsListening(true);
-    
-    recognitionRef.current.onend = () => {
-        setIsListening(false);
-    };
+    recognitionRef.current.onend = () => setIsListening(false);
     
     recognitionRef.current.onresult = (event) => {
         const transcript = event.results[0][0].transcript.trim();
-        if (transcript) {
-            sendMessage(transcript);
+        if (transcript && sendMessageRef.current) {
+            sendMessageRef.current(transcript);
         }
     };
     
@@ -228,14 +223,18 @@ export default function Chat() {
     } catch (e) {
         console.error("Mic busy");
     }
-  }, [isLiveMode, isAiSpeaking]); // removed sendMessage from dep array to avoid loops, purely relying on current scope
+  }, [isLiveMode, isAiSpeaking]);
+
+  // Sync refs to ensure the voice callbacks always have access to the latest logic
+  useEffect(() => { sendMessageRef.current = sendMessage; }, [messages, input, mode, subject, chapter, userData, isSending]);
+  useEffect(() => { startListeningRef.current = startListening; }, [startListening]);
 
   const toggleLiveMode = useCallback(() => {
     if (!isLiveMode) {
         setIsLiveMode(true);
         toast.info("🔴 Neural Link Active");
         const intro = `Link established. Ready for ${subject}.`;
-        speak(intro); // speak will trigger startListening onEnd
+        speak(intro);
     } else {
         setIsLiveMode(false);
         setIsListening(false);
@@ -249,8 +248,6 @@ export default function Chat() {
   // --- 🕒 SYSTEM INIT ---
   useEffect(() => {
     const interval = setInterval(() => setTimer(prev => prev + 1), 1000);
-    
-    // Initialize voices
     const loadVoices = () => { synthesisRef.current.getVoices(); };
     loadVoices();
     synthesisRef.current.onvoiceschanged = loadVoices;
