@@ -86,13 +86,47 @@ export default function Chat() {
   const activeTheme = themes[theme] || themes.DeepSpace;
 
   // --- 🤖 GEMINI LIVE VOICE ENGINE ---
- const startLiveNeuralLink = () => {
-    // We pass the current state so the Live Page is "Context Aware"
+ // --- 🤖 GEMINI LIVE VOICE ENGINE (Re-ordered for Build) ---
+
+// 1. Define the Voice Selector First
+const getMaleVoice = useCallback(() => {
+    const voices = synthesisRef.current.getVoices();
+    return voices.find(v => 
+        v.name.toLowerCase().includes("google uk english male") || 
+        v.name.toLowerCase().includes("david") || 
+        v.lang === 'en-GB'
+    ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+}, []);
+
+// 2. Define Speak (which uses getMaleVoice)
+const speak = useCallback((text) => {
+    // Only speak if we are NOT navigating to a new page (Live Mode)
+    // If you've moved to a new page, you can actually remove this 
+    // from Chat.jsx to prevent build errors!
+    synthesisRef.current.cancel();
+    const cleanText = text.replace(/[*_`~]/g, '').replace(/\\\[.*?\\\]/g, '').replace(/\n/g, ' ').trim();
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.voice = getMaleVoice(); // Now it's defined!
+    utterance.rate = 1.0;
+    
+    utterance.onstart = () => setIsAiSpeaking(true);
+    utterance.onend = () => setIsAiSpeaking(false);
+    synthesisRef.current.speak(utterance);
+}, [getMaleVoice]);
+
+// 3. Define navigation to the NEW Live Page
+const handleStartLiveMode = () => {
+    // Kill any existing speech before leaving
+    synthesisRef.current.cancel();
+    if (recognitionRef.current) recognitionRef.current.stop();
+
     navigate("/live", { 
         state: { 
-            subject: subject, 
-            chapter: chapter,
-            userData: userData 
+            subject, 
+            chapter, 
+            userData 
         } 
     });
 };
