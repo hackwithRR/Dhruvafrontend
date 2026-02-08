@@ -1,10 +1,10 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-   apiKey: "AIzaSyBOFHLJwdanETImp6TlPT8U7GdouprQfnc",
+  apiKey: "AIzaSyBOFHLJwdanETImp6TlPT8U7GdouprQfnc",
   authDomain: "ai-tutor-b89dd.firebaseapp.com",
   projectId: "ai-tutor-b89dd",
   storageBucket: "ai-tutor-b89dd.firebasestorage.app",
@@ -16,5 +16,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
+const provider = new GoogleAuthProvider(); // Fixed missing provider
 
-export { app, auth, db, storage };
+export { app, auth, db, storage, provider };
