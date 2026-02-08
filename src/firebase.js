@@ -13,12 +13,18 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// Main Services
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// Configure Google Provider
-export const provider = new GoogleAuthProvider();
-provider.setCustomParameters({ prompt: 'select_account' });
+// Google Auth Configuration
+// Exporting as both 'provider' and 'googleProvider' to ensure compatibility 
+// with whatever your untouched components are expecting.
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+export { googleProvider, googleProvider as provider };
 
 export default app;
