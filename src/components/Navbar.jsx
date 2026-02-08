@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { FaUser, FaSignOutAlt, FaChevronDown, FaHourglassHalf, FaMedal, FaPalette, FaRocket, FaShieldAlt } from "react-icons/fa";
 import { toast } from "react-toastify";
 import { motion, AnimatePresence } from "framer-motion";
+import { doc, updateDoc } from "firebase/firestore"; // Added for Sync
+import { db } from "../firebase"; // Ensure path is correct
 
 export default function Navbar({ currentUser, theme, setTheme, logout, userData }) {
     const navigate = useNavigate();
@@ -12,10 +14,12 @@ export default function Navbar({ currentUser, theme, setTheme, logout, userData 
     const dropdownRef = useRef(null);
 
     const isProfilePage = location.pathname === "/profile";
-    const displayName = currentUser?.displayName || currentUser?.email?.split('@')[0] || "Scholar";
+    
+    // Unified Naming: Matches Chat.js exactly
+    const displayName = userData?.displayName || currentUser?.displayName || currentUser?.email?.split('@')[0] || "Scholar";
     const photoURL = currentUser?.photoURL || `https://ui-avatars.com/api/?name=${displayName}&background=6366f1&color=fff&bold=true`;
 
-    // --- 🎨 DYNAMIC THEME ENGINE ---
+    // --- 🎨 THEME ENGINE CONFIG ---
     const themeConfigs = {
         DeepSpace: { 
             nav: "bg-[#050505]/80 border-white/5 text-white backdrop-blur-2xl", 
@@ -23,7 +27,7 @@ export default function Navbar({ currentUser, theme, setTheme, logout, userData 
             accent: "text-indigo-400",
             glow: "bg-indigo-500/20",
             border: "border-indigo-500/30",
-            dot: "bg-indigo-500",
+            dot: "bg-indigo-50",
             btn: "hover:bg-indigo-500/10 text-indigo-100",
             subtext: "text-indigo-400/50"
         },
@@ -61,6 +65,20 @@ export default function Navbar({ currentUser, theme, setTheme, logout, userData 
 
     const config = themeConfigs[theme] || themeConfigs.DeepSpace;
 
+    // --- 🚀 THEME SYNC FUNCTION ---
+    const changeTheme = async (newTheme) => {
+        setTheme(newTheme); // Local update for instant feel
+        setDropdownOpen(false);
+        if (currentUser) {
+            try {
+                const userRef = doc(db, "users", currentUser.uid);
+                await updateDoc(userRef, { theme: newTheme });
+            } catch (err) {
+                console.error("Theme Sync Error:", err);
+            }
+        }
+    };
+
     const handleLogout = async () => {
         setIsLoggingOut(true);
         try {
@@ -82,24 +100,21 @@ export default function Navbar({ currentUser, theme, setTheme, logout, userData 
     }, []);
 
     return (
-        <nav className={`sticky top-0 z-[100] w-full border-b transition-all duration-700 ${config.nav}`}>
+        <nav className={`sticky top-0 z-[500] w-full border-b transition-all duration-700 ${config.nav}`}>
             <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
                 
-                {/* --- LEFT: USER HUD --- */}
+                {/* LEFT: USER HUD */}
                 <div 
                     className="flex items-center gap-4 cursor-pointer group"
                     onClick={() => !isLoggingOut && navigate("/profile")}
                 >
                     <div className="relative">
-                        {/* Dynamic Theme Glow */}
                         <div className={`absolute -inset-1 rounded-full blur-md opacity-0 group-hover:opacity-40 transition-opacity duration-500 ${config.dot}`}></div>
-                        
                         <img 
                             src={photoURL} 
                             className={`relative w-10 h-10 rounded-full object-cover border-2 transition-transform group-hover:scale-105 duration-300 ${config.border}`} 
                             alt="Avatar" 
                         />
-                        
                         <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 ${theme === 'Light' ? 'border-white' : 'border-black'} bg-emerald-500`} />
                     </div>
 
@@ -122,10 +137,10 @@ export default function Navbar({ currentUser, theme, setTheme, logout, userData 
                     </div>
                 </div>
 
-                {/* --- RIGHT: HUD CONTROLS --- */}
+                {/* RIGHT: HUD CONTROLS */}
                 <div className="flex items-center gap-2 md:gap-4" ref={dropdownRef}>
                     
-                    {/* Theme Portal */}
+                    {/* Environment Toggle */}
                     <div className="relative">
                         <button 
                             onClick={() => setDropdownOpen(!dropdownOpen)}
@@ -142,13 +157,13 @@ export default function Navbar({ currentUser, theme, setTheme, logout, userData 
                                     initial={{ opacity: 0, y: 8, scale: 0.98 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, y: 8, scale: 0.98 }}
-                                    className={`absolute right-0 mt-3 w-44 p-1.5 rounded-2xl border backdrop-blur-3xl z-[110] ${config.dropdown}`}
+                                    className={`absolute right-0 mt-3 w-44 p-1.5 rounded-2xl border backdrop-blur-3xl z-[600] ${config.dropdown}`}
                                 >
                                     <p className="px-3 py-2 text-[7px] font-black uppercase opacity-30 tracking-[0.2em]">Switch Link</p>
                                     {Object.entries(themeConfigs).map(([key, cfg]) => (
                                         <button 
                                             key={key}
-                                            onClick={() => { setTheme(key); setDropdownOpen(false); }}
+                                            onClick={() => changeTheme(key)}
                                             className={`flex items-center justify-between w-full p-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${theme === key ? 'bg-white/5 opacity-100' : 'opacity-40 hover:opacity-100 hover:bg-white/5'}`}
                                         >
                                             <div className="flex items-center gap-3">
@@ -163,7 +178,7 @@ export default function Navbar({ currentUser, theme, setTheme, logout, userData 
                         </AnimatePresence>
                     </div>
 
-                    {/* Exit Matrix */}
+                    {/* Termination (Logout) */}
                     <button 
                         onClick={handleLogout}
                         disabled={isLoggingOut}
