@@ -96,8 +96,8 @@ export default function Chat() {
     // --- 🏆 XP & LEADERBOARD SYSTEM ---
     useEffect(() => {
         if (!currentUser) return;
-        const unsubUser = onSnapshot(doc(db, "users", currentUser.uid), (doc) => {
-            if (doc.exists()) setUserData(doc.data());
+        const unsubUser = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
+            if (docSnap.exists()) setUserData(docSnap.data());
         });
         const q = query(collection(db, "users"), orderBy("xp", "desc"), limit(5));
         const unsubLeader = onSnapshot(q, (snap) => {
@@ -107,6 +107,7 @@ export default function Chat() {
     }, [currentUser]);
 
     const incrementXP = async (amount) => {
+        if (!currentUser) return;
         const userRef = doc(db, "users", currentUser.uid);
         await updateDoc(userRef, { xp: increment(amount), dailyXp: increment(amount) });
     };
@@ -159,7 +160,6 @@ export default function Chat() {
 
             setMessages(prev => {
                 const updated = [...prev, aiMsg];
-                // Save session in background after AI replies
                 setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
                     messages: updated,
                     lastUpdate: Date.now(),
@@ -219,15 +219,15 @@ export default function Chat() {
                                         </div>
                                         <div className="text-right">
                                             <div className="text-3xl font-black tracking-tighter">LVL {calculateLevel(userData.xp)}</div>
-                                            <div className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{userData.xp} Total XP</div>
+                                            <div className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{userData.xp || 0} Total XP</div>
                                         </div>
                                     </div>
                                     <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-2">
-                                        <motion.div initial={{ width: 0 }} animate={{ width: `${(userData.dailyXp / 500) * 100}%` }} className="h-full bg-indigo-500" />
+                                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(((userData.dailyXp || 0) / 500) * 100, 100)}%` }} className="h-full bg-indigo-500" />
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <p className="text-[9px] font-black uppercase text-indigo-400">Daily Goal</p>
-                                        <p className="text-[9px] font-black uppercase opacity-40">{userData.dailyXp}/500 XP</p>
+                                        <p className="text-[9px] font-black uppercase opacity-40">{userData.dailyXp || 0}/500 XP</p>
                                     </div>
                                 </div>
 
@@ -235,12 +235,12 @@ export default function Chat() {
                                     <label className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30 px-2 flex items-center gap-2"><FaMedal/> Top Scholars</label>
                                     <div className="space-y-2">
                                         {leaderboard.map((user, idx) => (
-                                            <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border ${activeTheme.border} ${user.id === currentUser.uid ? 'bg-indigo-600/10 border-indigo-500/30' : 'bg-white/[0.02]'}`}>
+                                            <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border ${activeTheme.border} ${user.id === currentUser?.uid ? 'bg-indigo-600/10 border-indigo-500/30' : 'bg-white/[0.02]'}`}>
                                                 <div className="flex items-center gap-3">
                                                     <span className={`text-xs font-black ${idx === 0 ? 'text-yellow-500' : 'opacity-20'}`}>0{idx+1}</span>
                                                     <span className="text-xs font-bold truncate w-24 uppercase tracking-tight">{user.displayName || "Anonymous"}</span>
                                                 </div>
-                                                <span className="text-[10px] font-black text-indigo-500">{user.xp}</span>
+                                                <span className="text-[10px] font-black text-indigo-500">{user.xp || 0}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -358,7 +358,7 @@ export default function Chat() {
                         </AnimatePresence>
 
                         <div className={`${activeTheme.isDark ? 'bg-[#111] border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.5)]' : 'bg-white border-slate-200 shadow-2xl'} border rounded-[2.5rem] p-2 flex items-end gap-2 transition-all focus-within:border-indigo-500/50`}>
-                            <button onClick={() => fileInputRef.current.click()} className="p-5 opacity-30 hover:opacity-100 transition-all hover:text-indigo-500">
+                            <button onClick={() => fileInputRef.current?.click()} className="p-5 opacity-30 hover:opacity-100 transition-all hover:text-indigo-500">
                                 <FaImage size={22}/>
                                 <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileSelect} />
                             </button>
@@ -369,7 +369,10 @@ export default function Chat() {
                                 rows="1" 
                                 className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-5 resize-none no-scrollbar font-medium placeholder:opacity-20" 
                                 onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}}
-                                onInput={(e) => { e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+                                onInput={(e) => { 
+                                    e.target.style.height = 'auto'; 
+                                    e.target.style.height = Math.min(e.target.scrollHeight, 200) + 'px'; 
+                                }}
                             />
                             <div className="flex gap-2 pr-2 pb-2">
                                 <button onClick={() => sendMessage()} disabled={isSending} className="p-5 bg-indigo-600 text-white rounded-full shadow-lg shadow-indigo-600/30 active:scale-90 transition-all disabled:opacity-50">
@@ -398,9 +401,9 @@ export default function Chat() {
                                     <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500 opacity-0 group-hover:opacity-100 transition-all"/>
                                     <div>
                                         <h4 className="font-black uppercase text-sm tracking-tight group-hover:text-indigo-400 transition-colors">{s.title || "Untitled Lesson"}</h4>
-                                        <p className="text-[9px] opacity-30 mt-3 uppercase font-black tracking-widest">{s.subject} • {new Date(s.lastUpdate).toLocaleDateString()}</p>
+                                        <p className="text-[9px] opacity-30 mt-3 uppercase font-black tracking-widest">{s.subject} • {s.lastUpdate ? new Date(s.lastUpdate).toLocaleDateString() : 'N/A'}</p>
                                     </div>
-                                    <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)); }} className="opacity-0 group-hover:opacity-100 text-red-500 p-3 hover:bg-red-500/10 rounded-xl transition-all">
+                                    <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser?.uid}/sessions`, s.id)); }} className="opacity-0 group-hover:opacity-100 text-red-500 p-3 hover:bg-red-500/10 rounded-xl transition-all">
                                         <FaTrash size={14}/>
                                     </button>
                                 </div>
