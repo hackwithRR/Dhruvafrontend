@@ -75,6 +75,8 @@ function AppContent() {
         )}
       </AnimatePresence>
 
+          <Route path="/live" element={<LiveMode />} />
+
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route 
