@@ -10,7 +10,6 @@ export function AuthProvider({ children }) {
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Function to update theme in Firestore
     const updateTheme = async (newTheme) => {
         if (!currentUser) return;
         try {
@@ -22,17 +21,20 @@ export function AuthProvider({ children }) {
     };
 
     useEffect(() => {
+        let unsubscribeData = null; // Track the firestore listener separately
+
         const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
             setCurrentUser(user);
             
+            // Clean up existing firestore listener if auth state changes
+            if (unsubscribeData) unsubscribeData();
+
             if (user) {
-                // Real-time listener for user profile/theme
                 const userDocRef = doc(db, "users", user.uid);
-                const unsubscribeData = onSnapshot(userDocRef, (docSnap) => {
+                unsubscribeData = onSnapshot(userDocRef, (docSnap) => {
                     if (docSnap.exists()) {
                         setUserData(docSnap.data());
                     } else {
-                        // Fallback if user doc doesn't exist yet
                         setUserData({ 
                             theme: "DeepSpace", 
                             displayName: user.displayName || "Scholar",
@@ -44,30 +46,27 @@ export function AuthProvider({ children }) {
                     console.error("Firestore error:", err);
                     setLoading(false);
                 });
-
-                return () => unsubscribeData();
             } else {
                 setUserData(null);
                 setLoading(false);
             }
         });
 
-        return () => unsubscribeAuth();
+        return () => {
+            unsubscribeAuth();
+            if (unsubscribeData) unsubscribeData();
+        };
     }, []);
 
     const value = {
         currentUser,
         userData,
         loading,
-        setTheme: updateTheme // Ensure this is named consistently with your App.js usage
+        setTheme: updateTheme
     };
 
     return (
         <AuthContext.Provider value={value}>
-            {/* CRITICAL: We only render children when loading is false 
-               to prevent App.js from trying to read userData.theme 
-               while it is still null.
-            */}
             {!loading && children}
         </AuthContext.Provider>
     );
