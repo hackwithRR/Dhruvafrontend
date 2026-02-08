@@ -86,14 +86,15 @@ export default function Chat() {
   const activeTheme = themes[theme] || themes.DeepSpace;
 
   // --- 🤖 GEMINI LIVE VOICE ENGINE ---
-  const getMaleVoice = useCallback(() => {
-    const voices = synthesisRef.current.getVoices();
-    return voices.find(v => 
-        v.name.toLowerCase().includes("google uk english male") || 
-        v.name.toLowerCase().includes("david") || 
-        v.lang === 'en-GB'
-    ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
-  }, []);
+  const handleStartLiveMode = () => {
+    navigate("/live", { 
+        state: { 
+            subject, 
+            chapter, 
+            userData 
+        } 
+    });
+};
 
   const speak = useCallback((text) => {
     if (!isLiveMode) return;
@@ -319,9 +320,12 @@ export default function Chat() {
                </div>
             </div>
 
-            <button onClick={toggleLiveMode} className="px-10 py-5 bg-white/5 hover:bg-red-500/20 rounded-full border border-white/10 text-[10px] font-black uppercase tracking-[0.3em] transition-colors">
-              Disconnect Link
-            </button>
+            <button 
+    onClick={handleStartLiveMode} 
+    className="p-5 bg-white/5 rounded-full hover:bg-indigo-600 transition-all"
+>
+    <FaHeadphones size={22}/>
+</button>
           </motion.div>
         )}
       </AnimatePresence>
