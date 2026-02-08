@@ -79,14 +79,16 @@ export default function Chat() {
   const sendMessageRef = useRef();
   const startListeningRef = useRef();
 
-  // --- 🛠️ RECOVERY LOGIC ---
+  // --- 🛠️ MANUAL RESET PROTOCOL ---
   const stopAllVoice = useCallback(() => {
     if (synthesisRef.current) synthesisRef.current.cancel();
     if (recognitionRef.current) {
         try {
+            recognitionRef.current.onresult = null;
+            recognitionRef.current.onerror = null;
             recognitionRef.current.onend = null;
             recognitionRef.current.stop();
-        } catch (e) {}
+        } catch (e) { console.warn("Voice cleanup error", e); }
     }
     setIsAiSpeaking(false);
     setIsListening(false);
@@ -120,8 +122,9 @@ export default function Chat() {
     
     utterance.onend = () => {
         setIsAiSpeaking(false);
+        // Delay ensures hardware release before mic re-starts
         if (isLiveMode && startListeningRef.current) {
-            setTimeout(() => startListeningRef.current(), 600);
+            setTimeout(() => startListeningRef.current(), 700);
         }
     };
     
@@ -165,20 +168,19 @@ export default function Chat() {
         dailyXp: increment(img ? 30 : 15) 
       });
     } catch (err) {
-      toast.error("Neural Link Sync Failed.");
+      toast.error("Neural Sync Error. Check link.");
     }
     setIsSending(false);
   };
 
   const startListening = useCallback(() => {
-    if (!isLiveMode || isAiSpeaking) return;
+    // HARD CHECK: Prevent start if AI is still speaking
+    if (!isLiveMode || isAiSpeaking || synthesisRef.current.speaking) return;
     
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-        toast.error("Browser unsupported.");
-        return;
-    }
+    if (!SpeechRecognition) return;
 
+    // Reset instance
     if (recognitionRef.current) {
         try { recognitionRef.current.stop(); } catch(e) {}
     }
@@ -193,12 +195,11 @@ export default function Chat() {
     
     recognition.onerror = (event) => {
         setIsListening(false);
-        if (event.error === 'network') {
-            toast.warn("Neural Link: Check Connection");
-        }
         if (event.error === 'not-allowed') {
-            toast.error("Mic Access Denied");
+            toast.error("Mic Access Denied. Check settings.");
             setIsLiveMode(false);
+        } else if (event.error === 'network') {
+            toast.warn("Signal Weak: Network Error");
         }
     };
 
@@ -213,7 +214,7 @@ export default function Chat() {
     try {
         recognition.start();
     } catch (e) {
-        console.warn("Recognition already active");
+        console.warn("Attempting to restart busy link...");
     }
   }, [isLiveMode, isAiSpeaking]);
 
@@ -222,12 +223,17 @@ export default function Chat() {
 
   const toggleLiveMode = useCallback(() => {
     if (!isLiveMode) {
-        setIsLiveMode(true);
-        toast.info("Neural Link Established");
-        speak(`System online. Ready for ${subject}.`);
+        // Safe startup: clean everything before engaging
+        stopAllVoice();
+        setTimeout(() => {
+            setIsLiveMode(true);
+            toast.success("Neural Link: ENGAGED");
+            speak(`Link active. How can I help with ${subject}?`);
+        }, 300);
     } else {
         setIsLiveMode(false);
         stopAllVoice();
+        toast.info("Neural Link: DISENGAGED");
     }
   }, [isLiveMode, subject, speak, stopAllVoice]);
 
@@ -253,32 +259,40 @@ export default function Chat() {
 
   return (
     <div className={`flex h-[100dvh] w-full ${activeTheme.bg} ${activeTheme.text} overflow-hidden font-sans`}>
-      <ToastContainer theme="dark" position="top-center" />
+      <ToastContainer theme="dark" position="top-right" />
 
-      {/* VOICE INTERFACE */}
+      {/* --- 💎 NEURAL LINK HUD --- */}
       <AnimatePresence>
         {isLiveMode && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col items-center justify-center p-10">
-            <div className="text-center mb-12">
-              <h1 className="text-5xl font-black uppercase tracking-tighter text-indigo-500">Neural Link</h1>
-              <div className="h-1 w-12 bg-white/20 mx-auto mt-4" />
+          <motion.div initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black/95 backdrop-blur-xl flex flex-col items-center justify-center">
+            <div className="absolute top-10 flex flex-col items-center">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40">Neural Stream Active</span>
+              </div>
+              <h1 className="text-3xl font-black uppercase tracking-tighter">{subject}</h1>
             </div>
             
-            <div className="relative w-72 h-72 border border-white/5 rounded-full flex items-center justify-center">
-               <div className="flex items-end gap-3 h-20">
-                  {[...Array(7)].map((_, i) => (
+            <div className="relative w-80 h-80 flex items-center justify-center">
+               <motion.div 
+                 animate={{ rotate: 360 }} 
+                 transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
+                 className="absolute inset-0 border border-indigo-500/20 rounded-full border-dashed" 
+               />
+               <div className="flex items-end gap-3 h-24">
+                  {[...Array(9)].map((_, i) => (
                     <motion.div 
                       key={i} 
-                      animate={{ height: isAiSpeaking ? [10, 80, 10] : isListening ? [10, 40, 10] : 4 }}
-                      transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
+                      animate={{ height: isAiSpeaking ? [10, 90, 10] : isListening ? [10, 50, 10] : 6 }}
+                      transition={{ repeat: Infinity, duration: 0.5, delay: i * 0.05 }}
                       className="w-2 bg-indigo-500 rounded-full" 
                     />
                   ))}
                </div>
             </div>
 
-            <button onClick={toggleLiveMode} className="mt-20 px-12 py-4 bg-white/5 border border-white/10 rounded-full text-[10px] font-bold uppercase tracking-[0.4em]">
-              Close Connection
+            <button onClick={toggleLiveMode} className="mt-20 px-10 py-5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-[0.3em] transition-all active:scale-95">
+              Kill Connection
             </button>
           </motion.div>
         )}
@@ -288,41 +302,42 @@ export default function Chat() {
         <Navbar currentUser={currentUser} userData={userData} />
 
         {/* HUD SETTINGS */}
-        <div className="w-full max-w-3xl mx-auto px-4 mt-6 space-y-3">
-          <div className="flex gap-3 p-2 rounded-[2rem] bg-white/[0.03] border border-white/10 backdrop-blur-md">
-            <select value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 bg-transparent border-none text-[10px] font-black uppercase py-2 focus:ring-0">
+        <div className="w-full max-w-3xl mx-auto px-4 mt-6">
+          <div className="flex gap-4 p-3 rounded-[2rem] bg-white/[0.03] border border-white/10">
+            <select value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 bg-transparent border-none text-[11px] font-black uppercase focus:ring-0">
               {Object.keys(syllabusData[userData.board]?.[userData.class] || {}).map(s => <option key={s} value={s} className="bg-black">{s}</option>)}
             </select>
-            <div className="w-[1px] bg-white/10 my-2" />
-            <select value={chapter} onChange={(e) => setChapter(e.target.value)} className="flex-1 bg-transparent border-none text-[10px] font-black uppercase py-2 focus:ring-0">
-              <option value="" className="bg-black">Full Module</option>
+            <div className="w-[1px] bg-white/10 my-1" />
+            <select value={chapter} onChange={(e) => setChapter(e.target.value)} className="flex-1 bg-transparent border-none text-[11px] font-black uppercase focus:ring-0">
+              <option value="" className="bg-black">Full Syllabus</option>
               {(syllabusData[userData.board]?.[userData.class]?.[subject] || []).map(ch => <option key={ch} value={ch} className="bg-black">{ch}</option>)}
             </select>
           </div>
         </div>
 
-        {/* CHAT WINDOW */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-10 no-scrollbar pb-60">
-          <div className="max-w-3xl mx-auto space-y-10">
+        {/* CHAT INTERFACE */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-10 no-scrollbar pb-64">
+          <div className="max-w-3xl mx-auto space-y-12">
             {messages.length === 0 && (
-              <div className="text-center py-20 opacity-20">
-                <FaBrain size={40} className="mx-auto mb-4" />
-                <p className="text-[10px] font-black uppercase tracking-[0.5em]">Initiate Learning Protocol</p>
+              <div className="flex flex-col items-center justify-center py-20 opacity-10 grayscale">
+                <FaBrain size={50} className="mb-6" />
+                <p className="text-[10px] font-black uppercase tracking-[0.8em]">Core Idle</p>
               </div>
             )}
             {messages.map((msg, i) => (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`p-6 rounded-[2rem] max-w-[85%] ${msg.role === 'user' ? 'bg-indigo-600' : 'bg-white/[0.03] border border-white/10'}`}>
+              <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`p-7 rounded-[2.2rem] max-w-[88%] shadow-2xl ${msg.role === 'user' ? 'bg-indigo-600 rounded-tr-none' : 'bg-white/[0.04] border border-white/10 rounded-tl-none'}`}>
+                  {msg.image && <img src={msg.image} className="w-full rounded-2xl mb-6 border border-white/10 shadow-lg" alt="input" />}
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm, remarkMath]} 
                     rehypePlugins={[rehypeKatex]} 
-                    className="prose prose-invert text-sm"
+                    className="prose prose-invert text-sm font-medium leading-relaxed"
                   >
                     {msg.content}
                   </ReactMarkdown>
                   {msg.ytLink && (
-                    <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-4 flex items-center justify-center gap-2 py-3 bg-red-600/10 text-red-500 text-[10px] font-bold uppercase rounded-xl border border-red-500/10">
-                      <FaYoutube /> Watch Lesson
+                    <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600/10 text-red-500 text-[10px] font-black uppercase rounded-2xl hover:bg-red-600 hover:text-white transition-all border border-red-500/10">
+                      <FaYoutube size={16}/> Stream Video Lesson
                     </a>
                   )}
                 </div>
@@ -333,11 +348,11 @@ export default function Chat() {
         </div>
 
         {/* INPUT DOCK */}
-        <div className="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-black to-transparent">
+        <div className="absolute bottom-0 left-0 w-full p-6 bg-gradient-to-t from-black via-black/90 to-transparent">
           <div className="max-w-3xl mx-auto">
-            <div className="bg-[#0c0c0c] border border-white/10 rounded-[2.5rem] p-2 flex items-center gap-2 shadow-2xl">
-              <button onClick={() => fileInputRef.current.click()} className="p-4 opacity-30 hover:opacity-100 transition-all">
-                <FaImage size={20}/>
+            <div className="bg-[#0e0e0e] border border-white/10 rounded-[2.5rem] p-2 flex items-center gap-2 shadow-2xl">
+              <button onClick={() => fileInputRef.current.click()} className="p-4 opacity-20 hover:opacity-100 hover:text-indigo-400 transition-all">
+                <FaImage size={22}/>
                 <input type="file" ref={fileInputRef} hidden accept="image/*" onChange={(e) => {
                   const reader = new FileReader();
                   reader.onload = () => setImagePreview(reader.result);
@@ -348,18 +363,26 @@ export default function Chat() {
               <input 
                 value={input} 
                 onChange={(e) => setInput(e.target.value)} 
-                placeholder="Ask Dhruva..." 
-                className="flex-1 bg-transparent border-none focus:ring-0 text-sm font-medium"
+                placeholder="Talk to Dhruva..." 
+                className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-4"
                 onKeyDown={(e) => { if(e.key === 'Enter') sendMessage(); }}
               />
               
-              <button onClick={toggleLiveMode} className={`p-4 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600' : 'hover:bg-white/5'}`}>
-                <FaHeadphones size={20}/>
-              </button>
-              <button onClick={() => sendMessage()} className="p-4 bg-indigo-600 rounded-full shadow-lg">
-                <FaPaperPlane size={18}/>
-              </button>
+              <div className="flex gap-2">
+                <button onClick={toggleLiveMode} className={`p-4 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 animate-pulse' : 'bg-white/5 hover:bg-white/10'}`}>
+                  <FaHeadphones size={20}/>
+                </button>
+                <button onClick={() => sendMessage()} disabled={isSending} className="p-4 bg-indigo-600 rounded-full shadow-lg disabled:opacity-50">
+                  <FaPaperPlane size={18}/>
+                </button>
+              </div>
             </div>
+            {imagePreview && (
+                <div className="mt-3 flex items-center gap-3 p-2 bg-indigo-600/10 border border-indigo-500/20 rounded-2xl w-fit">
+                    <img src={imagePreview} className="w-10 h-10 object-cover rounded-lg" alt="preview"/>
+                    <button onClick={() => setImagePreview(null)} className="text-[10px] font-black uppercase pr-2">Remove</button>
+                </div>
+            )}
           </div>
         </div>
       </div>
