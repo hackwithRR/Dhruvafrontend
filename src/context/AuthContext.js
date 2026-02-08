@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
-import { auth, provider } from "../utils/firebase";
+import { auth, provider } from "../firebase"; // Adjusted path
+import { db } from "../firebase"; // Ensure db is exported from your firebase.js
+import { doc, onSnapshot } from "firebase/firestore";
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -15,17 +17,17 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // --- THEME STATE LOGIC ---
-  // We initialize from localStorage so the theme persists after page refreshes
+  // --- UNIFIED THEME STATE ---
   const [theme, setThemeState] = useState(() => {
-    return localStorage.getItem("dhruva-theme") || "dark";
+    return localStorage.getItem("theme") || "DeepSpace";
   });
 
   const setTheme = (newTheme) => {
     setThemeState(newTheme);
-    localStorage.setItem("dhruva-theme", newTheme);
+    localStorage.setItem("theme", newTheme);
   };
 
+  // Listen for Auth Changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
@@ -33,6 +35,23 @@ export const AuthProvider = ({ children }) => {
     });
     return () => unsubscribe();
   }, []);
+
+  // --- NEW: Real-time Cloud Theme Sync ---
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const userRef = doc(db, "users", currentUser.uid);
+    const unsub = onSnapshot(userRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const cloudTheme = docSnap.data().theme;
+        if (cloudTheme && cloudTheme !== theme) {
+          setThemeState(cloudTheme);
+          localStorage.setItem("theme", cloudTheme);
+        }
+      }
+    });
+    return () => unsub();
+  }, [currentUser, theme]);
 
   const register = async (email, password, name) => {
     const res = await createUserWithEmailAndPassword(auth, email, password);
@@ -44,30 +63,17 @@ export const AuthProvider = ({ children }) => {
   const googleLogin = () => signInWithPopup(auth, provider);
   const logout = () => signOut(auth);
 
-  // --- REFRESH SESSION ---
-  // Call this in Profile.js after the backend save is successful
   const reloadUser = async () => {
     if (auth.currentUser) {
-      try {
-        await auth.currentUser.reload();
-        // Spreading into a new object forces React to update the Navbar/Sidebar
-        setCurrentUser({ ...auth.currentUser });
-      } catch (error) {
-        console.error("Failed to refresh user session:", error);
-      }
+      await auth.currentUser.reload();
+      setCurrentUser({ ...auth.currentUser });
     }
   };
 
   return (
     <AuthContext.Provider value={{ 
-      currentUser, 
-      register, 
-      login, 
-      logout, 
-      googleLogin, 
-      reloadUser,
-      theme,    // Global theme state
-      setTheme  // Function to change theme globally
+      currentUser, register, login, logout, googleLogin, reloadUser, 
+      theme, setTheme, loading 
     }}>
       {!loading && children}
     </AuthContext.Provider>
