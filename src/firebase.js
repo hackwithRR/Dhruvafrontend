@@ -12,19 +12,26 @@ const firebaseConfig = {
   appId: "1:764592312268:web:9f011cb05ebaa984575769"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Main Services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+// Initialize Services
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
-// Google Auth Configuration
-// Exporting as both 'provider' and 'googleProvider' to ensure compatibility 
-// with whatever your untouched components are expecting.
+// Initialize Google Provider
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
-export { googleProvider, googleProvider as provider };
+// EXPORTS - Using multiple names to ensure untouched files don't break
+export { 
+  auth, 
+  db, 
+  storage, 
+  googleProvider, 
+  googleProvider as provider,      // Fixes files looking for 'provider'
+  googleProvider as GoogleProvider // Fixes files looking for 'GoogleProvider'
+};
 
 export default app;
