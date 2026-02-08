@@ -81,7 +81,7 @@ export default function Chat() {
     const [mode, setMode] = useState("Explain");
     const [isSending, setIsSending] = useState(false);
     const [theme, setTheme] = useState("DeepSpace");
-    const [userData, setUserData] = useState({ board: "", class: "", language: "English", xp: 0, badges: [] });
+    const [userData, setUserData] = useState({ board: "", class: "", language: "English", xp: 0 });
     const [showSidebar, setShowSidebar] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     const [subjectInput, setSubjectInput] = useState("");
@@ -128,13 +128,6 @@ export default function Chat() {
         setUserData(prev => ({ ...prev, xp: prev.xp + 10 }));
     };
 
-    const getYouTubeLink = () => {
-        if (!subjectInput) return null;
-        const queryStr = `${userData.board} class ${userData.class} ${subjectInput} ${chapterInput} lesson`.trim();
-        return `https://www.youtube.com/results?search_query=${encodeURIComponent(queryStr)}`;
-    };
-
-    // --- CORE AI LOGIC ---
     const sendMessage = async () => {
         if (isSending || (!input.trim() && !selectedFile)) return;
         setIsSending(true);
@@ -142,12 +135,21 @@ export default function Chat() {
         const file = selectedFile;
         setInput(""); setSelectedFile(null);
 
-        const userMsg = { role: "user", content: textToSend || "Analyzing attachment...", image: file ? URL.createObjectURL(file) : null };
+        const userMsg = { role: "user", content: textToSend || "Image Analysis", image: file ? URL.createObjectURL(file) : null };
         const updatedMsgs = [...messages, userMsg];
         setMessages(updatedMsgs);
 
         try {
-            const payload = { userId: currentUser.uid, message: textToSend, mode, subject: subjectInput, chapter: chapterInput, language: userData.language, classLevel: userData.class, board: userData.board };
+            const payload = { 
+                userId: currentUser.uid, 
+                message: textToSend, 
+                mode, 
+                subject: subjectInput, 
+                chapter: chapterInput, 
+                language: userData.language, 
+                classLevel: userData.class, 
+                board: userData.board 
+            };
             let res;
             if (file) {
                 const compressed = await imageCompression(file, { maxSizeMB: 0.4 });
@@ -159,7 +161,13 @@ export default function Chat() {
                 res = await axios.post(`${API_BASE}/chat`, payload);
             }
 
-            const aiMsg = { role: "ai", content: res.data.reply, ytLink: getYouTubeLink() };
+            const ytQuery = `${userData.board} class ${userData.class} ${subjectInput} ${chapterInput} lesson`.trim();
+            const aiMsg = { 
+                role: "ai", 
+                content: res.data.reply, 
+                ytLink: subjectInput ? `https://www.youtube.com/results?search_query=${encodeURIComponent(ytQuery)}` : null 
+            };
+            
             const finalMsgs = [...updatedMsgs, aiMsg];
             setMessages(finalMsgs);
             
@@ -176,7 +184,6 @@ export default function Chat() {
         <div className={`flex h-screen w-full overflow-hidden transition-all duration-500 ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" />
             
-            {/* SIDEBAR */}
             <AnimatePresence>
                 {showSidebar && (
                     <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[200] w-72 h-full flex flex-col p-6 shadow-2xl backdrop-blur-xl ${currentTheme.sidebar}`}>
@@ -187,11 +194,9 @@ export default function Chat() {
                             </div>
                             <button onClick={() => setShowSidebar(false)} className="p-2 opacity-50"><FaTimes/></button>
                         </div>
-                        
                         <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false)}} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-bold text-xs tracking-widest shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
                             <FaPlus size={10}/> NEW CHAT
                         </button>
-
                         <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
                             {sessions.map(s => (
                                 <div key={s.id} onClick={() => {setCurrentSessionId(s.id); setMessages(s.messages || []); setShowSidebar(false)}} className={`group p-4 rounded-xl cursor-pointer transition-all border ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-600/20' : 'border-transparent hover:bg-black/5'}`}>
@@ -210,8 +215,8 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
                 <StudyTimer currentTheme={currentTheme} onComplete={handleAchievement} />
 
-                {/* 4 AI MODES SELECTOR */}
-                <div className="w-full max-w-5xl mx-auto px-4 pt-6 space-y-4">
+                {/* MODE SELECTOR */}
+                <div className="w-full max-w-5xl mx-auto px-4 pt-6">
                     <div className="flex flex-col md:flex-row gap-3">
                         <div className={`flex-1 flex items-center gap-2 p-1.5 rounded-2xl border ${currentTheme.input} shadow-sm backdrop-blur-md`}>
                             <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject" className="flex-1 bg-transparent px-3 py-1 text-xs font-bold outline-none" />
@@ -230,7 +235,7 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* MESSAGES AREA */}
+                {/* MESSAGES */}
                 <div className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar">
                     <div className="max-w-3xl mx-auto space-y-8">
                         {messages.map((msg, i) => (
@@ -242,7 +247,7 @@ export default function Chat() {
                                     </div>
                                     {msg.role === "ai" && msg.ytLink && (
                                         <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-5 flex items-center gap-3 p-3 bg-red-600/10 text-red-500 rounded-xl text-[10px] font-black hover:bg-red-600/20 transition-all border border-red-500/20 uppercase tracking-widest">
-                                            <FaYoutube size={16}/> Visual Guide: {subjectInput || 'Lesson'}
+                                            <FaYoutube size={16}/> View Visual Guide
                                         </a>
                                     )}
                                 </div>
@@ -253,7 +258,7 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* BOTTOM INPUT DOCK */}
+                {/* TRIPLE INPUT DOCK */}
                 <div className="p-4 md:p-8">
                     <div className="max-w-3xl mx-auto relative">
                         {selectedFile && (
@@ -278,7 +283,7 @@ export default function Chat() {
                     </div>
                 </div>
 
-                {/* CAMERA VIEWPORT */}
+                {/* CAMERA */}
                 <AnimatePresence>
                     {isCameraOpen && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[500] bg-black flex flex-col">
