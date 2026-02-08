@@ -6,7 +6,8 @@ import { toast, ToastContainer } from "react-toastify";
 import { 
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaMicrophone, 
     FaImage, FaPlus, FaHistory, FaYoutube, FaTrash, 
-    FaClock, FaPlay, FaStop, FaTrophy, FaMagic, FaCheckCircle 
+    FaClock, FaPlay, FaStop, FaTrophy, FaMagic, FaCheckCircle,
+    FaVolumeUp, FaVolumeMute 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -20,19 +21,13 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-// ====================================================
-// MASTER SYLLABUS REGISTRY (LOCAL CONTEXT)
-// ====================================================
 const MASTER_SYLLABUS = `
 CBSE CLASS 8-12 & ICSE 8-10 Chapter Registry:
 CBSE 8 MATH: Rational Numbers, Linear Eq, Quadrilaterals, Practical Geo, Data Handling, Squares/Cubes, Comparing Quantities, Algebra, Mensuration, Exponents, Proportions, Factorisation.
-CBSE 9 MATH: Number Systems, Polynomials, Coordinate Geo, Euclid, Lines/Angles, Triangles, Circles, Heron, Surface Area, Stats.
-CBSE 10 MATH: Real Nos, Polynomials, Linear Eq, Quadratic, AP, Trig, Circles, Stats.
-CBSE 11/12 MATH: Sets, Relations, Trig Functions, Calculus, Vectors, 3D, Probability.
+...
 Standardize all queries for 'Maths' to 'Mathematics'.
 `;
 
-// --- TYPEWRITER COMPONENT ---
 const Typewriter = ({ text }) => {
     const [displayedText, setDisplayedText] = useState("");
     useEffect(() => {
@@ -49,14 +44,14 @@ const Typewriter = ({ text }) => {
         <ReactMarkdown 
             remarkPlugins={[remarkGfm, remarkMath]} 
             rehypePlugins={[rehypeKatex]}
-            className="prose prose-sm prose-invert max-w-none text-xs md:text-sm font-medium leading-relaxed space-y-4"
+            className="prose prose-sm prose-invert max-w-none text-xs md:text-sm font-medium leading-relaxed 
+                       prose-p:mb-5 prose-p:leading-relaxed prose-headings:mt-4 prose-headings:mb-2 prose-li:mb-2"
         >
             {displayedText}
         </ReactMarkdown>
     );
 };
 
-// --- STUDY TIMER COMPONENT ---
 const StudyTimer = ({ currentTheme, onComplete }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isActive, setIsActive] = useState(false);
@@ -122,6 +117,7 @@ export default function Chat() {
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isListening, setIsListening] = useState(false);
     const [showLevelUp, setShowLevelUp] = useState(false);
+    const [isVoiceActive, setIsVoiceActive] = useState(true);
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -138,19 +134,35 @@ export default function Chat() {
     const currentTheme = themes[theme] || themes.DeepSpace;
     const currentLevel = Math.floor((userData.xp || 0) / 500) + 1;
 
+    // --- VOICE CHAT ENGINE ---
+    const speak = (text) => {
+        if (!isVoiceActive) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text.replace(/[*#_~]/g, ""));
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1; // Friendly higher pitch
+        window.speechSynthesis.speak(utterance);
+    };
+
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = true;
-            recognitionRef.current.onresult = (e) => setInput(Array.from(e.results).map(r => r[0].transcript).join(''));
-            recognitionRef.current.onend = () => isListening && recognitionRef.current.start();
+            recognitionRef.current.continuous = false;
+            recognitionRef.current.onresult = (e) => setInput(e.results[0][0].transcript);
+            recognitionRef.current.onend = () => setIsListening(false);
         }
-    }, [isListening]);
+    }, []);
 
     const toggleVoice = () => {
-        if (isListening) { recognitionRef.current.stop(); setIsListening(false); if (input.trim()) sendMessage(); }
-        else { setInput(""); recognitionRef.current.start(); setIsListening(true); }
+        if (isListening) {
+            recognitionRef.current.stop();
+            setIsListening(false);
+        } else {
+            setInput("");
+            recognitionRef.current.start();
+            setIsListening(true);
+        }
     };
 
     const openCamera = async () => {
@@ -231,7 +243,6 @@ export default function Chat() {
                 res = await axios.post(`${API_BASE}/chat`, payload);
             }
 
-            // FIXED LOGIC: Only trigger YouTube if query is educational and long enough
             const isGreeting = /^(hi|hello|hey|hola|greetings|morning|evening|bye|thanks|thank you)$/i.test(text.trim());
             const eduTriggers = /(how|why|solve|explain|steps|formula|diagram|what is|define|derivation|theorem)/i;
             const needsVisual = !isGreeting && (eduTriggers.test(text) || text.length > 15);
@@ -245,6 +256,7 @@ export default function Chat() {
 
             const finalMsgs = [...updatedMsgs, aiMsg];
             setMessages(finalMsgs);
+            speak(res.data.reply); // FRIENDLY VOICE OUTPUT
             await setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), { messages: finalMsgs, lastUpdate: Date.now(), title: stdSub || text.slice(0, 20) }, { merge: true });
             loadSessions();
             awardXP(20);
@@ -262,16 +274,7 @@ export default function Chat() {
     return (
         <div className={`flex h-[100dvh] w-full overflow-hidden transition-all duration-500 ${currentTheme.container}`}>
             <ToastContainer theme="dark" position="top-center" autoClose={2000} hideProgressBar />
-            <AnimatePresence>{showLevelUp && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-2xl">
-                    <motion.div initial={{ scale: 0.5 }} animate={{ scale: 1 }} className="bg-indigo-600 p-12 rounded-[3rem] text-center shadow-3xl border-2 border-white/20">
-                        <div className="text-7xl mb-6">🎓</div>
-                        <h2 className="text-4xl font-black text-white uppercase italic tracking-tighter">Level {currentLevel} Scholar!</h2>
-                        <button onClick={() => setShowLevelUp(false)} className="mt-8 px-10 py-4 bg-white text-indigo-600 rounded-full font-black uppercase text-xs tracking-widest active:scale-90 transition-all">Keep Evolving</button>
-                    </motion.div>
-                </motion.div>
-            )}</AnimatePresence>
-
+            
             <AnimatePresence>
                 {showSidebar && (
                     <>
@@ -302,31 +305,43 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} userData={userData}/>
                 <StudyTimer currentTheme={currentTheme} onComplete={awardXP} />
 
-                <div className="w-full max-w-5xl mx-auto px-4 pt-6 flex flex-col gap-4">
-                    <div className={`flex items-center gap-2 p-2 rounded-2xl border ${currentTheme.input} backdrop-blur-2xl shadow-xl`}>
-                        <div className="p-2 text-indigo-500/50"><FaMagic size={12}/></div>
-                        <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject" className="w-[30%] bg-transparent px-2 py-1 text-[11px] font-black uppercase outline-none" />
+                {/* HEADER INPUTS */}
+                <div className="w-full max-w-5xl mx-auto px-4 pt-4 flex flex-col gap-3">
+                    <div className={`flex items-center gap-2 p-1.5 rounded-2xl border ${currentTheme.input} backdrop-blur-2xl shadow-xl`}>
+                        <div className="p-2 text-indigo-500/50 hidden md:block"><FaMagic size={12}/></div>
+                        <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Sub" className="w-[20%] md:w-[30%] bg-transparent px-2 py-1 text-[10px] font-black uppercase outline-none" />
                         <div className="h-4 w-[1px] bg-white/10"/>
-                        <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Chapter / Topic" className="flex-1 bg-transparent px-2 py-1 text-[11px] font-black uppercase outline-none" />
-                        <button onClick={() => setIsLocked(!isLocked)} className={`p-3 rounded-xl transition-all ${isLocked ? 'bg-emerald-600 text-white' : 'bg-white/5 text-indigo-500'}`}>{isLocked ? <FaLock size={12}/> : <FaCheckCircle size={12}/>}</button>
+                        <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Topic" className="flex-1 bg-transparent px-2 py-1 text-[10px] font-black uppercase outline-none" />
+                        <button onClick={() => setIsLocked(!isLocked)} className={`p-2.5 rounded-xl transition-all ${isLocked ? 'bg-emerald-600 text-white' : 'bg-white/5 text-indigo-500'}`}>{isLocked ? <FaLock size={10}/> : <FaCheckCircle size={10}/>}</button>
                     </div>
                     <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                         {["Explain", "Quiz", "Summary", "Homework"].map(m => (
-                            <button key={m} onClick={() => setMode(m)} className={`px-6 py-3 text-[10px] font-black uppercase rounded-xl border transition-all whitespace-nowrap ${mode === m ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white/5 opacity-40'}`}>{m}</button>
+                            <button key={m} onClick={() => setMode(m)} className={`px-4 py-2 text-[9px] font-black uppercase rounded-xl border transition-all whitespace-nowrap ${mode === m ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white/5 opacity-40'}`}>{m}</button>
                         ))}
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar">
-                    <div className="max-w-4xl mx-auto space-y-10">
+                {/* MESSAGES AREA */}
+                <div className="flex-1 overflow-y-auto px-4 py-6 no-scrollbar">
+                    <div className="max-w-4xl mx-auto space-y-12"> {/* SPACING BETWEEN SECTIONS */}
                         {messages.length === 0 && (
                             <div className="flex flex-col items-center justify-center h-96 opacity-10 text-center uppercase tracking-[0.4em] text-xs"><FaMagic size={40} className="mb-4"/><p>Awaiting Neural Input</p></div>
                         )}
                         {messages.map((msg, i) => (
                             <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                                <div className={`max-w-[95%] md:max-w-[85%] p-6 md:p-8 rounded-3xl md:rounded-[3rem] shadow-2xl relative ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none text-white` : `${currentTheme.aiBubble} rounded-tl-none border-white/5 backdrop-blur-3xl`}`}>
+                                <div className={`max-w-[95%] md:max-w-[85%] p-5 md:p-8 rounded-3xl md:rounded-[3rem] shadow-2xl relative ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none text-white` : `${currentTheme.aiBubble} rounded-tl-none border-white/5 backdrop-blur-3xl`}`}>
                                     {msg.image && <img src={msg.image} className="rounded-2xl mb-6 max-h-72 w-full object-cover shadow-2xl border border-white/10" alt="input" />}
-                                    {msg.role === "ai" && i === messages.length - 1 && !isSending ? <Typewriter text={msg.content} /> : <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className="prose prose-sm prose-invert max-w-none text-xs md:text-sm font-medium leading-relaxed space-y-5">{msg.content}</ReactMarkdown>}
+                                    {msg.role === "ai" && i === messages.length - 1 && !isSending ? 
+                                        <Typewriter text={msg.content} /> : 
+                                        <ReactMarkdown 
+                                            remarkPlugins={[remarkGfm, remarkMath]} 
+                                            rehypePlugins={[rehypeKatex]} 
+                                            className="prose prose-sm prose-invert max-w-none text-xs md:text-sm font-medium leading-relaxed 
+                                                       prose-p:mb-5 prose-li:mb-2 prose-headings:mb-3"
+                                        >
+                                            {msg.content}
+                                        </ReactMarkdown>
+                                    }
                                     {msg.role === "ai" && msg.ytLink && (
                                         <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] shadow-xl shadow-red-600/20"><FaYoutube size={18}/> Access Visual Lab</a>
                                     )}
@@ -341,16 +356,23 @@ export default function Chat() {
                     </div>
                 </div>
 
-                <div className="p-4 md:p-12 relative bg-gradient-to-t from-black/60 to-transparent backdrop-blur-sm">
-                    <div className="max-w-3xl mx-auto relative">
-                        <div className={`flex items-center gap-2 p-2 rounded-[3rem] border shadow-3xl backdrop-blur-3xl ${currentTheme.input}`}>
-                            <button onClick={() => setShowSidebar(true)} className="p-4 text-indigo-500 lg:hidden rounded-full"><FaHistory size={20}/></button>
-                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Ask Dhruva anything..." className="flex-1 bg-transparent px-4 py-2 outline-none text-xs md:text-sm font-bold" />
-                            <div className="flex items-center gap-1 pr-1">
-                                <button onClick={toggleVoice} className={`p-4 rounded-full transition-all ${isListening ? 'bg-red-500 text-white' : 'text-indigo-500'}`}><FaMicrophone size={20}/></button>
-                                <button onClick={openCamera} className="p-4 text-indigo-500 hidden xs:block"><FaCamera size={20}/></button>
-                                <button onClick={() => fileInputRef.current.click()} className="p-4 text-indigo-500"><FaImage size={20}/><input type="file" ref={fileInputRef} hidden onChange={e => setSelectedFile(e.target.files[0])} /></button>
-                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-6 rounded-full ${currentTheme.button} text-white shadow-2xl active:scale-75 transition-all`}>
+                {/* BOTTOM INPUT BAR - MOBILE OPTIMIZED */}
+                <div className="p-3 md:p-10 relative bg-gradient-to-t from-black/80 to-transparent backdrop-blur-sm">
+                    <div className="max-w-4xl mx-auto">
+                        <div className={`flex items-center gap-1 md:gap-2 p-1.5 md:p-2 rounded-[2.5rem] md:rounded-[4rem] border shadow-3xl backdrop-blur-3xl ${currentTheme.input}`}>
+                            
+                            <button onClick={() => setShowSidebar(true)} className="p-3 text-indigo-500 lg:hidden rounded-full"><FaHistory size={18}/></button>
+                            
+                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Ask Dhruva..." className="flex-1 bg-transparent px-2 md:px-6 py-2 outline-none text-sm font-bold min-w-0" />
+                            
+                            <div className="flex items-center gap-0.5 md:gap-1">
+                                <button onClick={() => setIsVoiceActive(!isVoiceActive)} className="p-3 text-indigo-500 hidden md:block">
+                                    {isVoiceActive ? <FaVolumeUp size={18}/> : <FaVolumeMute size={18}/>}
+                                </button>
+                                <button onClick={toggleVoice} className={`p-3 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-indigo-500'}`}><FaMicrophone size={20}/></button>
+                                <button onClick={openCamera} className="p-3 text-indigo-500 hidden sm:block"><FaCamera size={20}/></button>
+                                <button onClick={() => fileInputRef.current.click()} className="p-3 text-indigo-500"><FaImage size={20}/><input type="file" ref={fileInputRef} hidden onChange={e => setSelectedFile(e.target.files[0])} /></button>
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-4 md:p-6 rounded-full ${currentTheme.button} text-white shadow-2xl active:scale-75 transition-all`}>
                                     {isSending ? <FaSyncAlt className="animate-spin" size={16}/> : <FaPaperPlane size={16}/>}
                                 </button>
                             </div>
@@ -363,9 +385,9 @@ export default function Chat() {
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col">
                             <video ref={videoRef} autoPlay playsInline className="flex-1 object-cover" />
                             <canvas ref={canvasRef} className="hidden" />
-                            <div className="p-12 flex justify-between items-center bg-black/90 backdrop-blur-2xl border-t border-white/10">
-                                <button onClick={closeCamera} className="p-6 bg-white/10 rounded-full text-white hover:bg-red-600 transition-all"><FaTimes size={24}/></button>
-                                <button onClick={capturePhoto} className="w-24 h-24 bg-white rounded-full border-[8px] border-white/20 shadow-3xl active:scale-90 transition-all" />
+                            <div className="p-10 flex justify-between items-center bg-black/90 border-t border-white/10">
+                                <button onClick={closeCamera} className="p-5 bg-white/10 rounded-full text-white"><FaTimes size={24}/></button>
+                                <button onClick={capturePhoto} className="w-20 h-20 bg-white rounded-full border-[6px] border-white/20 active:scale-90 transition-all" />
                                 <div className="w-16" />
                             </div>
                         </motion.div>
