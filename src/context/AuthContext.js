@@ -21,37 +21,48 @@ export function AuthProvider({ children }) {
     };
 
     useEffect(() => {
-        let unsubscribeData = null; // Track the firestore listener separately
+        let unsubscribeData = null;
 
         const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+            // Immediately update the user state so App.js knows if someone is there
             setCurrentUser(user);
             
-            // Clean up existing firestore listener if auth state changes
-            if (unsubscribeData) unsubscribeData();
+            // Clean up previous Firestore listener to prevent memory leaks
+            if (unsubscribeData) {
+                unsubscribeData();
+                unsubscribeData = null;
+            }
 
             if (user) {
                 const userDocRef = doc(db, "users", user.uid);
+                
+                // Start listening to the specific user document
                 unsubscribeData = onSnapshot(userDocRef, (docSnap) => {
                     if (docSnap.exists()) {
                         setUserData(docSnap.data());
                     } else {
+                        // Keep your original UI fallback logic
                         setUserData({ 
                             theme: "DeepSpace", 
                             displayName: user.displayName || "Scholar",
                             streak: 0 
                         });
                     }
+                    // Stop the white screen/loader
                     setLoading(false);
                 }, (err) => {
                     console.error("Firestore error:", err);
+                    // Critical: if Firestore fails, we still need to let the user in
                     setLoading(false);
                 });
             } else {
+                // Clear data and stop loading for guests/logged-out users
                 setUserData(null);
                 setLoading(false);
             }
         });
 
+        // Combined cleanup
         return () => {
             unsubscribeAuth();
             if (unsubscribeData) unsubscribeData();
@@ -67,6 +78,7 @@ export function AuthProvider({ children }) {
 
     return (
         <AuthContext.Provider value={value}>
+            {/* children only render when loading is false to prevent undefined crashes */}
             {!loading && children}
         </AuthContext.Provider>
     );
