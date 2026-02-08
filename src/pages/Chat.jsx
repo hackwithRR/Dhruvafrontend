@@ -24,6 +24,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // --- 🔧 FIXED API BASE DEFINITION ---
 const API_URL = process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app";
+// Fix: Use string slicing instead of Regex to prevent build errors
 const API_BASE = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
 
 const syllabusData = {
@@ -84,29 +85,75 @@ export default function Chat() {
   const fileInputRef = useRef(null);
   const activeTheme = themes[theme] || themes.DeepSpace;
 
-  // --- 🤖 GEMINI LIVE VOICE ENGINE (PROPERLY ORDERED) ---
+  // --- 🤖 GEMINI LIVE VOICE ENGINE ---
+export default function Chat() {
+    // 1. YOUR HOOKS (Already there)
+    const navigate = useNavigate();
+    const [messages, setMessages] = useState([]);
+    const synthesisRef = useRef(window.speechSynthesis);
+    const recognitionRef = useRef(null);
+    // ... other states ...
 
-  // 1. Get Male Voice (no dependencies)
-  const getMaleVoice = useCallback(() => {
-    const voices = synthesisRef.current.getVoices();
-    return voices.find(v => 
-      v.name.toLowerCase().includes("google uk english male") || 
-      v.name.toLowerCase().includes("david") || 
-      v.lang === 'en-GB'
-    ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
-  }, []);
+    // ---------------------------------------------------------
+    // 2. PASTE THE NEW LOGIC HERE (Between Hooks and Effects)
+    // ---------------------------------------------------------
+    const getMaleVoice = useCallback(() => {
+        const voices = window.speechSynthesis.getVoices();
+        return voices.find(v => 
+            v.name.toLowerCase().includes("google uk english male") || 
+            v.lang === 'en-GB'
+        ) || voices[0];
+    }, []);
 
-  // 2. Speak function (uses getMaleVoice)
+    const speak = useCallback((text) => {
+        window.speechSynthesis.cancel();
+        const cleanText = text.replace(/[*_`~]/g, '').trim();
+        if (!cleanText) return;
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.voice = getMaleVoice(); 
+        utterance.onstart = () => setIsAiSpeaking(true);
+        utterance.onend = () => setIsAiSpeaking(false);
+        window.speechSynthesis.speak(utterance);
+    }, [getMaleVoice]);
+
+    const handleStartLiveMode = () => {
+        window.speechSynthesis.cancel();
+        if (recognitionRef.current) recognitionRef.current.stop();
+        
+        navigate("/live", { 
+            state: { 
+                subject: subject, 
+                chapter: chapter, 
+                userData: userData 
+            } 
+        });
+    };
+    // ---------------------------------------------------------
+
+    // 3. YOUR EFFECTS (Keep these below the pasted code)
+    useEffect(() => {
+        // ...
+    }, []);
+
+    return (
+        // 4. YOUR JSX
+        <button onClick={handleStartLiveMode}> 
+            <FaHeadphones /> 
+        </button>
+    );
+}
+
   const speak = useCallback((text) => {
     if (!isLiveMode) return;
     synthesisRef.current.cancel();
     
     const cleanText = text
-      .replace(/[*_`~]/g, '')
-      .replace(/\\\[.*?\\\]/g, '') // Remove LaTeX brackets
-      .replace(/\n/g, ' ')
-      .trim();
-      
+        .replace(/[*_`~]/g, '')
+        .replace(/\\\[.*?\\\]/g, '') // Remove LaTeX brackets
+        .replace(/\n/g, ' ')
+        .trim();
+        
     if (!cleanText) return;
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -115,59 +162,26 @@ export default function Chat() {
     utterance.pitch = 1.0;
     
     utterance.onstart = () => {
-      setIsAiSpeaking(true);
-      if (recognitionRef.current) recognitionRef.current.stop();
+        setIsAiSpeaking(true);
+        if (recognitionRef.current) recognitionRef.current.stop(); // Ensure mic is off while speaking
     };
     
     utterance.onend = () => {
-      setIsAiSpeaking(false);
-      if (isLiveMode) {
-        setTimeout(startListening, 500);
-      }
+        setIsAiSpeaking(false);
+        if (isLiveMode) {
+             // Small delay before listening again to avoid picking up echo
+            setTimeout(startListening, 500);
+        }
     };
     
     utterance.onerror = () => setIsAiSpeaking(false);
     synthesisRef.current.speak(utterance);
-  }, [isLiveMode, getMaleVoice]);
+  }, [isLiveMode, getMaleVoice]); // Added dependencies
 
-  // 3. Start Listening (uses sendMessage, defined below)
-  const startListening = useCallback(() => {
-    if (!isLiveMode || isAiSpeaking) return;
-    
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast.error("Speech Recognition not supported.");
-      return;
-    }
-
-    if (recognitionRef.current) recognitionRef.current.stop();
-
-    recognitionRef.current = new SpeechRecognition();
-    recognitionRef.current.continuous = false;
-    recognitionRef.current.interimResults = false;
-    recognitionRef.current.lang = 'en-US';
-    
-    recognitionRef.current.onstart = () => setIsListening(true);
-    
-    recognitionRef.current.onend = () => {
-      setIsListening(false);
-    };
-    
-    recognitionRef.current.onresult = (event) => {
-      const transcript = event.results[0][0].transcript.trim();
-      if (transcript) {
-        sendMessage(transcript);
-      }
-    };
-    
-    try {
-      recognitionRef.current.start();
-    } catch (e) {
-      console.error("Mic busy");
-    }
-  }, [isLiveMode, isAiSpeaking]);
-
-  // 4. Send Message (uses speak, will be called by startListening)
+  // Define startListening AFTER speak to avoid circular dependency, or use ref for speak if needed.
+  // Ideally, define startListening first, but it calls sendMessage, which calls speak.
+  // To resolve: we can pass `speak` into sendMessage or rely on the stable reference.
+  
   const sendMessage = async (override = null) => {
     const text = override || input;
     if (isSending || (!text.trim() && !imagePreview)) return;
@@ -229,34 +243,55 @@ export default function Chat() {
     setIsSending(false);
   };
 
-  // 5. Handle Start Live Neural Link (uses navigate, synthesisRef, recognitionRef)
-  const handleStartLiveNeuralLink = useCallback(() => {
-    synthesisRef.current.cancel();
+  const startListening = useCallback(() => {
+    if (!isLiveMode || isAiSpeaking) return;
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        toast.error("Speech Recognition not supported.");
+        return;
+    }
+
     if (recognitionRef.current) recognitionRef.current.stop();
 
-    navigate("/live", { 
-      state: { 
-        subject, 
-        chapter, 
-        userData 
-      } 
-    });
-  }, [subject, chapter, userData, navigate]);
+    recognitionRef.current = new SpeechRecognition();
+    recognitionRef.current.continuous = false; // False is often more stable for turn-based chat
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.lang = 'en-US';
+    
+    recognitionRef.current.onstart = () => setIsListening(true);
+    
+    recognitionRef.current.onend = () => {
+        setIsListening(false);
+    };
+    
+    recognitionRef.current.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.trim();
+        if (transcript) {
+            sendMessage(transcript);
+        }
+    };
+    
+    try {
+        recognitionRef.current.start();
+    } catch (e) {
+        console.error("Mic busy");
+    }
+  }, [isLiveMode, isAiSpeaking]); // removed sendMessage from dep array to avoid loops, purely relying on current scope
 
-  // 6. Toggle Live Mode
   const toggleLiveMode = useCallback(() => {
     if (!isLiveMode) {
-      setIsLiveMode(true);
-      toast.info("🔴 Neural Link Active");
-      const intro = `Link established. Ready for ${subject}.`;
-      speak(intro);
+        setIsLiveMode(true);
+        toast.info("🔴 Neural Link Active");
+        const intro = `Link established. Ready for ${subject}.`;
+        speak(intro); // speak will trigger startListening onEnd
     } else {
-      setIsLiveMode(false);
-      setIsListening(false);
-      setIsAiSpeaking(false);
-      if (recognitionRef.current) recognitionRef.current.stop();
-      synthesisRef.current.cancel();
-      toast.info("🔴 Link Disconnected");
+        setIsLiveMode(false);
+        setIsListening(false);
+        setIsAiSpeaking(false);
+        if (recognitionRef.current) recognitionRef.current.stop();
+        synthesisRef.current.cancel();
+        toast.info("🔴 Link Disconnected");
     }
   }, [isLiveMode, subject, speak]);
 
@@ -333,11 +368,8 @@ export default function Chat() {
                </div>
             </div>
 
-            <button 
-              onClick={toggleLiveMode} 
-              className="p-5 bg-white/5 rounded-full hover:bg-indigo-600 transition-all"
-            >
-              <FaHeadphones size={22}/>
+            <button onClick={toggleLiveMode} className="px-10 py-5 bg-white/5 hover:bg-red-500/20 rounded-full border border-white/10 text-[10px] font-black uppercase tracking-[0.3em] transition-colors">
+              Disconnect Link
             </button>
           </motion.div>
         )}
@@ -381,7 +413,7 @@ export default function Chat() {
                 </div>
               </div>
 
-              <button onClick={() => { auth.signOut(); navigate("/login"); }} className="w-full p-5 rounded-2xl bg-red-500/5 hover:bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-3">
+              <button onClick={() => { auth.signOut(); navigate("/login"); }} className="w-full p-5 rounded-2xl bg-red-500/5 hover:bg-red-500/10 text-red-500 text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 border border-red-500/10">
                 <FaSignOutAlt /> Logout
               </button>
             </motion.div>
@@ -409,10 +441,10 @@ export default function Chat() {
           </div>
 
           <div className={`flex gap-3 p-2 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border}`}>
-            <select value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 bg-white/5 border-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 cursor-pointer focus:ring-0 focus:outline-none text-white">
+            <select value={subject} onChange={(e) => setSubject(e.target.value)} className="flex-1 bg-white/5 border-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 cursor-pointer focus:ring-0">
               {Object.keys(syllabusData[userData.board]?.[userData.class] || {}).map(s => <option key={s} value={s} className="bg-black">{s}</option>)}
             </select>
-            <select value={chapter} onChange={(e) => setChapter(e.target.value)} className="flex-1 bg-white/5 border-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 cursor-pointer focus:ring-0 focus:outline-none text-white">
+            <select value={chapter} onChange={(e) => setChapter(e.target.value)} className="flex-1 bg-white/5 border-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 cursor-pointer focus:ring-0">
               <option value="" className="bg-black">Full Subject</option>
               {(syllabusData[userData.board]?.[userData.class]?.[subject] || []).map(ch => <option key={ch} value={ch} className="bg-black">{ch}</option>)}
             </select>
@@ -445,7 +477,7 @@ export default function Chat() {
                   </ReactMarkdown>
 
                   {msg.ytLink && (
-                    <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-8 flex items-center justify-center gap-3 py-4 bg-red-600/10 text-red-500 text-[10px] font-black uppercase rounded-2xl hover:bg-red-600/20 transition-all">
+                    <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-8 flex items-center justify-center gap-3 py-4 bg-red-600/10 text-red-500 text-[10px] font-black uppercase rounded-2xl hover:bg-red-600 hover:text-white transition-all border border-red-500/10">
                       <FaYoutube size={16}/> Watch Tutorial
                     </a>
                   )}
@@ -462,18 +494,14 @@ export default function Chat() {
             
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
               {quickReplies.map(q => (
-                <button key={q} onClick={() => sendMessage(q)} className="whitespace-nowrap px-6 py-3 rounded-2xl border border-white/5 bg-white/[0.02] text-[10px] font-black uppercase tracking-widest hover:bg-white/5 transition-all">
-                  {q}
-                </button>
+                <button key={q} onClick={() => sendMessage(q)} className="whitespace-nowrap px-6 py-3 rounded-2xl border border-white/5 bg-white/[0.02] text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all">{q}</button>
               ))}
             </div>
 
             <div className="flex items-center justify-between">
               <div className="flex gap-1 p-1 bg-white/5 rounded-2xl border border-white/10">
                 {["Explain", "Quiz", "HW"].map(m => (
-                  <button key={m} onClick={() => setMode(m)} className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${mode === m ? 'bg-indigo-600 text-white shadow-xl' : 'opacity-40'}`}>
-                    {m}
-                  </button>
+                  <button key={m} onClick={() => setMode(m)} className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${mode === m ? 'bg-indigo-600 text-white shadow-xl' : 'opacity-40 hover:opacity-100'}`}>{m}</button>
                 ))}
               </div>
               <button onClick={() => setShowSidebar(true)} className="p-4 rounded-2xl bg-white/5 border border-white/10 opacity-40 hover:opacity-100 transition-all"><FaChartLine size={16}/></button>
@@ -502,11 +530,8 @@ export default function Chat() {
               />
               
               <div className="flex gap-2 pr-2 pb-2">
-                <button 
-                  onClick={handleStartLiveNeuralLink} 
-                  className="p-5 rounded-full bg-white/5 hover:bg-indigo-600 text-white transition-all shadow-xl hover:shadow-indigo-500/20 group"
-                >
-                  <FaHeadphones size={22} className="group-hover:scale-110 transition-transform" />
+                <button onClick={toggleLiveMode} className={`p-5 rounded-full transition-all ${isLiveMode ? 'bg-indigo-600 text-white animate-pulse' : 'bg-white/5'}`}>
+                  <FaHeadphones size={22}/>
                 </button>
                 <button onClick={() => sendMessage()} disabled={isSending} className="p-5 bg-indigo-600 text-white rounded-full shadow-xl disabled:opacity-50 hover:scale-105 active:scale-95 transition-all">
                   <FaPaperPlane size={22}/>
@@ -517,6 +542,9 @@ export default function Chat() {
         </div>
 
       </div>
+    </div>
+  );
+}
     </div>
   );
 }
