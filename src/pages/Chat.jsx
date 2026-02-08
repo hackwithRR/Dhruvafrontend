@@ -136,20 +136,21 @@ export default function Chat() {
         const text = override || input;
         if (isSending || (!text.trim() && !selectedFile)) return;
         setIsSending(true);
+        const currentInput = text;
+        const currentImg = imagePreview;
         setInput("");
-        let imgBase64 = imagePreview;
         setImagePreview(null);
         setSelectedFile(null);
-        const userMsg = { role: "user", content: text, image: imgBase64, timestamp: Date.now() };
+        const userMsg = { role: "user", content: currentInput, image: currentImg, timestamp: Date.now() };
         setMessages(prev => [...prev, userMsg]);
         try {
             const res = await axios.post(`${API_BASE}/chat`, {
                 userId: currentUser.uid,
-                message: text,
+                message: currentInput,
                 mode,
                 subject,
                 chapter,
-                image: imgBase64,
+                image: currentImg,
                 board: userData.board,
                 class: userData.class
             });
@@ -161,12 +162,12 @@ export default function Chat() {
                 setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
                     messages: updated,
                     lastUpdate: Date.now(),
-                    title: sessionTitle === "New Lesson" ? text.slice(0, 20) : sessionTitle,
+                    title: sessionTitle === "New Lesson" ? currentInput.slice(0, 20) : sessionTitle,
                     subject, chapter
                 }, { merge: true });
                 return updated;
             });
-            await incrementXP(imgBase64 ? 30 : 15);
+            await incrementXP(currentImg ? 30 : 15);
         } catch (err) { toast.error("Signal Lost. Check Connection."); }
         setIsSending(false);
     };
@@ -191,7 +192,7 @@ export default function Chat() {
     }, [sessions, searchQuery]);
 
     if (authLoading) return (
-      <div className={`h-screen w-full flex flex-col items-center justify-center space-y-4 ${activeTheme.bg}`}>
+      <div className={`h-screen w-full flex flex-col items-center justify-center space-y-4`} style={{ backgroundColor: activeTheme.hex }}>
         <FaBrain className="text-indigo-500 animate-pulse" size={40}/>
         <h2 className={`${activeTheme.text} text-xs font-black uppercase tracking-[0.5em]`}>Syncing Neural Link...</h2>
       </div>
@@ -225,7 +226,7 @@ export default function Chat() {
                                         </div>
                                     </div>
                                     <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-2">
-                                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(((userData.dailyXp || 0) / 500) * 100, 100)}%` }} className={`h-full bg-${activeTheme.primary}`} />
+                                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(((userData.dailyXp || 0) / 500) * 100, 100)}%` }} style={{ backgroundColor: activeTheme.primaryHex }} className="h-full" />
                                     </div>
                                     <div className="flex justify-between items-center">
                                         <p className={`text-[9px] font-black uppercase ${activeTheme.accent}`}>Daily Session</p>
@@ -302,7 +303,7 @@ export default function Chat() {
                         )}
                         {messages.map((msg, i) => (
                             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`p-6 rounded-[2.5rem] max-w-[90%] shadow-2xl relative ${msg.role === 'user' ? `bg-${activeTheme.primary} text-white rounded-tr-none` : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`}`}>
+                                <div className={`p-6 rounded-[2.5rem] max-w-[90%] shadow-2xl relative ${msg.role === 'user' ? `text-white rounded-tr-none` : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`}`} style={msg.role === 'user' ? {backgroundColor: activeTheme.primaryHex} : {}}>
                                     {msg.image && <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-black/50"><img src={msg.image} alt="analysis" className="w-full max-h-[500px] object-contain" /></div>}
                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className={`prose ${activeTheme.isDark ? 'prose-invert' : 'prose-slate'} text-sm leading-relaxed prose-p:my-2`}>{msg.content}</ReactMarkdown>
                                     {msg.ytLink && <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white text-[10px] font-black uppercase rounded-2xl hover:bg-red-700 transition-all shadow-lg"><FaYoutube size={16}/> Visual Supplement Found</a>}
@@ -317,13 +318,13 @@ export default function Chat() {
                     <div className="max-w-3xl mx-auto space-y-4">
                         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                             {quickReplies.map(q => (
-                                <button key={q} onClick={() => sendMessage(q)} className={`whitespace-nowrap px-6 py-3 rounded-2xl border ${activeTheme.border} ${activeTheme.card} text-[10px] font-black uppercase tracking-widest hover:bg-${activeTheme.primary} hover:text-white transition-all hover:scale-105 active:scale-95 shadow-lg`}>{q}</button>
+                                <button key={q} onClick={() => sendMessage(q)} className={`whitespace-nowrap px-6 py-3 rounded-2xl border ${activeTheme.border} ${activeTheme.card} text-[10px] font-black uppercase tracking-widest hover:text-white transition-all hover:scale-105 active:scale-95 shadow-lg`} style={{ "--hover-bg": activeTheme.primaryHex }}>{q}</button>
                             ))}
                         </div>
                         <div className="flex items-center justify-between">
                             <div className={`flex gap-1 p-1.5 ${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-200'} rounded-2xl border ${activeTheme.border} backdrop-blur-md`}>
                                 {["Explain", "Quiz", "HW"].map(m => (
-                                    <button key={m} onClick={() => setMode(m)} className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${mode === m ? `bg-${activeTheme.primary} text-white shadow-lg` : 'opacity-40 hover:opacity-100'}`}>{m}</button>
+                                    <button key={m} onClick={() => setMode(m)} className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${mode === m ? `text-white shadow-lg` : 'opacity-40 hover:opacity-100'}`} style={mode === m ? {backgroundColor: activeTheme.primaryHex} : {}}>{m}</button>
                                 ))}
                             </div>
                             <div className="flex gap-3">
@@ -334,7 +335,7 @@ export default function Chat() {
                         <AnimatePresence>
                             {imagePreview && (
                                 <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-24 h-24 ml-4 mb-2">
-                                    <img src={imagePreview} className={`w-full h-full object-cover rounded-2xl border-2 border-${activeTheme.primary} shadow-2xl`} alt="preview" />
+                                    <img src={imagePreview} className={`w-full h-full object-cover rounded-2xl border-2 shadow-2xl`} style={{borderColor: activeTheme.primaryHex}} alt="preview" />
                                     <button onClick={() => {setImagePreview(null); setSelectedFile(null)}} className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-xl"><FaTimes size={10}/></button>
                                 </motion.div>
                             )}
@@ -343,7 +344,7 @@ export default function Chat() {
                             <button onClick={() => fileInputRef.current?.click()} className="p-5 opacity-30 hover:opacity-100 transition-all hover:text-indigo-500"><FaImage size={22}/><input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileSelect} /></button>
                             <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Neural inquiry: ${chapter || subject}...`} rows="1" className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm py-5 resize-none no-scrollbar font-medium" onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}} />
                             <div className="flex gap-2 pr-2 pb-2">
-                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 bg-${activeTheme.primary} text-white rounded-full shadow-lg active:scale-90 transition-all disabled:opacity-50`}>
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 text-white rounded-full shadow-lg active:scale-90 transition-all disabled:opacity-50`} style={{backgroundColor: activeTheme.primaryHex}}>
                                     {isSending ? <FaSyncAlt className="animate-spin" size={22}/> : <FaPaperPlane size={22}/>}
                                 </button>
                             </div>
@@ -371,7 +372,7 @@ export default function Chat() {
                         <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto no-scrollbar pb-20">
                             {filteredSessions.map(s => (
                                 <div key={s.id} onClick={() => { setMessages(s.messages || []); setCurrentSessionId(s.id); setSessionTitle(s.title || "Untitled"); setShowSessionPicker(false); setSearchQuery(""); }} className={`p-8 rounded-[3rem] border ${activeTheme.border} ${activeTheme.card} hover:border-indigo-500/50 cursor-pointer transition-all flex justify-between items-center group relative overflow-hidden shadow-xl`}>
-                                    <div className={`absolute top-0 left-0 w-1 h-full bg-${activeTheme.primary} opacity-0 group-hover:opacity-100 transition-all`}/>
+                                    <div className={`absolute top-0 left-0 w-1 h-full opacity-0 group-hover:opacity-100 transition-all`} style={{backgroundColor: activeTheme.primaryHex}}/>
                                     <div>
                                         <h4 className={`font-black uppercase text-sm tracking-tight group-hover:${activeTheme.accent} transition-colors`}>{s.title || "Untitled Lesson"}</h4>
                                         <p className="text-[9px] opacity-30 mt-3 uppercase font-black tracking-widest">{s?.subject} • {s.lastUpdate ? new Date(s.lastUpdate).toLocaleDateString() : 'New'}</p>
