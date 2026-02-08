@@ -57,7 +57,6 @@ export default function Register() {
         if (loading) return;
         setLoading(true);
 
-        // Capture current state values into constants to avoid closure issues
         const currentGender = gender;
         const currentName = name;
         const currentEmail = email;
@@ -65,27 +64,31 @@ export default function Register() {
         try {
             const avatarUrl = avatars.find(a => a.id === selectedAvatar).url;
             
-            // 1. Create Auth User
-            const userCredential = await register(currentEmail, password, currentName, avatarUrl, currentGender);
+            // FIX: We only pass email and password to the register function
+            // Then we handle the name and avatar in the Firestore sync
+            const userCredential = await register(currentEmail, password);
             
-            // 2. Immediate Firestore Sync
-            // We use the UID directly from the response to ensure the document maps to the user
+            // Immediate Firestore Sync
             await setDoc(doc(db, "users", userCredential.user.uid), {
                 uid: userCredential.user.uid,
                 name: currentName,
                 email: currentEmail,
                 pfp: avatarUrl,
-                gender: currentGender, // This saves 'male', 'female', or 'other'
+                gender: currentGender,
                 board: "CBSE",
                 classLevel: "10",
+                theme: "DeepSpace", // Ensuring a default theme exists
                 createdAt: serverTimestamp()
             }, { merge: true });
 
-            // 3. Success Sequence
             await logout();
             setIsVerified(true);
         } catch (err) {
-            toast.error(err.message || "Registration failed. Please try again.");
+            // Handle specific Firebase errors for better UX
+            const errorMessage = err.code === 'auth/email-already-in-use' 
+                ? "This email is already registered." 
+                : (err.message || "Registration failed.");
+            toast.error(errorMessage);
             setLoading(false);
         }
     };
