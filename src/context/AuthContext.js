@@ -8,7 +8,7 @@ import {
   signOut, 
   updateProfile 
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, getDoc } from "firebase/firestore";
 
 const AuthContext = createContext();
 
@@ -25,18 +25,16 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Ensure user document exists in Firestore to prevent Chat.js from crashing
+        // Sync user doc if missing
         const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (!userSnap.exists()) {
+        const snap = await getDoc(userRef);
+        if (!snap.exists()) {
           await setDoc(userRef, {
             uid: user.uid,
             email: user.email,
             displayName: user.displayName || "Scholar",
             theme: "DeepSpace",
             xp: 0,
-            dailyXp: 0,
             board: "CBSE",
             class: "10"
           }, { merge: true });
@@ -49,41 +47,18 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const register = async (email, password, name) => {
-    try {
-      const res = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(res.user, { displayName: name });
-      return res.user;
-    } catch (err) {
-      console.error("Register Error:", err.code);
-      throw err;
-    }
+    const res = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(res.user, { displayName: name });
+    return res.user;
   };
 
-  const login = async (email, password) => {
-    try {
-      return await signInWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      console.error("Login Error:", err.code);
-      throw err;
-    }
-  };
-
-  const googleLogin = async () => {
-    try {
-      // Use Popup as it's more reliable for Web than Redirect
-      const result = await signInWithPopup(auth, provider);
-      return result;
-    } catch (err) {
-      console.error("Google Login Error:", err.message);
-      throw err;
-    }
-  };
-
+  const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
+  const googleLogin = () => signInWithPopup(auth, provider);
   const logout = () => signOut(auth);
 
   return (
-    <AuthContext.Provider value={{ currentUser, register, login, logout, googleLogin, theme, setTheme }}>
-      {!loading && children}
+    <AuthContext.Provider value={{ currentUser, register, login, logout, googleLogin, theme, setTheme, loading }}>
+      {children}
     </AuthContext.Provider>
   );
 };
