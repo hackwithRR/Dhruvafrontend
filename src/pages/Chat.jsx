@@ -34,7 +34,6 @@ const syllabusData = {
     }
 };
 
-// ADDED: 'hex' property to sync the actual CSS background of the body
 const themes = {
     DeepSpace: { bg: "bg-[#050505]", hex: "#050505", primary: "indigo-600", primaryHex: "#4f46e5", text: "text-white", accent: "text-indigo-400", card: "bg-white/[0.03]", border: "border-white/10", isDark: true },
     Light: { bg: "bg-[#f8fafc]", hex: "#f8fafc", primary: "indigo-600", primaryHex: "#4f46e5", text: "text-slate-900", accent: "text-indigo-600", card: "bg-white shadow-sm", border: "border-slate-200", isDark: false },
@@ -72,19 +71,15 @@ export default function Chat() {
         return themes[themeKey] || themes.DeepSpace;
     }, [userData?.theme]);
 
-    // FIX: This Effect forces the entire HTML body to match the theme background
-    // This removes the "black leak" or overlap issues.
     useEffect(() => {
         if (activeTheme?.hex) {
             document.body.style.backgroundColor = activeTheme.hex;
+            document.documentElement.style.backgroundColor = activeTheme.hex;
         }
-        return () => { document.body.style.backgroundColor = ""; };
     }, [activeTheme]);
 
     useEffect(() => {
-        if (!authLoading && !currentUser) {
-            navigate("/login");
-        }
+        if (!authLoading && !currentUser) navigate("/login");
     }, [currentUser, authLoading, navigate]);
 
     useEffect(() => {
@@ -196,23 +191,23 @@ export default function Chat() {
     }, [sessions, searchQuery]);
 
     if (authLoading) return (
-      <div className="h-screen w-full bg-[#050505] flex flex-col items-center justify-center space-y-4">
+      <div className={`h-screen w-full flex flex-col items-center justify-center space-y-4 ${activeTheme.bg}`}>
         <FaBrain className="text-indigo-500 animate-pulse" size={40}/>
-        <h2 className="text-white text-xs font-black uppercase tracking-[0.5em]">Syncing Neural Link...</h2>
+        <h2 className={`${activeTheme.text} text-xs font-black uppercase tracking-[0.5em]`}>Syncing Neural Link...</h2>
       </div>
     );
 
     return (
-        <div className={`flex h-[100dvh] w-full ${activeTheme?.bg ?? 'bg-[#050505]'} ${activeTheme?.text ?? 'text-white'} overflow-hidden font-sans selection:bg-indigo-500/30 transition-colors duration-500 relative`}>
-            {/* Added a base layer div to ensure background fills the whole viewport regardless of content overflow */}
-            <div className={`absolute inset-0 -z-20 ${activeTheme?.bg ?? 'bg-[#050505]'}`} />
+        <div className={`flex h-[100dvh] w-full ${activeTheme.bg} ${activeTheme.text} overflow-hidden font-sans selection:bg-indigo-500/30 transition-colors duration-500 relative`}>
+            <div className={`absolute inset-0 -z-20 ${activeTheme.bg}`} />
             
-            <ToastContainer theme={activeTheme?.isDark ? "dark" : "light"} />
+            <ToastContainer theme={activeTheme.isDark ? "dark" : "light"} />
+
             <AnimatePresence>
                 {showSidebar && (
                     <>
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSidebar(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md z-[800]" />
-                        <motion.div initial={{ x: -400 }} animate={{ x: 0 }} exit={{ x: -400 }} className={`fixed inset-y-0 left-0 w-80 ${activeTheme.isDark ? 'bg-[#080808]' : 'bg-white'} border-r ${activeTheme.border} z-[801] p-8 flex flex-col`}>
+                        <motion.div initial={{ x: -400 }} animate={{ x: 0 }} exit={{ x: -400 }} className={`fixed inset-y-0 left-0 w-80 ${activeTheme.isDark ? 'bg-black/40' : 'bg-white/90'} backdrop-blur-2xl border-r ${activeTheme.border} z-[801] p-8 flex flex-col`}>
                             <div className="flex justify-between items-center mb-10">
                                 <div className="flex items-center gap-2">
                                     <FaBrain className={activeTheme.accent}/>
@@ -265,7 +260,7 @@ export default function Chat() {
 
             <div className="flex-1 flex flex-col relative h-full">
                 <div className="relative z-[500]">
-                    <Navbar currentUser={currentUser} userData={userData} theme={userData?.theme || "DeepSpace"} />
+                    <Navbar userData={userData} />
                 </div>
                 <div className="w-full max-w-3xl mx-auto px-4 mt-4 space-y-3 z-[400] sticky top-[72px]">
                     <div className={`flex items-center justify-between p-4 rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-xl shadow-2xl`}>
@@ -285,13 +280,13 @@ export default function Chat() {
                     <div className={`flex gap-3 p-2 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} backdrop-blur-md`}>
                         <div className="flex-1 relative">
                             <select value={subject} onChange={(e) => setSubject(e.target.value)} className={`${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-100'} w-full border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer`}>
-                                {Object.keys(syllabusData[userData?.board]?.[userData?.class] || {}).map(s => <option key={s} value={s} className="bg-black text-white">{s}</option>)}
+                                {Object.keys(syllabusData[userData?.board]?.[userData?.class] || {}).map(s => <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>)}
                             </select>
                         </div>
                         <div className="flex-1 relative">
                             <select value={chapter} onChange={(e) => setChapter(e.target.value)} className={`${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-100'} w-full border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer`}>
-                                <option value="" className="bg-black text-white">Select Chapter</option>
-                                {(syllabusData[userData?.board]?.[userData?.class]?.[subject] || []).map(ch => <option key={ch} value={ch} className="bg-black text-white">{ch}</option>)}
+                                <option value="" className="bg-slate-900 text-white">Select Chapter</option>
+                                {(syllabusData[userData?.board]?.[userData?.class]?.[subject] || []).map(ch => <option key={ch} value={ch} className="bg-slate-900 text-white">{ch}</option>)}
                             </select>
                         </div>
                     </div>
@@ -318,7 +313,7 @@ export default function Chat() {
                     </div>
                 </div>
 
-                <div className={`fixed bottom-0 left-0 w-full p-6 bg-gradient-to-t ${activeTheme.isDark ? 'from-black via-black/90' : 'from-white via-white/90'} to-transparent z-[600]`}>
+                <div className={`fixed bottom-0 left-0 w-full p-6 bg-gradient-to-t ${activeTheme.isDark ? 'from-black/80 via-black/40' : 'from-white/80 via-white/40'} to-transparent z-[600]`}>
                     <div className="max-w-3xl mx-auto space-y-4">
                         <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                             {quickReplies.map(q => (
@@ -344,7 +339,7 @@ export default function Chat() {
                                 </motion.div>
                             )}
                         </AnimatePresence>
-                        <div className={`${activeTheme.isDark ? 'bg-[#111] border-white/10' : 'bg-white border-slate-200'} border rounded-[2.5rem] p-2 flex items-end gap-2 shadow-2xl`}>
+                        <div className={`${activeTheme.isDark ? 'bg-white/10 border-white/10' : 'bg-white border-slate-200'} border rounded-[2.5rem] p-2 flex items-end gap-2 shadow-2xl backdrop-blur-xl`}>
                             <button onClick={() => fileInputRef.current?.click()} className="p-5 opacity-30 hover:opacity-100 transition-all hover:text-indigo-500"><FaImage size={22}/><input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileSelect} /></button>
                             <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Neural inquiry: ${chapter || subject}...`} rows="1" className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm py-5 resize-none no-scrollbar font-medium" onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}} />
                             <div className="flex gap-2 pr-2 pb-2">
@@ -359,7 +354,7 @@ export default function Chat() {
 
             <AnimatePresence>
                 {showSessionPicker && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[1000] bg-black/95 backdrop-blur-3xl p-8 flex flex-col items-center">
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={`fixed inset-0 z-[1000] ${activeTheme.isDark ? 'bg-black/95' : 'bg-slate-50/95'} backdrop-blur-3xl p-8 flex flex-col items-center`}>
                         <div className="w-full max-w-4xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
                             <div>
                                 <h2 className={`text-4xl font-black uppercase italic tracking-tighter ${activeTheme.accent}`}>The Vault</h2>
@@ -367,15 +362,15 @@ export default function Chat() {
                             </div>
                             <div className="flex items-center gap-4 w-full md:w-auto">
                                 <div className="relative flex-1 md:w-64">
-                                    <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={12}/>
-                                    <input type="text" placeholder="SEARCH NODES..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-10 pr-4 text-[10px] font-black uppercase tracking-widest focus:border-indigo-500/50 focus:ring-0 outline-none transition-all" />
+                                    <FaSearch className={`absolute left-4 top-1/2 -translate-y-1/2 ${activeTheme.isDark ? 'text-white/20' : 'text-black/20'}`} size={12}/>
+                                    <input type="text" placeholder="SEARCH NODES..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full ${activeTheme.card} border ${activeTheme.border} rounded-2xl py-3 pl-10 pr-4 text-[10px] font-black uppercase tracking-widest focus:border-indigo-500/50 focus:ring-0 outline-none transition-all`} />
                                 </div>
-                                <button onClick={() => {setShowSessionPicker(false); setSearchQuery("");}} className="p-6 bg-white/5 hover:bg-white/10 rounded-full transition-all"><FaTimes size={20}/></button>
+                                <button onClick={() => {setShowSessionPicker(false); setSearchQuery("");}} className={`p-6 ${activeTheme.card} border ${activeTheme.border} rounded-full transition-all`}><FaTimes size={20}/></button>
                             </div>
                         </div>
                         <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto no-scrollbar pb-20">
                             {filteredSessions.map(s => (
-                                <div key={s.id} onClick={() => { setMessages(s.messages || []); setCurrentSessionId(s.id); setSessionTitle(s.title || "Untitled"); setShowSessionPicker(false); setSearchQuery(""); }} className={`p-8 rounded-[3rem] border ${activeTheme.border} ${activeTheme.card} hover:border-indigo-500/50 cursor-pointer transition-all flex justify-between items-center group relative overflow-hidden`}>
+                                <div key={s.id} onClick={() => { setMessages(s.messages || []); setCurrentSessionId(s.id); setSessionTitle(s.title || "Untitled"); setShowSessionPicker(false); setSearchQuery(""); }} className={`p-8 rounded-[3rem] border ${activeTheme.border} ${activeTheme.card} hover:border-indigo-500/50 cursor-pointer transition-all flex justify-between items-center group relative overflow-hidden shadow-xl`}>
                                     <div className={`absolute top-0 left-0 w-1 h-full bg-${activeTheme.primary} opacity-0 group-hover:opacity-100 transition-all`}/>
                                     <div>
                                         <h4 className={`font-black uppercase text-sm tracking-tight group-hover:${activeTheme.accent} transition-colors`}>{s.title || "Untitled Lesson"}</h4>
