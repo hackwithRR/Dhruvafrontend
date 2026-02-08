@@ -8,7 +8,7 @@ import {
   signOut, 
   updateProfile 
 } from "firebase/auth";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 
 const AuthContext = createContext();
 
@@ -51,20 +51,64 @@ export const AuthProvider = ({ children }) => {
   }, [currentUser, theme]);
 
   const register = async (email, password, name) => {
-    const res = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(res.user, { displayName: name });
-    setCurrentUser({ ...res.user, displayName: name });
+    try {
+      const res = await createUserWithEmailAndPassword(auth, email, password);
+      // Update Auth Profile
+      await updateProfile(res.user, { displayName: name });
+      
+      // Initialize User Doc in Firestore (Crucial for first login)
+      await setDoc(doc(db, "users", res.user.uid), {
+        uid: res.user.uid,
+        email: email,
+        displayName: name,
+        theme: "DeepSpace",
+        xp: 0,
+        dailyXp: 0,
+        streak: 0,
+        board: "CBSE",
+        class: "10"
+      }, { merge: true });
+
+      return res.user;
+    } catch (error) {
+      throw error;
+    }
   };
 
   const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
-  const googleLogin = () => signInWithPopup(auth, provider);
+
+  const googleLogin = async () => {
+    try {
+      const result = await signInWithPopup(auth, provider);
+      // Create user doc if it doesn't exist on Google Sign-in
+      await setDoc(doc(db, "users", result.user.uid), {
+        uid: result.user.uid,
+        email: result.user.email,
+        displayName: result.user.displayName,
+        lastLogin: Date.now()
+      }, { merge: true });
+      return result;
+    } catch (error) {
+      console.error("Google Auth Error:", error);
+      throw error;
+    }
+  };
+
   const logout = () => signOut(auth);
 
+  const value = {
+    currentUser,
+    register,
+    login,
+    logout,
+    googleLogin,
+    theme,
+    setTheme,
+    loading
+  };
+
   return (
-    <AuthContext.Provider value={{ 
-      currentUser, register, login, logout, googleLogin, 
-      theme, setTheme, loading 
-    }}>
+    <AuthContext.Provider value={value}>
       {!loading && children}
     </AuthContext.Provider>
   );
