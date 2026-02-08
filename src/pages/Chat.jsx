@@ -56,7 +56,18 @@ export default function Chat() {
     const [subject, setSubject] = useState("MATHEMATICS");
     const [chapter, setChapter] = useState("");
     const [isSending, setIsSending] = useState(false);
-    const [userData, setUserData] = useState({ board: "CBSE", class: "10", xp: 0, dailyXp: 0, streak: 0, theme: "DeepSpace", displayName: "" });
+    
+    // UPDATE: Set default theme in state to prevent black screen on first render
+    const [userData, setUserData] = useState({ 
+        board: "CBSE", 
+        class: "10", 
+        xp: 0, 
+        dailyXp: 0, 
+        streak: 0, 
+        theme: "DeepSpace", 
+        displayName: "" 
+    });
+
     const [timer, setTimer] = useState(0);
     const [showSidebar, setShowSidebar] = useState(false);
     const [showSessionPicker, setShowSessionPicker] = useState(false);
@@ -66,8 +77,11 @@ export default function Chat() {
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
     
-    // Safety added: Optional chaining for themes
-    const activeTheme = useMemo(() => themes[userData?.theme] || themes.DeepSpace, [userData?.theme]);
+    // UPDATE: Use Nullish Coalescing and forced fallbacks for the active theme
+    const activeTheme = useMemo(() => {
+        const themeKey = userData?.theme || "DeepSpace";
+        return themes[themeKey] || themes.DeepSpace;
+    }, [userData?.theme]);
 
     useEffect(() => {
         if (!authLoading && !currentUser) {
@@ -88,11 +102,17 @@ export default function Chat() {
         try { await auth.signOut(); navigate("/login"); } catch (err) { toast.error("Logout Failed"); }
     };
 
+    // UPDATE: Robust Merge Logic in Snapshot to prevent theme being overwritten by null/undefined
     useEffect(() => {
         if (!currentUser?.uid) return;
         const unsubUser = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
             if (docSnap.exists()) {
-                setUserData(prev => ({ ...prev, ...docSnap.data() }));
+                const incomingData = docSnap.data();
+                setUserData(prev => ({ 
+                    ...prev, 
+                    ...incomingData,
+                    theme: incomingData.theme || prev.theme || "DeepSpace" 
+                }));
             }
         });
         const q = query(collection(db, "users"), orderBy("xp", "desc"), limit(5));
@@ -186,8 +206,8 @@ export default function Chat() {
     );
 
     return (
-        <div className={`flex h-[100dvh] w-full ${activeTheme.bg} ${activeTheme.text} overflow-hidden font-sans selection:bg-indigo-500/30 transition-colors duration-500`}>
-            <ToastContainer theme={activeTheme.isDark ? "dark" : "light"} />
+        <div className={`flex h-[100dvh] w-full ${activeTheme?.bg ?? 'bg-[#050505]'} ${activeTheme?.text ?? 'text-white'} overflow-hidden font-sans selection:bg-indigo-500/30 transition-colors duration-500`}>
+            <ToastContainer theme={activeTheme?.isDark ? "dark" : "light"} />
             <AnimatePresence>
                 {showSidebar && (
                     <>
@@ -245,7 +265,7 @@ export default function Chat() {
 
             <div className="flex-1 flex flex-col relative h-full">
                 <div className="relative z-[500]">
-                    <Navbar currentUser={currentUser} userData={userData} theme={userData.theme} />
+                    <Navbar currentUser={currentUser} userData={userData} theme={userData?.theme || "DeepSpace"} />
                 </div>
                 <div className="w-full max-w-3xl mx-auto px-4 mt-4 space-y-3 z-[400] sticky top-[72px]">
                     <div className={`flex items-center justify-between p-4 rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-xl shadow-2xl`}>
@@ -264,7 +284,6 @@ export default function Chat() {
                     </div>
                     <div className={`flex gap-3 p-2 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} backdrop-blur-md`}>
                         <div className="flex-1 relative">
-                            {/* Safety added: Added null checks for syllabus lookups */}
                             <select value={subject} onChange={(e) => setSubject(e.target.value)} className={`${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-100'} w-full border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer`}>
                                 {Object.keys(syllabusData[userData?.board]?.[userData?.class] || {}).map(s => <option key={s} value={s} className="bg-black text-white">{s}</option>)}
                             </select>
