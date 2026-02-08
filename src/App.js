@@ -3,17 +3,16 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "r
 import { useAuth } from "./context/AuthContext";
 import { AnimatePresence, motion } from "framer-motion";
 
-import LoginPage from "./pages/LoginPage";
-import Register from "./pages/Register";
-import Chat from "./pages/Chat";
-import Profile from "./pages/Profile";
 import Background from "./components/Background";
 import Background2 from "./components/Background2";
+import Chat from "./pages/Chat";
+import Profile from "./pages/Profile";
+import LoginPage from "./pages/LoginPage";
+import Register from "./pages/Register";
 
-// Wrapper to handle theme and backgrounds
 function AppContent() {
   const location = useLocation();
-  const { theme, setTheme } = useAuth(); // Single source of truth
+  const { theme, setTheme } = useAuth(); // Single source of truth from Context
 
   return (
     <>
@@ -31,19 +30,18 @@ function AppContent() {
         </motion.div>
       </AnimatePresence>
 
-      <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/chat" element={<Chat theme={theme} setTheme={setTheme} />} />
-          <Route path="/profile" element={<Profile theme={theme} setTheme={setTheme} />} />
-          <Route path="*" element={<Navigate to="/chat" replace />} />
-        </Routes>
-      </AnimatePresence>
+      <Routes location={location} key={location.pathname}>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/chat" element={<Chat theme={theme} setTheme={setTheme} />} />
+        <Route path="/profile" element={<Profile theme={theme} setTheme={setTheme} />} />
+        <Route path="*" element={<Navigate to="/chat" replace />} />
+      </Routes>
     </>
   );
 }
 
+// Fixed Default Export
 export default function App() {
   return (
     <Router>
