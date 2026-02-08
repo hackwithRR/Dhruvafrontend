@@ -6,7 +6,7 @@ import { toast, ToastContainer } from "react-toastify";
 import { 
     FaPaperPlane, FaCamera, FaLock, FaSyncAlt, FaTimes, FaMicrophone, 
     FaImage, FaPlus, FaHistory, FaUnlock, FaYoutube, FaTrash, 
-    FaClock, FaPlay, FaStop, FaVolumeUp, FaMedal, FaTrophy, FaStar, FaMagic 
+    FaClock, FaPlay, FaStop, FaTrophy, FaMagic 
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
-// --- UPGRADED STUDY TIMER (SUPER UX) ---
+// --- STUDY TIMER (MOBILE OPTIMIZED) ---
 const StudyTimer = ({ currentTheme, onComplete }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isActive, setIsActive] = useState(false);
@@ -29,7 +29,7 @@ const StudyTimer = ({ currentTheme, onComplete }) => {
             timerRef.current = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
         } else if (timeLeft === 0 && isActive) {
             setIsActive(false);
-            onComplete(true); // Bonus XP for timer
+            onComplete(true);
             toast.success("Focus Session Complete! Rank Points Added! 🏆");
         }
         return () => clearInterval(timerRef.current);
@@ -42,33 +42,21 @@ const StudyTimer = ({ currentTheme, onComplete }) => {
     };
 
     return (
-        <motion.div drag dragMomentum={false} className="fixed z-[100] right-6 top-24 hidden md:block">
+        <motion.div drag dragMomentum={false} className="fixed z-[100] right-4 top-20 md:right-6 md:top-24 scale-90 md:scale-100">
             <motion.div 
-                animate={{ width: isOpen ? "240px" : "60px", height: isOpen ? "280px" : "60px", borderRadius: isOpen ? "32px" : "50%" }}
-                className={`flex flex-col overflow-hidden border shadow-[0_20px_50px_rgba(0,0,0,0.3)] backdrop-blur-3xl ${currentTheme.aiBubble} border-white/10 cursor-pointer relative group`}
+                animate={{ width: isOpen ? "220px" : "48px", height: isOpen ? "250px" : "48px", borderRadius: isOpen ? "28px" : "50%" }}
+                className={`flex flex-col overflow-hidden border shadow-2xl backdrop-blur-3xl ${currentTheme.aiBubble} border-white/10 cursor-pointer`}
             >
                 {!isOpen ? (
-                    <button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-400 relative">
-                        <FaClock size={22}/>
-                        {isActive && <span className="absolute inset-0 rounded-full border-2 border-indigo-500 animate-ping opacity-50"/>}
-                    </button>
+                    <button onClick={() => setIsOpen(true)} className="w-full h-full flex items-center justify-center text-indigo-400"><FaClock size={18}/></button>
                 ) : (
-                    <div className="p-5 flex flex-col h-full items-center justify-between">
-                        <div className="flex justify-between w-full items-center">
-                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Zen Mode</span>
-                            <button onClick={() => setIsOpen(false)} className="hover:rotate-90 transition-transform"><FaTimes size={14}/></button>
-                        </div>
-                        <div className="relative">
-                             <h2 className={`text-5xl font-black font-mono transition-all ${isActive ? 'scale-110 text-white' : 'opacity-40'}`}>{formatTime(timeLeft)}</h2>
-                        </div>
-                        <div className="flex gap-2 w-full">
-                            {[10, 25, 45].map(m => (
-                                <button key={m} onClick={() => {setTimeLeft(m*60); setIsActive(true)}} className="flex-1 py-2 rounded-xl bg-white/5 hover:bg-indigo-600 text-[10px] font-black transition-all border border-white/5">{m}m</button>
-                            ))}
-                        </div>
-                        <div className="flex gap-4">
-                            <button onClick={() => setIsActive(!isActive)} className="w-14 h-14 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">{isActive ? <FaStop size={14}/> : <FaPlay size={14}/>}</button>
-                            <button onClick={() => {setTimeLeft(0); setIsActive(false)}} className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center border border-white/10"><FaTrash size={14}/></button>
+                    <div className="p-4 flex flex-col h-full items-center justify-between">
+                        <div className="flex justify-between w-full items-center"><span className="text-[9px] font-black uppercase opacity-40">Zen Mode</span><button onClick={() => setIsOpen(false)}><FaTimes size={12}/></button></div>
+                        <h2 className="text-4xl font-black font-mono">{formatTime(timeLeft)}</h2>
+                        <div className="grid grid-cols-3 gap-1 w-full">{[10, 25, 45].map(m => (<button key={m} onClick={() => {setTimeLeft(m*60); setIsActive(true)}} className="py-1.5 rounded-lg bg-white/5 text-[8px] font-black">{m}m</button>))}</div>
+                        <div className="flex gap-3">
+                            <button onClick={() => setIsActive(!isActive)} className="w-12 h-12 rounded-full bg-indigo-600 flex items-center justify-center shadow-lg">{isActive ? <FaStop size={12}/> : <FaPlay size={12}/>}</button>
+                            <button onClick={() => setTimeLeft(0)} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10"><FaTrash size={12}/></button>
                         </div>
                     </div>
                 )}
@@ -102,50 +90,30 @@ export default function Chat() {
     const recognitionRef = useRef(null);
 
     const themes = {
-        DeepSpace: { container: "bg-[#050505] text-white", aiBubble: "bg-white/[0.03] border-white/10", userBubble: "bg-indigo-600", input: "bg-white/[0.02] border-white/10", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-white/5", accent: "text-indigo-400" },
-        Light: { container: "bg-gray-50 text-gray-900", aiBubble: "bg-white border-gray-200 shadow-sm", userBubble: "bg-indigo-600 text-white", input: "bg-white border-gray-300 shadow-inner", button: "bg-indigo-600", sidebar: "bg-white border-gray-200", accent: "text-indigo-600" },
-        Sakura: { container: "bg-[#1a0f12] text-rose-50", aiBubble: "bg-rose-500/10 border-rose-500/20", userBubble: "bg-rose-600", input: "bg-rose-500/5 border-rose-500/10", button: "bg-rose-600", sidebar: "bg-[#221418] border-rose-500/10", accent: "text-rose-400" },
-        Cyberpunk: { container: "bg-[#0a0512] text-cyan-50", aiBubble: "bg-cyan-500/10 border-cyan-500/30", userBubble: "bg-fuchsia-600", input: "bg-cyan-500/5 border-cyan-500/10", button: "bg-cyan-600", sidebar: "bg-[#120a1a] border-cyan-500/20", accent: "text-cyan-400" }
+        DeepSpace: { container: "bg-[#050505] text-white", aiBubble: "bg-white/[0.03] border-white/10", userBubble: "bg-indigo-600", input: "bg-white/[0.02] border-white/10", button: "bg-indigo-600", sidebar: "bg-[#0A0A0A] border-white/5" },
+        Light: { container: "bg-gray-50 text-gray-900", aiBubble: "bg-white border-gray-200 shadow-sm", userBubble: "bg-indigo-600 text-white", input: "bg-white border-gray-300 shadow-inner", button: "bg-indigo-600", sidebar: "bg-white border-gray-200" },
+        Sakura: { container: "bg-[#1a0f12] text-rose-50", aiBubble: "bg-rose-500/10 border-rose-500/20", userBubble: "bg-rose-600", input: "bg-rose-500/5 border-rose-500/10", button: "bg-rose-600", sidebar: "bg-[#221418] border-rose-500/10" },
+        Cyberpunk: { container: "bg-[#0a0512] text-cyan-50", aiBubble: "bg-cyan-500/10 border-cyan-500/30", userBubble: "bg-fuchsia-600", input: "bg-cyan-500/5 border-cyan-500/10", button: "bg-cyan-600", sidebar: "bg-[#120a1a] border-cyan-500/20" }
     };
     const currentTheme = themes[theme] || themes.DeepSpace;
 
-    // --- VOICE FEATURE (CONTINUOUS LOOP) ---
+    // --- CONTINUOUS VOICE LOOP ---
     useEffect(() => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognitionRef.current = new SpeechRecognition();
             recognitionRef.current.continuous = true;
-            recognitionRef.current.interimResults = true;
-            
-            recognitionRef.current.onresult = (event) => {
-                const transcript = Array.from(event.results)
-                    .map(result => result[0])
-                    .map(result => result.transcript)
-                    .join('');
-                setInput(transcript);
-            };
-
-            recognitionRef.current.onend = () => {
-                if (isListening) recognitionRef.current.start(); // Auto-restart loop
-            };
+            recognitionRef.current.onresult = (e) => setInput(Array.from(e.results).map(r => r[0].transcript).join(''));
+            recognitionRef.current.onend = () => isListening && recognitionRef.current.start();
         }
     }, [isListening]);
 
     const toggleVoice = () => {
-        if (isListening) {
-            recognitionRef.current.stop();
-            setIsListening(false);
-            if (input.trim()) sendMessage();
-        } else {
-            setInput("");
-            recognitionRef.current.start();
-            setIsListening(true);
-        }
+        if (isListening) { recognitionRef.current.stop(); setIsListening(false); if (input.trim()) sendMessage(); }
+        else { setInput(""); recognitionRef.current.start(); setIsListening(true); }
     };
 
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages, isSending]);
+    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isSending]);
 
     useEffect(() => {
         if (!currentUser) return;
@@ -179,21 +147,26 @@ export default function Chat() {
         const file = selectedFile;
         setInput(""); setSelectedFile(null);
 
-        const userMsg = { role: "user", content: textToSend || "Image Analysis", image: file ? URL.createObjectURL(file) : null };
+        const userMsg = { role: "user", content: textToSend || "Analyzing Image", image: file ? URL.createObjectURL(file) : null };
         const updatedMsgs = [...messages, userMsg];
         setMessages(updatedMsgs);
 
         try {
+            // Standardize Maths/Mathematics
+            const standardizedSubject = subjectInput.toLowerCase().startsWith("math") ? "Mathematics" : subjectInput;
+
             const payload = { 
                 userId: currentUser.uid, 
                 message: textToSend, 
                 mode, 
-                subject: subjectInput, 
+                subject: standardizedSubject, 
                 chapter: chapterInput, 
                 language: userData.language, 
                 classLevel: userData.class, 
-                board: userData.board 
+                board: userData.board,
+                systemContext: "Strictly follow CBSE/ICSE chapter list provided in history. Ensure accurate numbering."
             };
+
             let res;
             if (file) {
                 const compressed = await imageCompression(file, { maxSizeMB: 0.4 });
@@ -205,15 +178,16 @@ export default function Chat() {
                 res = await axios.post(`${API_BASE}/chat`, payload);
             }
 
-            // SMART YOUTUBE LOGIC: Only trigger if the user asks "How", "Explain", "Show me", or if it's a new concept.
-            const needsVideo = /(how|explain|show|visual|understand|steps|experiment|diagram|process)/i.test(textToSend);
-            const ytQuery = `${userData.board} class ${userData.class} ${subjectInput} ${chapterInput} ${textToSend}`.trim();
+            // SMART YOUTUBE LOGIC: Only for specific educational triggers
+            const eduTriggers = /(how|explain|steps|tutorial|visual|mechanism|derivation|diagram|experiment)/i;
+            const needsVideo = eduTriggers.test(textToSend) || mode === "Explain";
+            const ytQuery = `${userData.board} class ${userData.class} ${standardizedSubject} ${chapterInput} ${textToSend}`.trim();
             
             const aiMsg = { 
                 role: "ai", 
                 content: res.data.reply, 
-                ytLink: (needsVideo || mode === "Explain") ? `https://www.youtube.com/results?search_query=${encodeURIComponent(ytQuery)}` : null,
-                suggestions: ["Give Examples", "Key Equations", "Quiz Me", "Simpler Version"]
+                ytLink: needsVideo ? `https://www.youtube.com/results?search_query=${encodeURIComponent(ytQuery)}` : null,
+                suggestions: ["Give Example", "Key Formula", "Quiz Me"]
             };
             
             const finalMsgs = [...updatedMsgs, aiMsg];
@@ -224,45 +198,34 @@ export default function Chat() {
             }, { merge: true });
             fetchSessions();
             handleAchievement();
-        } catch (e) { toast.error("Error connecting to AI"); }
+        } catch (e) { toast.error("Synthesis failed. Check connection."); }
         setIsSending(false);
     };
 
     return (
-        <div className={`flex h-screen w-full overflow-hidden transition-all duration-500 ${currentTheme.container}`}>
-            <ToastContainer theme="dark" position="top-center" />
+        <div className={`flex h-[100dvh] w-full overflow-hidden transition-all duration-500 ${currentTheme.container}`}>
+            <ToastContainer theme="dark" position="top-center" autoClose={2000} hideProgressBar />
             
-            {/* SIDEBAR */}
+            {/* SIDEBAR OVERLAY */}
             <AnimatePresence>
                 {showSidebar && (
-                    <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[200] w-72 h-full flex flex-col p-6 shadow-2xl backdrop-blur-xl ${currentTheme.sidebar}`}>
-                        <div className="flex justify-between items-center mb-8">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 rounded-lg bg-yellow-500/10 text-yellow-500 border border-yellow-500/20"><FaTrophy size={14}/></div>
-                                <div className="flex flex-col leading-none">
-                                    <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Global Rank</span>
-                                    <span className="text-sm font-black italic">{userData.xp} <span className="text-[10px] opacity-50">Points</span></span>
-                                </div>
+                    <>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSidebar(false)} className="fixed inset-0 bg-black/70 z-[150] backdrop-blur-md lg:hidden" />
+                        <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} className={`fixed lg:relative z-[200] w-[85%] md:w-72 h-full flex flex-col p-6 shadow-2xl ${currentTheme.sidebar}`}>
+                            <div className="flex justify-between items-center mb-8">
+                                <div className="flex items-center gap-2"><FaTrophy className="text-yellow-500"/><span className="text-xs font-black uppercase italic tracking-widest">{userData.xp} XP</span></div>
+                                <button onClick={() => setShowSidebar(false)} className="p-2 opacity-30"><FaTimes/></button>
                             </div>
-                            <button onClick={() => setShowSidebar(false)} className="p-2 opacity-30 hover:opacity-100 transition-opacity"><FaTimes/></button>
-                        </div>
-                        <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false)}} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest shadow-[0_10px_30px_rgba(99,102,241,0.3)] flex items-center justify-center gap-2 active:scale-95 transition-all uppercase">
-                            <FaPlus size={10}/> Initialise New Core
-                        </button>
-                        <div className="flex-1 overflow-y-auto space-y-3 no-scrollbar">
-                            {sessions.map(s => (
-                                <div key={s.id} onClick={() => {setCurrentSessionId(s.id); setMessages(s.messages || []); setShowSidebar(false)}} className={`group p-4 rounded-2xl cursor-pointer transition-all border ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-600/20' : 'border-transparent hover:bg-white/5'}`}>
-                                    <div className="flex justify-between items-center">
-                                        <div className="flex flex-col overflow-hidden">
-                                             <span className="text-xs font-black truncate text-indigo-400 uppercase tracking-tighter">{s.title || "Study Core"}</span>
-                                             <span className="text-[8px] font-bold opacity-30 uppercase">Updated: {new Date(s.lastUpdate).toLocaleDateString()}</span>
-                                        </div>
-                                        <FaTrash onClick={(e) => {e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser.uid}/sessions`, s.id)); fetchSessions();}} className="opacity-0 group-hover:opacity-100 text-red-500 text-[10px] hover:scale-125 transition-all"/>
+                            <button onClick={() => {setMessages([]); setCurrentSessionId(Date.now().toString()); setShowSidebar(false)}} className="w-full py-4 mb-6 rounded-2xl bg-indigo-600 text-white font-black text-[10px] tracking-widest uppercase shadow-lg shadow-indigo-600/20"><FaPlus className="inline mr-2"/> New Session</button>
+                            <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
+                                {sessions.map(s => (
+                                    <div key={s.id} onClick={() => {setCurrentSessionId(s.id); setMessages(s.messages || []); setShowSidebar(false)}} className={`p-4 rounded-xl border transition-all ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-600/20' : 'border-transparent hover:bg-white/5'}`}>
+                                        <span className="text-[10px] font-black truncate block uppercase tracking-tighter">{s.title || "Study Session"}</span>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    </motion.div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    </>
                 )}
             </AnimatePresence>
 
@@ -270,133 +233,90 @@ export default function Chat() {
                 <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} userData={userData}/>
                 <StudyTimer currentTheme={currentTheme} onComplete={handleAchievement} />
 
-                {/* MODE SELECTOR (UPGRADED UI) */}
-                <div className="w-full max-w-5xl mx-auto px-4 pt-6">
-                    <div className="flex flex-col md:flex-row gap-4 items-center">
-                        <div className={`flex-1 flex items-center gap-2 p-2 rounded-2xl border ${currentTheme.input} backdrop-blur-md group focus-within:ring-1 ring-indigo-500/50 transition-all`}>
-                            <div className="px-3 opacity-30 group-focus-within:opacity-100 transition-opacity"><FaMagic size={12}/></div>
-                            <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Enter Subject..." className="flex-1 bg-transparent py-1 text-xs font-black uppercase tracking-tighter outline-none" />
-                            <div className="h-4 w-[1px] bg-white/10"/>
-                            <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Topic/Chapter..." className="flex-1 bg-transparent py-1 text-xs font-black uppercase tracking-tighter outline-none" />
-                            <button onClick={() => setIsLocked(!isLocked)} className={`p-3 rounded-xl transition-all ${isLocked ? 'bg-emerald-600 text-white shadow-lg' : 'text-indigo-500 bg-white/5'}`}>
-                                {isLocked ? <FaLock size={12}/> : <FaUnlock size={12}/>}
-                            </button>
-                        </div>
-                        <div className={`flex p-1 rounded-2xl border ${currentTheme.input} gap-1 overflow-x-auto no-scrollbar max-w-full`}>
-                            {["Explain", "Quiz", "Summary", "Homework"].map(m => (
-                                <button key={m} onClick={() => setMode(m)} className={`px-6 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all whitespace-nowrap ${mode === m ? 'bg-indigo-600 text-white shadow-xl scale-105' : 'opacity-30 hover:opacity-100 hover:bg-white/5'}`}>
-                                    {m}
-                                </button>
-                            ))}
-                        </div>
+                {/* SELECTORS (NON-CONGESTED MOBILE UI) */}
+                <div className="w-full max-w-5xl mx-auto px-4 pt-4 flex flex-col gap-3">
+                    <div className={`flex items-center gap-2 p-1.5 rounded-xl border ${currentTheme.input} backdrop-blur-md shadow-sm`}>
+                        <input disabled={isLocked} value={subjectInput} onChange={e => setSubjectInput(e.target.value)} placeholder="Subject" className="w-[35%] bg-transparent px-2 py-1 text-[10px] font-black uppercase outline-none placeholder:opacity-20" />
+                        <div className="h-4 w-[1px] bg-white/10"/>
+                        <input disabled={isLocked} value={chapterInput} onChange={e => setChapterInput(e.target.value)} placeholder="Topic / Chapter" className="flex-1 bg-transparent px-2 py-1 text-[10px] font-black uppercase outline-none placeholder:opacity-20" />
+                        <button onClick={() => setIsLocked(!isLocked)} className={`p-2.5 rounded-lg transition-all ${isLocked ? 'bg-emerald-600 shadow-lg text-white' : 'bg-white/5 text-indigo-500'}`}><FaLock size={10}/></button>
+                    </div>
+                    <div className="flex gap-1 overflow-x-auto no-scrollbar pb-1">
+                        {["Explain", "Quiz", "Summary", "Homework"].map(m => (
+                            <button key={m} onClick={() => setMode(m)} className={`px-5 py-2.5 text-[9px] font-black uppercase rounded-lg transition-all whitespace-nowrap ${mode === m ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'bg-white/5 opacity-40 hover:opacity-100'}`}>{m}</button>
+                        ))}
                     </div>
                 </div>
 
-                {/* MESSAGES */}
-                <div className="flex-1 overflow-y-auto px-4 py-8 no-scrollbar scroll-smooth">
-                    <div className="max-w-4xl mx-auto space-y-12 pb-20">
+                {/* MESSAGES (RESPONSIVE) */}
+                <div className="flex-1 overflow-y-auto px-4 py-6 no-scrollbar">
+                    <div className="max-w-4xl mx-auto space-y-8">
                         {messages.length === 0 && (
-                            <div className="h-full flex flex-col items-center justify-center opacity-20 py-20 text-center">
-                                <FaMagic size={40} className="mb-4 animate-pulse text-indigo-500"/>
-                                <h1 className="text-2xl font-black uppercase tracking-[0.3em]">Neural Core Active</h1>
-                                <p className="text-[10px] font-bold mt-2">Select a mode and begin the neural exchange.</p>
+                            <div className="h-64 flex flex-col items-center justify-center opacity-10 text-center">
+                                <FaMagic size={32} className="mb-4"/><h3 className="font-black uppercase tracking-[0.3em] text-xs">Neural Engine Ready</h3>
                             </div>
                         )}
                         {messages.map((msg, i) => (
-                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                                <div className={`max-w-[85%] p-8 rounded-[2.5rem] shadow-2xl relative ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none text-white ring-1 ring-white/20` : `${currentTheme.aiBubble} rounded-tl-none backdrop-blur-xl border-white/5`}`}>
-                                    {msg.image && <img src={msg.image} className="rounded-3xl mb-6 max-h-80 w-full object-cover shadow-2xl border border-white/10" alt="input" />}
-                                    <div className="prose prose-sm prose-invert max-w-none text-sm font-bold leading-relaxed tracking-tight">
+                            <motion.div key={i} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                                <div className={`max-w-[94%] md:max-w-[85%] p-6 rounded-2xl md:rounded-[2.5rem] shadow-xl ${msg.role === "user" ? `${currentTheme.userBubble} rounded-tr-none text-white` : `${currentTheme.aiBubble} rounded-tl-none border-white/5 backdrop-blur-md`}`}>
+                                    {msg.image && <img src={msg.image} className="rounded-xl mb-4 max-h-64 w-full object-cover shadow-lg border border-white/10" alt="upload" />}
+                                    <div className="prose prose-sm prose-invert max-w-none text-xs md:text-sm font-medium leading-relaxed">
                                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                                     </div>
-                                    
                                     {msg.role === "ai" && msg.ytLink && (
-                                        <div className="mt-8 pt-8 border-t border-white/5">
-                                            <a href={msg.ytLink} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-4 py-4 bg-red-600 text-white rounded-2xl text-[10px] font-black hover:bg-red-700 transition-all shadow-xl shadow-red-600/20 uppercase tracking-[0.2em]">
-                                                <FaYoutube size={18}/> Stream Visual Simulation
-                                            </a>
-                                        </div>
+                                        <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-5 flex items-center justify-center gap-3 py-3.5 bg-red-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-red-600/20 hover:brightness-110 transition-all">
+                                            <FaYoutube size={16}/> Stream Simulation
+                                        </a>
                                     )}
-
-                                    {/* QUICK SUGGESTIONS */}
                                     {msg.role === "ai" && i === messages.length - 1 && (
-                                        <div className="mt-8 flex flex-wrap gap-2">
-                                            {msg.suggestions?.map((s, idx) => (
-                                                <button key={idx} onClick={() => sendMessage(s)} className="px-4 py-2 rounded-full border border-white/10 bg-white/5 text-[9px] font-black uppercase hover:bg-indigo-600 hover:text-white transition-all">
-                                                    {s}
-                                                </button>
-                                            ))}
+                                        <div className="mt-6 flex flex-wrap gap-2">
+                                            {msg.suggestions?.map((s, idx) => (<button key={idx} onClick={() => sendMessage(s)} className="px-4 py-2 rounded-lg border border-white/10 bg-white/5 text-[8px] font-black uppercase hover:bg-indigo-600 transition-all">{s}</button>))}
                                         </div>
                                     )}
                                 </div>
                             </motion.div>
                         ))}
-                        {isSending && (
-                            <div className="flex items-center gap-3 px-8 text-indigo-500">
-                                <FaSyncAlt className="animate-spin" size={12}/>
-                                <span className="text-[9px] font-black uppercase tracking-[0.3em] animate-pulse">Synthesis in Progress...</span>
-                            </div>
-                        )}
-                        <div ref={messagesEndRef} className="h-10" />
+                        {isSending && <div className="flex items-center gap-2 px-4 text-[8px] font-black uppercase tracking-[0.2em] text-indigo-500 animate-pulse"><FaSyncAlt className="animate-spin"/> Synthesis...</div>}
+                        <div ref={messagesEndRef} className="h-24" />
                     </div>
                 </div>
 
-                {/* DOCK BAR (UPGRADED) */}
-                <div className="p-4 md:p-10 relative">
-                    <div className="max-w-3xl mx-auto relative group">
-                        {isListening && <div className="absolute -top-16 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-full text-[10px] font-black animate-bounce shadow-2xl uppercase tracking-widest"><FaMicrophone/> Listening...</div>}
-                        
-                        <div className={`flex items-center gap-1 p-2 rounded-[3rem] border shadow-[0_30px_60px_rgba(0,0,0,0.5)] backdrop-blur-3xl transition-all focus-within:ring-2 ring-indigo-600/30 ${currentTheme.input}`}>
-                            <button onClick={() => setShowSidebar(true)} className="p-5 text-indigo-500 lg:hidden hover:bg-white/5 rounded-full transition-all active:scale-75"><FaHistory/></button>
-                            <input 
-                                value={input} 
-                                onChange={e => setInput(e.target.value)} 
-                                onKeyDown={e => e.key === "Enter" && sendMessage()} 
-                                placeholder={`Exchange data in ${mode.toLowerCase()} mode...`} 
-                                className="flex-1 bg-transparent px-6 py-3 outline-none text-sm font-black placeholder:opacity-20 placeholder:uppercase" 
-                            />
-                            
-                            <div className="flex items-center gap-2 pr-2">
-                                <button onClick={toggleVoice} className={`p-4 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-pulse' : 'text-indigo-500 hover:bg-white/5'}`}>
-                                    <FaMicrophone size={18}/>
-                                </button>
-                                <button onClick={() => setIsCameraOpen(true)} className="p-4 text-indigo-500 hover:bg-white/5 rounded-full transition-all hidden sm:block"><FaCamera size={18}/></button>
+                {/* BOTTOM ACTION BAR (MOBILE FIXED) */}
+                <div className="p-3 md:p-10 relative bg-gradient-to-t from-black/40 via-transparent to-transparent">
+                    <div className="max-w-3xl mx-auto relative">
+                        {isListening && <div className="absolute -top-14 left-1/2 -translate-x-1/2 bg-indigo-600 text-white px-5 py-2 rounded-full text-[9px] font-black animate-bounce shadow-xl">LISTENING...</div>}
+                        <div className={`flex items-center gap-1 p-1.5 rounded-[2.5rem] border shadow-2xl backdrop-blur-3xl transition-all ${currentTheme.input}`}>
+                            <button onClick={() => setShowSidebar(true)} className="p-4 text-indigo-500 lg:hidden active:scale-75 transition-transform"><FaHistory size={18}/></button>
+                            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMessage()} placeholder="Ask Dhruva AI..." className="flex-1 bg-transparent px-3 py-2 outline-none text-xs md:text-sm font-bold placeholder:opacity-20" />
+                            <div className="flex items-center gap-1 pr-1">
+                                <button onClick={toggleVoice} className={`p-3 rounded-full transition-all ${isListening ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-500/30' : 'text-indigo-500 hover:bg-white/5'}`}><FaMicrophone size={18}/></button>
+                                <button onClick={() => setIsCameraOpen(true)} className="p-3 text-indigo-500 hover:bg-white/5 rounded-full hidden xs:block"><FaCamera size={18}/></button>
                                 <input type="file" ref={fileInputRef} hidden onChange={e => setSelectedFile(e.target.files[0])} />
-                                <button onClick={() => fileInputRef.current.click()} className="p-4 text-indigo-500 hover:bg-white/5 rounded-full transition-all"><FaImage size={18}/></button>
-                                
-                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-6 rounded-full ${currentTheme.button} text-white shadow-2xl active:scale-75 transition-all flex items-center justify-center hover:brightness-125`}>
-                                    {isSending ? <FaSyncAlt className="animate-spin" size={16}/> : <FaPaperPlane size={16}/>}
+                                <button onClick={() => fileInputRef.current.click()} className="p-3 text-indigo-500 hover:bg-white/5 rounded-full"><FaImage size={18}/></button>
+                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 rounded-full ${currentTheme.button} text-white shadow-xl flex items-center justify-center active:scale-75 transition-all hover:brightness-125`}>
+                                    {isSending ? <FaSyncAlt className="animate-spin" size={14}/> : <FaPaperPlane size={14}/>}
                                 </button>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* CAMERA VIEWPORT */}
+                {/* CAMERA OVERLAY */}
                 <AnimatePresence>
                     {isCameraOpen && (
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col p-4 md:p-12">
-                            <div className="relative flex-1 rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl">
-                                <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                                <div className="absolute inset-0 border-[40px] border-black/20 pointer-events-none"/>
-                                <canvas ref={canvasRef} className="hidden" />
-                                
-                                <div className="absolute bottom-12 left-0 right-0 flex justify-center items-center gap-12 px-12">
-                                    <button onClick={() => setIsCameraOpen(false)} className="p-6 bg-white/10 backdrop-blur-md rounded-full text-white border border-white/20 hover:bg-red-500 transition-all"><FaTimes size={24}/></button>
-                                    <button onClick={() => {
-                                        const context = canvasRef.current.getContext("2d");
-                                        canvasRef.current.width = videoRef.current.videoWidth;
-                                        canvasRef.current.height = videoRef.current.videoHeight;
-                                        context.drawImage(videoRef.current, 0, 0);
-                                        canvasRef.current.toBlob(blob => {
-                                            setSelectedFile(new File([blob], "capture.jpg", { type: "image/jpeg" }));
-                                            setIsCameraOpen(false);
-                                        }, "image/jpeg", 0.7);
-                                    }} className="w-24 h-24 bg-white rounded-full border-[8px] border-white/30 shadow-2xl active:scale-90 transition-all flex items-center justify-center">
-                                        <div className="w-16 h-16 rounded-full border-2 border-black/5"/>
-                                    </button>
-                                    <div className="w-16"/> {/* Spacer */}
-                                </div>
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[600] bg-black flex flex-col">
+                            <video ref={videoRef} autoPlay playsInline className="flex-1 object-cover" />
+                            <canvas ref={canvasRef} className="hidden" />
+                            <div className="p-10 flex justify-between items-center bg-black/90 backdrop-blur-xl border-t border-white/10">
+                                <button onClick={() => setIsCameraOpen(false)} className="p-5 bg-white/10 rounded-full text-white hover:bg-red-500 transition-all"><FaTimes size={20}/></button>
+                                <button onClick={() => {
+                                    const ctx = canvasRef.current.getContext("2d");
+                                    canvasRef.current.width = videoRef.current.videoWidth;
+                                    canvasRef.current.height = videoRef.current.videoHeight;
+                                    ctx.drawImage(videoRef.current, 0, 0);
+                                    canvasRef.current.toBlob(b => { setSelectedFile(new File([b], "shot.jpg", {type: "image/jpeg"})); setIsCameraOpen(false); }, "image/jpeg", 0.8);
+                                }} className="w-20 h-20 bg-white rounded-full border-[6px] border-white/20 shadow-2xl active:scale-90 transition-all" />
+                                <div className="w-10" />
                             </div>
                         </motion.div>
                     )}
