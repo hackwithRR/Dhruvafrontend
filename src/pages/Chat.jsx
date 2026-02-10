@@ -1,6 +1,8 @@
 // 1. ALL IMPORTS MUST BE AT THE VERY TOP
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import Navbar from "../components/Navbar";
+import imageCompression from 'browser-image-compression'; // <--- Move here
+import { PDFDocument } from 'pdf-lib';                     // <--- Move here
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -9,7 +11,7 @@ import {
     FaPaperPlane, FaSyncAlt, FaTimes, FaImage, FaHistory, FaTrash,
     FaTrophy, FaChartLine, FaLayerGroup, FaWaveSquare,
     FaClock, FaSignOutAlt, FaMedal, FaBrain, FaSearch, FaChevronDown, FaPlus,
-    FaSlidersH, FaFire, FaGem, FaStar, FaLock, FaBolt, FaFilePdf, FaFileWord, FaFileAlt, FaYoutube
+    FaSlidersH, FaFire, FaGem, FaStar, FaLock, FaBolt, FaFilePdf, FaFileWord, FaFileAlt, FaYoutube, FaChevronRight, FaChevronLeft,
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -22,7 +24,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { motion, AnimatePresence } from "framer-motion";
-import imageCompression from 'browser-image-compression';
+
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
@@ -123,6 +125,59 @@ export default function Chat() {
     const [input, setInput] = useState(""); // <--- Only keep this ONE
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+    // Function to Sync all Header/Overlay changes to Firestore
+    const syncContext = async (overrideSubj, overrideChap) => {
+        // Determine the class from profile data
+        const effectiveClass = userData?.classLevel || userData?.class;
+
+        if (!currentSessionId || !effectiveClass) {
+            toast.error("Profile Class not detected.");
+            return;
+        }
+
+        try {
+            const sessionRef = doc(db, `users/${currentUser.uid}/sessions`, currentSessionId);
+
+            // We use the arguments if they exist, otherwise fallback to the current state
+            const finalSubject = overrideSubj !== undefined ? overrideSubj : subject;
+            const finalChapter = overrideChap !== undefined ? overrideChap : chapter;
+
+            const updates = {
+                subject: finalSubject || "",
+                chapter: finalChapter || "",
+                board: userData.board || "CBSE",
+                class: String(effectiveClass),
+                lastUpdate: Date.now(),
+            };
+
+            // Rename session if it's the first time setting a chapter
+            if (finalChapter && (sessionTitle === "New Lesson" || !sessionTitle)) {
+                updates.title = finalChapter;
+                setSessionTitle(finalChapter);
+            }
+
+            await setDoc(sessionRef, updates, { merge: true });
+
+            // Only show success toast if we are manually syncing via button
+            if (overrideSubj === undefined) {
+                toast.success(`Synced: ${userData.board} Class ${effectiveClass}`);
+                setShowContextOverlay(false);
+            }
+        } catch (err) {
+            console.error("Neural Sync Error:", err);
+            toast.error("Failed to sync context.");
+        }
+    };
+
+
+
+    // Handle Title Edit Finish
+    const handleTitleBlur = () => {
+        setIsEditingTitle(false);
+        syncContext();
+    };
+
+
     // --- FILE & UI STATES ---
     const [attachedFile, setAttachedFile] = useState(null);
     const [fileType, setFileType] = useState(null);
@@ -147,11 +202,12 @@ export default function Chat() {
     // 1. Make sure you have this state defined at the top of your component:
     // const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+
     const handleFileUpload = async (e) => {
-        const file = e.target.files[0];
+        let file = e.target.files[0];
         if (!file) return;
 
-        // 1. Size Validation (10MB is safe for direct upload)
+        // 1. Size Validation (Initial 10MB cap)
         if (file.size > 10 * 1024 * 1024) {
             toast.error("File too large. Maximum size is 10MB.");
             return;
@@ -160,28 +216,60 @@ export default function Chat() {
         try {
             setIsAnalyzing(true);
             const isImage = file.type.startsWith('image/');
+            const isPDF = file.type === 'application/pdf';
             const type = isImage ? 'image' : 'document';
 
             setFileType(type);
-            setAttachedFile(file); // Store the actual file to send later
 
-            // 2. Local Preview (No Upload Needed)
-            // This creates a temporary URL in your browser memory
-            const localPreviewUrl = URL.createObjectURL(file);
-            setImagePreview(localPreviewUrl);
+            if (isImage) {
+                // --- IMAGE COMPRESSION LOGIC ---
+                const options = {
+                    maxSizeMB: 0.1,       // Aim for ~100KB (Safe for Firestore)
+                    maxWidthOrHeight: 1024,
+                    useWebWorker: true
+                };
+
+                const compressedFile = await imageCompression(file, options);
+                setAttachedFile(compressedFile);
+
+                // Convert to Base64 so it STAYS in chat history after refresh
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setImagePreview(reader.result);
+                };
+                reader.readAsDataURL(compressedFile);
+
+            } else if (isPDF) {
+                // --- PDF OPTIMIZATION LOGIC ---
+                const arrayBuffer = await file.arrayBuffer();
+                const pdfDoc = await PDFDocument.load(arrayBuffer);
+
+                // This flattens the PDF and removes unneeded metadata to save space
+                const compressedBytes = await pdfDoc.save({ useObjectStreams: true });
+                const optimizedPDF = new Blob([compressedBytes], { type: 'application/pdf' });
+
+                setAttachedFile(optimizedPDF);
+                // For PDFs, we use a generic icon or local URL as preview
+                setImagePreview(URL.createObjectURL(optimizedPDF));
+
+            } else {
+                // Fallback for other document types
+                setAttachedFile(file);
+                setImagePreview(null);
+            }
 
             toast.success("Neural Link Ready.");
-            console.log("File staged for transmission:", file.name);
 
         } catch (error) {
             console.error("Attachment Error:", error);
-            toast.error("Failed to attach file.");
+            toast.error("Compression failed. Try a smaller file.");
             setImagePreview(null);
             setAttachedFile(null);
         } finally {
             setIsAnalyzing(false);
         }
     };
+
 
     // --- CALCULATED STATISTICS ---
     // This defines the variables the ESLint error is complaining about
@@ -311,45 +399,43 @@ export default function Chat() {
         const text = override || input;
 
         // 1. VALIDATION
-        // Check if both text and file are missing
         if (isSending || (!text.trim() && !attachedFile)) return;
 
-        // 2. SYSTEM PROMPT & MODE LOGIC
+        // 2. SYSTEM PROMPT & MODE BEHAVIORS
         const modeBehaviors = {
-            "Explain": "Break down the topic into simple analogies. Use step-by-step logic and clear language.",
-            "Practice": "Do NOT provide direct answers. Present a challenging problem and guide the user.",
-            "Summarize": "Provide a high-level summary with bullet points and bold key terms.",
-            "Deep Dive": "Go beyond the standard curriculum. Explain advanced theory and background."
+            "Explain": "You are a proactive teacher. Focus on conceptual understanding and analogies. Clarify doubts deeply and use step-by-step logic.",
+            "Practice": "Do NOT provide direct answers. Present a challenging problem and guide the user through the solution process.",
+            "Summarize": "Provide a high-level summary with bullet points, bold key terms, and core takeaways.",
+            "Deep Dive": "Go beyond the standard curriculum. Explain advanced theory, research, and real-world applications."
         };
 
         const systemPrompt = `
-You are 'Dhruva AI', an elite academic tutor powered by a Neural Core.
+You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class ${userData.class}.
 ### ACADEMIC CONTEXT
-- Board: ${userData.board} | Class: ${userData.class}
 - Subject: ${subject} | Chapter: ${chapter}
 - Mode: ${mode} (${modeBehaviors[mode]})
 
-### ATTACHMENT HANDLING
-- If data is provided from a file/image, treat it as the student's PRIMARY notes.
-- Ensure all math/science formulas use LaTeX ($E=mc^2$).
-- If unrelated to ${subject}, politely redirect to the current curriculum.
+### RULES
+- Use LaTeX for ALL math/science formulas ($E=mc^2$).
+- If Mode is Explain: Focus on teaching. If the user has a doubt, use a new analogy.
+- For small talk (Hi, Hello, Thanks), be warm but very brief.
 `;
 
         setIsSending(true);
 
-        // Capture current states before clearing UI
+        // Capture states before UI reset
         const currentInput = text;
         const currentFile = attachedFile;
         const currentPreview = imagePreview;
         const currentFileType = fileType;
 
-        // 3. UI RESET (Immediate feedback for the user)
+        // 3. UI RESET (Immediate feedback)
         setInput("");
         setImagePreview(null);
         setAttachedFile(null);
         setFileType(null);
 
-        // 4. PREPARE FORMDATA (This bypasses the 1MB limit)
+        // 4. PREPARE FORMDATA
         const formData = new FormData();
         formData.append("userId", currentUser.uid);
         formData.append("message", currentInput);
@@ -359,23 +445,19 @@ You are 'Dhruva AI', an elite academic tutor powered by a Neural Core.
         formData.append("mode", mode);
         formData.append("board", userData.board);
         formData.append("class", userData.class);
-
-        // If there is an actual file, append it
-        if (currentFile) {
-            formData.append("file", currentFile);
-        }
+        if (currentFile) formData.append("file", currentFile);
 
         // 5. LOCAL UI UPDATE
         const userMsg = {
             role: "user",
             content: currentInput,
             attachment: currentPreview,
+            attachmentName: currentFile?.name || "Attachment",
             attachmentType: currentFileType,
             timestamp: Date.now()
         };
+
         setMessages(prev => [...prev, userMsg]);
-
-
 
         try {
             // 6. API CALL
@@ -383,21 +465,46 @@ You are 'Dhruva AI', an elite academic tutor powered by a Neural Core.
                 headers: { "Content-Type": "multipart/form-data" }
             });
 
-            const ytLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} class ${userData.class} ${subject} ${chapter}`)}`;
+            const aiResponse = res.data.reply;
+            const lowRes = aiResponse.toLowerCase();
+
+            // 7. 🛡️ ANTI-SPAM YOUTUBE LOGIC
+            let ytLink = null;
+
+            if (mode === "Explain") {
+                // Check for greetings/closings in the first 40 characters
+                const smallTalkPhrases = ["hi", "hello", "hey", "thanks", "thank you", "welcome", "no problem", "bye", "sure", "ok", "okay"];
+                const startsWithSmallTalk = smallTalkPhrases.some(word => lowRes.substring(0, 40).includes(word));
+
+                // Academic "Trigger" Keywords - Essential for detecting a real lesson
+                const teachingKeywords = ["define", "explain", "because", "process", "concept", "example", "formula", "law", "theory", "step", "understand", "meaning", "doubt"];
+                const containsTeachingContent = teachingKeywords.some(word => lowRes.includes(word));
+
+                // CRITERIA: 
+                // 1. Must be longer than 120 chars (prevents link on short replies)
+                // 2. Must not start with small talk (prevents link on "Hello! How can I help?")
+                // 3. Must contain academic keywords (ensures it's an actual explanation)
+                if (aiResponse.length > 120 && !startsWithSmallTalk && containsTeachingContent) {
+                    ytLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(
+                        `${userData.board} class ${userData.class} ${subject} ${chapter} explanation tutorial`
+                    )}`;
+                }
+            }
 
             const aiMsg = {
                 role: "ai",
-                content: res.data.reply,
+                content: aiResponse,
                 timestamp: Date.now(),
-                ytLink,
+                ytLink, // This will be null if filters aren't met
             };
 
+            // 8. FINAL STATE & FIREBASE SYNC
             setMessages(prev => {
-                const updated = [...prev, aiMsg];
+                const finalHistory = [...prev, aiMsg];
+                const sessionRef = doc(db, `users/${currentUser.uid}/sessions`, currentSessionId);
 
-                // 7. DATABASE SYNC (Saves session to Firestore)
-                setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
-                    messages: updated,
+                setDoc(sessionRef, {
+                    messages: finalHistory,
                     lastUpdate: Date.now(),
                     title: sessionTitle === "New Lesson" ? currentInput.slice(0, 25) + "..." : sessionTitle,
                     subject,
@@ -407,21 +514,24 @@ You are 'Dhruva AI', an elite academic tutor powered by a Neural Core.
                     activeMode: mode
                 }, { merge: true });
 
-                return updated;
+                return finalHistory;
             });
 
-            // 8. REWARD SYSTEM
+            // 9. REWARD SYSTEM
             await incrementXP(currentFile ? 30 : 15);
 
         } catch (err) {
             console.error("Neural Error:", err);
             toast.error("Signal Lost. Check your neural link.");
-            // Optional: Put the message back in the input if it fails
             setInput(currentInput);
+            setMessages(prev => prev.filter(m => m !== userMsg)); // Remove failed message
         } finally {
             setIsSending(false);
         }
     };
+
+
+
     const quickReplies = useMemo(() => {
         if (mode === "Quiz") return ["Start 5 MCQ Quiz", "Hard Mode", "Summary"];
         if (mode === "HW") return ["Step-by-step", "Clarify this", "Alternative"];
@@ -649,45 +759,62 @@ You are 'Dhruva AI', an elite academic tutor powered by a Neural Core.
             </AnimatePresence>
 
             {/* --- NEW CONTEXT OVERLAY (PHONE OPTIMIZED) --- */}
+            {/* --- CONTEXT OVERLAY (MOBILE/TABLET) --- */}
             <AnimatePresence>
                 {showContextOverlay && (
                     <motion.div
-                        initial={{ opacity: 0, y: -20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-2xl p-6 flex flex-col justify-center gap-6"
+                        initial={{ opacity: 0, scale: 1.1 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 1.1 }}
+                        className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-3xl p-6 flex flex-col justify-center gap-6"
                     >
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-2xl font-black uppercase italic tracking-tighter">Subject & Chapter</h2>
-                            <button onClick={() => setShowContextOverlay(false)} className="p-4 bg-white/5 rounded-full"><FaTimes size={18} /></button>
+                            <div className="flex flex-col">
+                                <h2 className="text-2xl font-black uppercase italic tracking-tighter text-white">Neural Vault</h2>
+                                <span className="text-[10px] font-bold text-indigo-400 tracking-[0.3em] uppercase">
+                                    Config: {userData?.board} — Class {userData?.classLevel || userData?.class}
+                                </span>
+                            </div>
+                            <button onClick={() => setShowContextOverlay(false)} className="p-4 bg-white/5 rounded-full text-white active:scale-90 transition-transform">
+                                <FaTimes size={18} />
+                            </button>
                         </div>
 
                         <div className="space-y-6">
+                            {/* Mobile Subject Selector */}
                             <div className="relative">
-                                <label className="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Select Subject</label>
-                                <div onClick={() => setShowSubjDrop(!showSubjDrop)} className={`flex items-center justify-between p-5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border}`}>
-                                    <span className="text-sm font-black uppercase">{subject || "Select Subject"}</span>
-                                    <FaChevronDown size={12} className="opacity-30" />
+                                <label className="text-[10px] font-black uppercase opacity-40 text-white ml-4 mb-2 block">Primary Subject</label>
+                                <div onClick={() => { setShowSubjDrop(!showSubjDrop); setShowChapDrop(false); }} className={`flex items-center justify-between p-5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer shadow-2xl`}>
+                                    <span className="text-sm font-black uppercase text-white">{subject || "Select Subject"}</span>
+                                    <FaChevronDown size={12} className={`transition-transform duration-300 ${showSubjDrop ? 'rotate-180' : ''} opacity-30 text-white`} />
                                 </div>
                                 {showSubjDrop && (
-                                    <div className="absolute top-full left-0 w-full mt-2 rounded-2xl bg-white/10 border border-white/10 p-2 max-h-40 overflow-y-auto z-50 backdrop-blur-xl">
-                                        {Object.keys(syllabusData[userData.board]?.[userData.class] || {}).map(s => (
-                                            <div key={s} onClick={() => { setSubject(s); setChapter(""); setShowSubjDrop(false); }} className="p-4 rounded-xl text-xs font-bold uppercase hover:bg-white/10">{s}</div>
+                                    <div className="absolute top-full left-0 w-full mt-2 rounded-2xl bg-gray-900 border border-white/10 p-2 max-h-48 overflow-y-auto z-[1000] backdrop-blur-xl shadow-2xl no-scrollbar">
+                                        {Object.keys(syllabusData?.[userData?.board]?.[String(userData?.classLevel || userData?.class)] || {}).map(s => (
+                                            <div key={s} onClick={() => {
+                                                setSubject(s);
+                                                setChapter(""); // Reset chapter on subject change
+                                                setShowSubjDrop(false);
+                                            }} className="p-4 rounded-xl text-xs font-bold uppercase text-white hover:bg-white/10 transition-colors">{s}</div>
                                         ))}
                                     </div>
                                 )}
                             </div>
 
+                            {/* Mobile Chapter Selector */}
                             <div className="relative">
-                                <label className="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Select Chapter</label>
-                                <div onClick={() => setShowChapDrop(!showChapDrop)} className={`flex items-center justify-between p-5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border}`}>
-                                    <span className="text-sm font-black uppercase">{chapter || "Select Chapter"}</span>
-                                    <FaChevronDown size={12} className="opacity-30" />
+                                <label className="text-[10px] font-black uppercase opacity-40 text-white ml-4 mb-2 block">Target Chapter</label>
+                                <div onClick={() => { setShowChapDrop(!showChapDrop); setShowSubjDrop(false); }} className={`flex items-center justify-between p-5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer shadow-2xl`}>
+                                    <span className="text-sm font-black uppercase text-white">{chapter || "Select Chapter"}</span>
+                                    <FaChevronDown size={12} className={`transition-transform duration-300 ${showChapDrop ? 'rotate-180' : ''} opacity-30 text-white`} />
                                 </div>
                                 {showChapDrop && (
-                                    <div className="absolute top-full left-0 w-full mt-2 rounded-2xl bg-white/10 border border-white/10 p-2 max-h-40 overflow-y-auto z-50 backdrop-blur-xl">
-                                        {(syllabusData[userData.board]?.[userData.class]?.[subject] || []).map(ch => (
-                                            <div key={ch} onClick={() => { setChapter(ch); setShowChapDrop(false); }} className="p-4 rounded-xl text-xs font-bold uppercase hover:bg-white/10">{ch}</div>
+                                    <div className="absolute top-full left-0 w-full mt-2 rounded-2xl bg-gray-900 border border-white/10 p-2 max-h-48 overflow-y-auto z-[1000] backdrop-blur-xl shadow-2xl no-scrollbar">
+                                        {(syllabusData?.[userData?.board]?.[String(userData?.classLevel || userData?.class)]?.[subject] || []).map(ch => (
+                                            <div key={ch} onClick={() => {
+                                                setChapter(ch);
+                                                setShowChapDrop(false);
+                                            }} className="p-4 rounded-xl text-xs font-bold uppercase text-white hover:bg-white/10 transition-colors">{ch}</div>
                                         ))}
                                     </div>
                                 )}
@@ -695,11 +822,11 @@ You are 'Dhruva AI', an elite academic tutor powered by a Neural Core.
                         </div>
 
                         <button
-                            onClick={() => setShowContextOverlay(false)}
-                            className="w-full py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em]"
+                            onClick={() => syncContext(subject, chapter)}
+                            className="w-full py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] text-white shadow-[0_0_30px_rgba(99,102,241,0.3)] active:scale-95 transition-all"
                             style={{ backgroundColor: activeTheme.primaryHex }}
                         >
-                            Sync Changes
+                            Establish Connection
                         </button>
                     </motion.div>
                 )}
@@ -708,66 +835,85 @@ You are 'Dhruva AI', an elite academic tutor powered by a Neural Core.
             <div className="flex-1 flex flex-col relative h-full">
                 <Navbar userData={userData} />
 
-                {/* --- HEADER (DYNAMICALLY CONDENSED) --- */}
+                {/* --- STICKY HEADER --- */}
                 <div className="w-full max-w-3xl mx-auto px-4 mt-2 md:mt-4 space-y-2 md:space-y-4 z-[400] sticky top-[72px]">
 
                     {/* Main Header Bar */}
                     <div className={`flex items-center justify-between p-3 md:p-4 rounded-2xl md:rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-xl shadow-2xl`}>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 overflow-hidden">
                             <FaHistory size={12} className={activeTheme.accent} />
                             {isEditingTitle ? (
-                                <input autoFocus value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} onBlur={() => setIsEditingTitle(false)} className="bg-transparent border-none focus:ring-0 text-[10px] md:text-xs font-black uppercase p-0 w-24 md:w-32 outline-none" />
+                                <input
+                                    autoFocus
+                                    value={sessionTitle}
+                                    onChange={(e) => setSessionTitle(e.target.value)}
+                                    onBlur={handleTitleBlur}
+                                    onKeyDown={(e) => e.key === 'Enter' && handleTitleBlur()}
+                                    className="bg-transparent border-none focus:ring-0 text-[10px] md:text-xs font-black uppercase p-0 w-32 outline-none text-white placeholder-white/20"
+                                    placeholder="RENAME SESSION..."
+                                />
                             ) : (
-                                <span onClick={() => setIsEditingTitle(true)} className="text-[10px] md:text-xs font-black uppercase tracking-tighter cursor-pointer truncate max-w-[100px] md:max-w-none">{sessionTitle}</span>
+                                <span onClick={() => setIsEditingTitle(true)} className="text-[10px] md:text-xs font-black uppercase tracking-tighter cursor-pointer truncate max-w-[120px] md:max-w-none text-white hover:opacity-70 transition-opacity">
+                                    {sessionTitle || "New Lesson"}
+                                </span>
                             )}
                         </div>
 
-                        {/* Status Chips - On mobile these trigger the overlay */}
                         <div className="flex items-center gap-2">
                             <div
                                 onClick={() => setShowContextOverlay(true)}
-                                className="md:hidden flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/5 active:bg-white/10"
+                                className="md:hidden flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/5 active:bg-white/10 transition-colors"
                             >
                                 <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 truncate max-w-[80px]">
-                                    {subject ? `${subject}` : 'SELECT'}
+                                    {subject || 'CONTEXT'}
                                 </span>
-                                <FaSlidersH size={10} className="opacity-40" />
+                                <FaSlidersH size={10} className="opacity-40 text-white" />
                             </div>
-                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-full border border-white/5 text-[9px] font-black uppercase">
+                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-full border border-white/5 text-[9px] font-black uppercase text-white shadow-inner">
                                 <FaClock className={activeTheme.accent} size={10} /> {formatTime(timer)}
                             </span>
                         </div>
                     </div>
 
-                    {/* Desktop-Only Grid (Hidden on Mobile) */}
+                    {/* Desktop Context Selectors */}
                     <div className="hidden md:grid grid-cols-2 gap-4">
                         <div className="relative">
-                            <div onClick={() => { setShowSubjDrop(!showSubjDrop); setShowChapDrop(false); }} className={`flex items-center gap-3 p-1.5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer`}>
+                            <div onClick={() => { setShowSubjDrop(!showSubjDrop); setShowChapDrop(false); }} className={`flex items-center gap-3 p-1.5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer hover:border-white/20 transition-all shadow-lg`}>
                                 <div className="p-3 rounded-full bg-white/5"><FaLayerGroup className={activeTheme.accent} size={14} /></div>
-                                <span className="flex-1 text-[10px] font-black uppercase truncate">{subject || "Subject"}</span>
-                                <FaChevronDown size={10} className="mr-4 opacity-30" />
+                                <span className="flex-1 text-[10px] font-black uppercase truncate text-white">{subject || "Subject"}</span>
+                                <FaChevronDown size={10} className={`mr-4 transition-transform duration-300 ${showSubjDrop ? 'rotate-180' : ''} opacity-30 text-white`} />
                             </div>
                             <AnimatePresence>
                                 {showSubjDrop && (
-                                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="absolute top-full left-0 w-full mt-2 rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl z-50 p-2 max-h-48 overflow-y-auto shadow-2xl no-scrollbar">
-                                        {Object.keys(syllabusData[userData.board]?.[userData.class] || {}).map(s => (
-                                            <div key={s} onClick={() => { setSubject(s); setChapter(""); setShowSubjDrop(false); }} className="p-4 rounded-xl text-[10px] font-black uppercase hover:bg-white/10">{s}</div>
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 w-full mt-2 rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl z-[500] p-2 max-h-48 overflow-y-auto shadow-2xl no-scrollbar">
+                                        {Object.keys(syllabusData?.[userData?.board]?.[String(userData?.classLevel || userData?.class)] || {}).map(s => (
+                                            <div key={s} onClick={() => {
+                                                setSubject(s);
+                                                setChapter("");
+                                                setShowSubjDrop(false);
+                                                syncContext(s, ""); // Immediate subject update
+                                            }} className="p-4 rounded-xl text-[10px] font-black uppercase text-white hover:bg-white/10 cursor-pointer transition-colors">{s}</div>
                                         ))}
                                     </motion.div>
                                 )}
                             </AnimatePresence>
                         </div>
+
                         <div className="relative">
-                            <div onClick={() => { setShowChapDrop(!showChapDrop); setShowSubjDrop(false); }} className={`flex items-center gap-3 p-1.5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer`}>
+                            <div onClick={() => { setShowChapDrop(!showChapDrop); setShowSubjDrop(false); }} className={`flex items-center gap-3 p-1.5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer hover:border-white/20 transition-all shadow-lg`}>
                                 <div className="p-3 rounded-full bg-white/5"><FaBrain className="text-cyan-400" size={14} /></div>
-                                <span className="flex-1 text-[10px] font-black uppercase truncate">{chapter || "Chapter"}</span>
-                                <FaChevronDown size={10} className="mr-4 opacity-30" />
+                                <span className="flex-1 text-[10px] font-black uppercase truncate text-white">{chapter || "Chapter"}</span>
+                                <FaChevronDown size={10} className={`mr-4 transition-transform duration-300 ${showChapDrop ? 'rotate-180' : ''} opacity-30 text-white`} />
                             </div>
                             <AnimatePresence>
                                 {showChapDrop && (
-                                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="absolute top-full left-0 w-full mt-2 rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl z-50 p-2 max-h-48 overflow-y-auto shadow-2xl no-scrollbar">
-                                        {(syllabusData[userData.board]?.[userData.class]?.[subject] || []).map(ch => (
-                                            <div key={ch} onClick={() => { setChapter(ch); setShowChapDrop(false); }} className="p-4 rounded-xl text-[10px] font-black uppercase hover:bg-white/10">{ch}</div>
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 w-full mt-2 rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl z-[500] p-2 max-h-48 overflow-y-auto shadow-2xl no-scrollbar">
+                                        {(syllabusData?.[userData?.board]?.[String(userData?.classLevel || userData?.class)]?.[subject] || []).map(ch => (
+                                            <div key={ch} onClick={() => {
+                                                setChapter(ch);
+                                                setShowChapDrop(false);
+                                                syncContext(subject, ch); // Immediate chapter update
+                                            }} className="p-4 rounded-xl text-[10px] font-black uppercase text-white hover:bg-white/10 cursor-pointer transition-colors">{ch}</div>
                                         ))}
                                     </motion.div>
                                 )}
@@ -776,93 +922,159 @@ You are 'Dhruva AI', an elite academic tutor powered by a Neural Core.
                     </div>
                 </div>
 
+
+
                 {/* MESSAGES AREA */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar pb-40">
-                    <div className="max-w-3xl mx-auto space-y-10">
-                        {messages.length === 0 && (
-                            <div className="h-48 flex flex-col items-center justify-center opacity-5">
-                                <FaWaveSquare size={40} className="animate-pulse" />
-                            </div>
-                        )}
-                        {messages.map((msg, i) => (
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                key={i}
-                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
-                            >
-                                <div
-                                    className={`p-6 rounded-[2.5rem] max-w-[85%] shadow-xl ${msg.role === 'user'
-                                        ? 'text-white rounded-tr-none'
-                                        : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`
-                                        }`}
-                                    style={msg.role === 'user' ? { backgroundColor: activeTheme.primaryHex } : {}}
-                                >
-                                    {/* --- ATTACHMENT RENDERER --- */}
-                                    {/* Inside your messages.map, replace the attachment block with this */}
-                                    {msg.attachment && (
-                                        <div className="mb-4 rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-2xl max-w-sm">
-                                            {msg.attachmentType === 'image' ? (
-                                                <img
-                                                    src={msg.attachment}
-                                                    alt="Neural Context"
-                                                    className="w-full h-auto max-h-80 object-cover"
-                                                />
-                                            ) : (
-                                                /* PDF / Document Thumbnail Card */
-                                                <div className="flex items-center gap-4 p-5 group cursor-default">
-                                                    <div className="p-3 bg-red-500/20 rounded-2xl group-hover:bg-red-500/30 transition-colors">
-                                                        <FaFilePdf className="text-red-400" size={24} />
-                                                    </div>
-                                                    <div className="flex flex-col flex-1 min-w-0">
-                                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-400/60">
-                                                            Document Established
-                                                        </span>
-                                                        <span className="text-sm text-white/90 font-semibold truncate">
-                                                            {/* If you save the filename in your userMsg, you can show it here */}
-                                                            Neural_Knowledge_Base.pdf
-                                                        </span>
-                                                        {/* Replace the old <a> tag with this button */}
-                                                        <button
-                                                            onClick={() => openVaultFile(msg.attachment)}
-                                                            className="w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-[10px] text-center font-bold uppercase tracking-widest text-indigo-400 rounded-lg transition-all border border-indigo-500/20"
-                                                        >
-                                                            Open Knowledge Vault
-                                                        </button>
-                                                    </div>
+                {/* --- MAIN PAGE WRAPPER --- */}
+                <div className="flex flex-col h-screen overflow-hidden bg-transparent">
+
+                    {/* 1. HEADER (Optional - adjust height as needed) */}
+                    {/* <div className="h-16 flex-shrink-0"> ... </div> */}
+
+                    {/* 2. FIXED CHAT AREA */}
+                    {/* 'flex-1' fills the middle, 'h-0' forces it to stay inside the flex box */}
+                    <div className="flex-1 relative flex flex-col h-0 w-full overflow-hidden">
+
+                        <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar scroll-smooth">
+                            {/* The 'pb-32' here creates the gap ABOVE the input bar */}
+                            <div className="max-w-3xl mx-auto space-y-10 pb-32">
+
+                                {messages.length === 0 && (
+                                    <div className="h-64 flex flex-col items-center justify-center opacity-10">
+                                        <FaWaveSquare size={40} className="animate-pulse text-indigo-400" />
+                                    </div>
+                                )}
+
+                                {/* --- MESSAGES LOOP --- */}
+                                {messages.map((msg, i) => (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 15 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        key={msg.timestamp || i}
+                                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} w-full mb-6`}
+                                    >
+                                        <div
+                                            className={`p-5 md:p-6 rounded-[2rem] max-w-[90%] md:max-w-[80%] shadow-2xl ${msg.role === 'user'
+                                                ? 'text-white rounded-tr-none'
+                                                : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`
+                                                }`}
+                                            style={msg.role === 'user' ? { backgroundColor: activeTheme.primaryHex } : {}}
+                                        >
+                                            {/* --- ATTACHMENT RENDERER --- */}
+                                            {msg.attachment && (
+                                                <div className="mb-4 rounded-2xl overflow-hidden border border-white/10 bg-black/30 max-w-sm">
+                                                    {msg.attachmentType === 'image' ? (
+                                                        <img
+                                                            src={msg.attachment}
+                                                            alt="Neural Context"
+                                                            className="w-full h-auto max-h-72 object-cover"
+                                                        />
+                                                    ) : (
+                                                        <div className="flex flex-col p-4 gap-3 bg-white/5">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="p-2.5 bg-red-500/20 rounded-xl">
+                                                                    <FaFilePdf className="text-red-400" size={20} />
+                                                                </div>
+                                                                <span className="text-xs text-white/90 font-medium truncate">
+                                                                    {msg.attachmentName || "Source_Document.pdf"}
+                                                                </span>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => openVaultFile(msg.attachment)}
+                                                                className="w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/25 text-[9px] text-center font-bold uppercase tracking-widest text-indigo-300 rounded-lg border border-indigo-500/20"
+                                                            >
+                                                                Access Knowledge Vault
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
-                                        </div>
-                                    )}
 
-                                    {/* --- MESSAGE TEXT --- */}
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                        rehypePlugins={[rehypeKatex]}
-                                        className="prose prose-invert text-sm leading-relaxed"
-                                    >
-                                        {msg.content}
-                                    </ReactMarkdown>
+                                            {/* --- MESSAGE CONTENT --- */}
+                                            <div className="prose prose-invert prose-sm max-w-none">
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm, remarkMath]}
+                                                    rehypePlugins={[rehypeKatex]}
+                                                >
+                                                    {msg.content}
+                                                </ReactMarkdown>
+                                            </div>
 
-                                    {/* --- YOUTUBE LINK (AI ONLY) --- */}
-                                    {msg.role === 'ai' && msg.ytLink && (
-                                        <div className="mt-4 pt-3 border-t border-white/5">
-                                            <a
-                                                href={msg.ytLink}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-400 transition-all"
-                                            >
-                                                <FaYoutube size={14} /> Watch Related Lesson
-                                            </a>
+                                            {/* --- AI METADATA --- */}
+                                            {/* --- YOUTUBE LINK (AI ONLY & CONDITIONAL) --- */}
+                                            {msg.role === 'ai' && msg.ytLink && typeof msg.ytLink === 'string' && msg.ytLink.includes('youtube.com') && (
+                                                <motion.div
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className="mt-4 pt-4 border-t border-white/5"
+                                                >
+                                                    <div className="flex flex-col gap-2">
+                                                        {/* Subtle Label with Subject/Chapter context */}
+                                                        <div className="flex justify-between items-center ml-1">
+                                                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-white/30">
+                                                                Neural Recommended Media
+                                                            </span>
+                                                            {/* Secondary badge for Chapter info */}
+                                                            <span className="text-[7px] font-bold text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-500/20">
+                                                                {subject || "General"} • {chapter || "Lesson"}
+                                                            </span>
+                                                        </div>
+
+                                                        <a
+                                                            /* This line ignores the AI's bad link and builds a perfect search for the user's actual class */
+                                                            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(
+                                                                (userData?.board || "CBSE") + " class " + (userData?.classLevel || userData?.class || "9") + " " + (subject || "") + " " + (chapter || "") + " explanation"
+                                                            )}`}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            className="group relative flex items-center justify-between gap-4 p-3 rounded-xl bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 hover:border-red-500/30 transition-all duration-300 shadow-lg shadow-red-500/5"
+                                                        >
+
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="p-2 bg-red-500 rounded-lg shadow-[0_0_15px_rgba(239,68,68,0.4)] group-hover:scale-110 transition-transform">
+                                                                    <FaYoutube size={14} className="text-white" />
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-red-500 group-hover:text-red-400">
+                                                                        Watch {subject || "Related"} Lesson
+                                                                    </span>
+                                                                    <span className="text-[9px] text-white/40 font-medium italic leading-tight">
+                                                                        {/* This line dynamically picks your board and class */}
+                                                                        {userData?.board || "CBSE"} • Class {userData?.classLevel || userData?.class || userData?.grade || "9"} • {subject || "Science"}
+                                                                    </span>
+
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="mr-2 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all">
+                                                                <FaChevronRight size={10} className="text-red-500" />
+                                                            </div>
+                                                        </a>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+
+
+
                                         </div>
-                                    )}
-                                </div>
-                            </motion.div>
-                        ))}
-                        <div ref={messagesEndRef} />
+                                    </motion.div>
+                                ))}
+
+                                {/* --- AUTO-SCROLL ANCHOR --- */}
+                                <div ref={messagesEndRef} className="h-2 w-full" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. INPUT AREA (Fixed Sibling) */}
+                    {/* Ensure this is NOT absolute. It should naturally sit at the bottom. */}
+                    <div className="flex-shrink-0 w-full bg-transparent p-4 z-50">
+                        <div className="max-w-3xl mx-auto">
+                            {/* Your Input bar and Quick Replies code goes here */}
+                        </div>
                     </div>
                 </div>
+
 
                 {/* --- REFINED BOTTOM INTERFACE --- */}
                 <div className="fixed bottom-0 left-0 w-full z-[600] pointer-events-none">
@@ -1020,7 +1232,7 @@ You are 'Dhruva AI', an elite academic tutor powered by a Neural Core.
                                     className="p-4 md:p-5 rounded-full shadow-lg disabled:opacity-50 overflow-hidden group flex items-center justify-center"
                                     style={{ backgroundColor: activeTheme.primaryHex }}
                                 >
-                                    {isAnalyzing ? "Processing..." : "Send"}
+                                    {isAnalyzing ? "Processing..." : ""}
                                     <AnimatePresence mode="wait">
                                         {isSending ? (
                                             <motion.div key="spin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><FaSyncAlt className="animate-spin text-white" size={18} /></motion.div>
