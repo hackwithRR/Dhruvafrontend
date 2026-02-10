@@ -28,3 +28,4 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 export const provider = googleProvider;
 
 export default app;
+
