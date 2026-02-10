@@ -1,3 +1,4 @@
+// 1. ALL IMPORTS MUST BE AT THE VERY TOP
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
@@ -5,32 +6,98 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import {
-    FaPaperPlane, FaSyncAlt, FaTimes, FaImage, FaHistory, FaYoutube, FaTrash,
-    FaTrophy, FaChevronLeft, FaChartLine, FaLayerGroup, FaWaveSquare, 
-    FaClock, FaSignOutAlt, FaMedal, FaBrain, FaSearch
+    FaPaperPlane, FaSyncAlt, FaTimes, FaImage, FaHistory, FaTrash,
+    FaTrophy, FaChartLine, FaLayerGroup, FaWaveSquare,
+    FaClock, FaSignOutAlt, FaMedal, FaBrain, FaSearch, FaChevronDown, FaPlus,
+    FaSlidersH, FaFire, FaGem, FaStar, FaLock, FaBolt, FaFilePdf, FaFileWord, FaFileAlt, FaYoutube
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import 'katex/dist/katex.min.css';
-import { 
-    doc, setDoc, collection, query, updateDoc, increment, onSnapshot, 
-    orderBy, limit, deleteDoc, getDoc
+import {
+    doc, setDoc, collection, query, updateDoc, increment, onSnapshot,
+    orderBy, limit, deleteDoc
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { motion, AnimatePresence } from "framer-motion";
+import imageCompression from 'browser-image-compression';
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
 
+// SYLLABUS DATA (PRESERVED)
 const syllabusData = {
     CBSE: {
-        "8": { "MATHEMATICS": ["Rational Numbers", "Linear Equations", "Understanding Quadrilaterals", "Data Handling", "Squares and Roots", "Cubes and Roots", "Comparing Quantities", "Algebraic Expressions", "Mensuration", "Exponents", "Factorisation"], "SCIENCE": ["Crop Production", "Microorganisms", "Coal and Petroleum", "Combustion", "Cell Structure", "Force and Pressure", "Friction", "Sound", "Light"] },
-        "10": { "MATHEMATICS": ["Real Numbers", "Polynomials", "Linear Equations", "Quadratic Equations", "Arithmetic Progressions", "Triangles", "Coordinate Geometry", "Trigonometry", "Circles", "Surface Areas", "Statistics", "Probability"], "SCIENCE": ["Chemical Reactions", "Acids, Bases and Salts", "Metals and Non-metals", "Carbon Compounds", "Life Processes", "Control and Coordination", "Reproduction", "Heredity", "Light Reflection", "Human Eye", "Electricity", "Magnetic Effects"] },
-        "12": { "PHYSICS": ["Electrostatics", "Current Electricity", "Magnetic Effects", "EMI", "Alternating Current", "EM Waves", "Ray Optics", "Wave Optics", "Dual Nature", "Atoms", "Nuclei", "Semiconductors"], "CHEMISTRY": ["Solutions", "Electrochemistry", "Chemical Kinetics", "d & f Block", "Coordination Compounds", "Haloalkanes", "Alcohols & Phenols", "Aldehydes & Ketones", "Amines", "Biomolecules"] }
+        "8": {
+            "MATHEMATICS": ["Rational Numbers", "Linear Equations in One Variable", "Understanding Quadrilaterals", "Practical Geometry", "Data Handling", "Squares and Square Roots", "Cubes and Cube Roots", "Comparing Quantities", "Algebraic Expressions and Identities", "Visualising Solid Shapes", "Mensuration", "Exponents and Powers", "Direct and Inverse Proportions", "Factorisation", "Introduction to Graphs", "Playing with Numbers"],
+            "SCIENCE": ["Crop Production and Management", "Microorganisms: Friend and Foe", "Synthetic Fibres and Plastics", "Materials: Metals and Non-Metals", "Coal and Petroleum", "Combustion and Flame", "Conservation of Plants and Animals", "Cell – Structure and Functions", "Reproduction in Animals", "Reaching the Age of Adolescence", "Force and Pressure", "Friction", "Sound", "Chemical Effects of Electric Current", "Some Natural Phenomena", "Light", "Stars and the Solar System", "Pollution of Air and Water"],
+            "HISTORY": ["How, When and Where", "From Trade to Territory", "Ruling the Countryside", "Tribals, Dikus and the Vision of a Golden Age", "When People Rebel", "Colonialism and the City", "Weavers, Iron Smelters and Factory Owners", "Civilising the Native, Educating the Nation"],
+            "GEOGRAPHY": ["Resources", "Land, Soil, Water, Natural Vegetation and Wildlife", "Mineral and Power Resources", "Agriculture", "Industries", "Human Resources"],
+            "CIVICS": ["The Indian Constitution", "Understanding Secularism", "Why Do We Need a Parliament", "Understanding Laws", "Judiciary", "Understanding Our Criminal Justice System", "Understanding Marginalisation", "Confronting Marginalisation"],
+            "ENGLISH": ["The Best Christmas Present in the World", "The Tsunami", "Glimpses of the Past", "Bepin Choudhury’s Lapse of Memory", "The Summit Within", "This Is Jody’s Fawn", "A Visit to Cambridge", "A Short Monsoon Diary"],
+            "HINDI": ["ध्वनि", "लाख की चूड़ियाँ", "बस की यात्रा", "दीवानों की हस्ती", "चिट्ठियों की अनूठी दुनिया", "भगवान के डाकिए", "क्या निराश हुआ जाए", "यह सबसे कठिन समय नहीं"]
+        },
+        "9": {
+            "MATHEMATICS": ["Number Systems", "Polynomials", "Coordinate Geometry", "Linear Equations in Two Variables", "Introduction to Euclid’s Geometry", "Lines and Angles", "Triangles", "Quadrilaterals", "Areas of Parallelograms and Triangles", "Circles", "Constructions", "Heron’s Formula", "Surface Areas and Volumes", "Statistics", "Probability"],
+            "SCIENCE": ["Matter in Our Surroundings", "Is Matter Around Us Pure", "Atoms and Molecules", "Structure of the Atom", "The Fundamental Unit of Life", "Tissues", "Diversity in Living Organisms", "Motion", "Force and Laws of Motion", "Gravitation", "Work and Energy", "Sound", "Why Do We Fall Ill", "Natural Resources", "Improvement in Food Resources"],
+            "HISTORY": ["The French Revolution", "Socialism in Europe and the Russian Revolution", "Nazism and the Rise of Hitler", "Forest Society and Colonialism", "Pastoralists in the Modern World"],
+            "GEOGRAPHY": ["India – Size and Location", "Physical Features of India", "Drainage", "Climate", "Natural Vegetation and Wildlife", "Population"],
+            "POLITICAL SCIENCE": ["What is Democracy? Why Democracy?", "Constitutional Design", "Electoral Politics", "Working of Institutions", "Democratic Rights"],
+            "ECONOMICS": ["The Story of Village Palampur", "People as Resource", "Poverty as a Challenge", "Food Security in India"],
+            "ENGLISH": ["The Fun They Had", "The Sound of Music", "The Little Girl", "A Truly Beautiful Mind", "The Snake and the Mirror", "My Childhood", "Packing", "Reach for the Top", "The Bond of Love", "Kathmandu", "If I Were You"]
+        },
+        "10": {
+            "MATHEMATICS": ["Real Numbers", "Polynomials", "Pair of Linear Equations in Two Variables", "Quadratic Equations", "Arithmetic Progressions", "Triangles", "Coordinate Geometry", "Introduction to Trigonometry", "Some Applications of Trigonometry", "Circles", "Constructions", "Areas Related to Circles", "Surface Areas and Volumes", "Statistics", "Probability"],
+            "SCIENCE": ["Chemical Reactions and Equations", "Acids, Bases and Salts", "Metals and Non-metals", "Carbon and its Compounds", "Life Processes", "Control and Coordination", "How Do Organisms Reproduce", "Heredity and Evolution", "Light – Reflection and Refraction", "The Human Eye and the Colourful World", "Electricity", "Magnetic Effects of Electric Current", "Our Environment", "Sources of Energy"],
+            "HISTORY": ["The Rise of Nationalism in Europe", "Nationalism in India", "The Making of a Global World", "The Age of Industrialisation", "Print Culture and the Modern World"],
+            "GEOGRAPHY": ["Resources and Development", "Forest and Wildlife Resources", "Water Resources", "Agriculture", "Minerals and Energy Resources", "Manufacturing Industries", "Lifelines of National Economy"],
+            "POLITICAL SCIENCE": ["Power Sharing", "Federalism", "Gender, Religion and Caste", "Political Parties", "Outcomes of Democracy"],
+            "ECONOMICS": ["Development", "Sectors of the Indian Economy", "Money and Credit", "Globalisation and the Indian Economy", "Consumer Rights"],
+            "ENGLISH": ["A Letter to God", "Nelson Mandela: Long Walk to Freedom", "Two Stories about Flying", "From the Diary of Anne Frank", "Glimpses of India", "Mijbil the Otter", "Madam Rides the Bus", "The Sermon at Benares", "The Proposal"]
+        },
+        "11": {
+            "PHYSICS": ["Physical World and Measurement", "Kinematics", "Laws of Motion", "Work, Energy and Power", "Motion of System of Particles", "Gravitation", "Properties of Bulk Matter", "Thermodynamics", "Kinetic Theory", "Oscillations and Waves"],
+            "CHEMISTRY": ["Some Basic Concepts of Chemistry", "Structure of Atom", "States of Matter", "Thermodynamics", "Equilibrium", "Organic Chemistry – Basic Principles", "Hydrocarbons"],
+            "BIOLOGY": ["Diversity in Living World", "Structural Organisation in Animals and Plants", "Cell Structure and Function", "Plant Physiology", "Human Physiology"],
+            "ENGLISH": ["Hornbill", "Snapshots"]
+        },
+        "12": {
+            "PHYSICS": ["Electrostatics", "Current Electricity", "Magnetic Effects of Current", "Electromagnetic Induction", "Alternating Current", "Electromagnetic Waves", "Ray Optics", "Wave Optics", "Dual Nature of Radiation and Matter", "Atoms", "Nuclei", "Semiconductor Electronics"],
+            "CHEMISTRY": ["Solid State", "Solutions", "Electrochemistry", "Chemical Kinetics", "Surface Chemistry", "p-Block Elements", "d and f Block Elements", "Coordination Compounds", "Haloalkanes and Haloarenes", "Alcohols, Phenols and Ethers", "Aldehydes, Ketones and Carboxylic Acids", "Amines", "Biomolecules", "Polymers", "Chemistry in Everyday Life"],
+            "BIOLOGY": ["Reproduction", "Genetics and Evolution", "Biology and Human Welfare", "Biotechnology", "Ecology and Environment"],
+            "ENGLISH": ["Flamingo", "Vistas"]
+        }
     },
     ICSE: {
-        "10": { "MATHEMATICS": ["Quadratic Equations", "Linear Inequations", "Ratio & Proportion", "Matrices", "Arithmetic Progression", "Similarity", "Trigonometry", "Statistics"], "PHYSICS": ["Force", "Work, Power, Energy", "Machines", "Refraction", "Spectrum", "Sound", "Electricity", "Radioactivity"] }
+        "8": {
+            "MATHEMATICS": ["Rational Numbers", "Exponents", "Squares and Square Roots", "Cubes and Cube Roots", "Algebraic Expressions", "Linear Equations", "Factorisation", "Ratio and Proportion", "Percentages", "Profit and Loss", "Simple Interest", "Polygons", "Quadrilaterals", "Mensuration", "Data Handling", "Graphs"],
+            "PHYSICS": ["Matter", "Physical Quantities and Measurement", "Force and Pressure", "Energy", "Light", "Heat", "Sound", "Electricity"],
+            "CHEMISTRY": ["Matter", "Physical and Chemical Changes", "Elements, Compounds and Mixtures", "Atomic Structure", "Chemical Reactions", "Hydrogen", "Water", "Carbon and its Compounds"],
+            "BIOLOGY": ["Plant Tissues", "Animal Tissues", "Transport in Plants", "Reproduction in Plants", "Reproduction in Animals", "Ecosystem", "Human Body Systems", "Health and Hygiene"],
+            "HISTORY & CIVICS": ["Indian Constitution", "Parliament", "Judiciary", "Revolt of 1857", "Colonial Rule in India"],
+            "GEOGRAPHY": ["Climate of India", "Resources", "Agriculture", "Industries"],
+            "ENGLISH": ["Prose", "Poetry", "Grammar and Composition"]
+        },
+        "9": {
+            "MATHEMATICS": ["Rational and Irrational Numbers", "Indices", "Algebraic Expressions", "Factorisation", "Linear Equations", "Expansions", "Coordinate Geometry", "Triangles", "Pythagoras Theorem", "Circles", "Mensuration", "Statistics", "Trigonometry"],
+            "PHYSICS": ["Measurements and Experimentation", "Motion", "Laws of Motion", "Fluids", "Heat", "Light", "Sound"],
+            "CHEMISTRY": ["Matter and its Composition", "Atomic Structure", "Periodic Table", "Chemical Bonding", "Study of Gases", "Acids, Bases and Salts"],
+            "BIOLOGY": ["Cell", "Tissues", "Diversity of Living Organisms", "Plant Physiology", "Human Physiology", "Health and Hygiene"],
+            "HISTORY & CIVICS": ["French Revolution", "Russian Revolution", "World Wars", "Indian Constitution"],
+            "GEOGRAPHY": ["Earth as a Planet", "Structure of the Earth", "Climate", "Resources"],
+            "ENGLISH": ["Prose", "Poetry", "Drama", "Grammar and Composition"]
+        },
+        "10": {
+            "MATHEMATICS": ["Quadratic Equations", "Linear Inequations", "Ratio and Proportion", "Matrices", "Arithmetic Progression", "Coordinate Geometry", "Similarity", "Trigonometry", "Heights and Distances", "Mensuration", "Probability", "Statistics"],
+            "PHYSICS": ["Force", "Work, Power and Energy", "Machines", "Refraction of Light", "Spectrum", "Sound", "Current Electricity", "Magnetism", "Electromagnetic Induction", "Radioactivity"],
+            "CHEMISTRY": ["Periodic Properties", "Chemical Bonding", "Acids, Bases and Salts", "Analytical Chemistry", "Metallurgy", "Organic Chemistry"],
+            "BIOLOGY": ["Cell Cycle", "Genetics", "Plant Physiology", "Human Anatomy and Physiology", "Population", "Environment"],
+            "HISTORY & CIVICS": ["First War of Independence", "Growth of Nationalism", "World Wars", "United Nations", "Union Legislature", "Union Executive", "Judiciary"],
+            "GEOGRAPHY": ["Map Work", "Climate", "Soil Resources", "Water Resources", "Natural Vegetation", "Mineral Resources", "Industries", "Transport", "Waste Management"],
+            "ENGLISH": ["Prose", "Poetry", "Drama – Merchant of Venice", "Grammar and Composition"]
+        }
     }
 };
 
@@ -44,6 +111,8 @@ const themes = {
 export default function Chat() {
     const { currentUser, loading: authLoading } = useAuth();
     const navigate = useNavigate();
+
+    // --- BASIC STATES ---
     const [messages, setMessages] = useState([]);
     const [sessions, setSessions] = useState([]);
     const [leaderboard, setLeaderboard] = useState([]);
@@ -51,25 +120,108 @@ export default function Chat() {
     const [sessionTitle, setSessionTitle] = useState("New Lesson");
     const [isEditingTitle, setIsEditingTitle] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
-    const [input, setInput] = useState("");
+    const [input, setInput] = useState(""); // <--- Only keep this ONE
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // --- FILE & UI STATES ---
+    const [attachedFile, setAttachedFile] = useState(null);
+    const [fileType, setFileType] = useState(null);
     const [mode, setMode] = useState("Explain");
-    const [subject, setSubject] = useState("MATHEMATICS");
+    const [subject, setSubject] = useState("");
     const [chapter, setChapter] = useState("");
     const [isSending, setIsSending] = useState(false);
     const [userData, setUserData] = useState({ board: "CBSE", class: "10", xp: 0, dailyXp: 0, streak: 0, theme: "DeepSpace", displayName: "" });
     const [timer, setTimer] = useState(0);
-    const [showSidebar, setShowSidebar] = useState(false);
     const [showSessionPicker, setShowSessionPicker] = useState(false);
     const [selectedFile, setSelectedFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
+    const [showSubjDrop, setShowSubjDrop] = useState(false);
+    const [showChapDrop, setShowChapDrop] = useState(false);
+    const [showPlusMenu, setShowPlusMenu] = useState(false);
+    const [showContextOverlay, setShowContextOverlay] = useState(false);
+    const [searchVault, setSearchVault] = useState("");
+    const [showSidebar, setShowSidebar] = useState(false);
+
+
+    // --- LOGIC FUNCTIONS ---
+    // 1. Make sure you have this state defined at the top of your component:
+    // const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // 1. Size Validation (10MB is safe for direct upload)
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error("File too large. Maximum size is 10MB.");
+            return;
+        }
+
+        try {
+            setIsAnalyzing(true);
+            const isImage = file.type.startsWith('image/');
+            const type = isImage ? 'image' : 'document';
+
+            setFileType(type);
+            setAttachedFile(file); // Store the actual file to send later
+
+            // 2. Local Preview (No Upload Needed)
+            // This creates a temporary URL in your browser memory
+            const localPreviewUrl = URL.createObjectURL(file);
+            setImagePreview(localPreviewUrl);
+
+            toast.success("Neural Link Ready.");
+            console.log("File staged for transmission:", file.name);
+
+        } catch (error) {
+            console.error("Attachment Error:", error);
+            toast.error("Failed to attach file.");
+            setImagePreview(null);
+            setAttachedFile(null);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    // --- CALCULATED STATISTICS ---
+    // This defines the variables the ESLint error is complaining about
+    const currentLvl = useMemo(() =>
+        Math.floor((userData.xp || 0) / 1000) + 1,
+        [userData.xp]
+    );
+
+    const levelProgress = useMemo(() =>
+        (userData.xp % 1000) / 10,
+        [userData.xp]
+    );
+
+
+
+    const dailyProgress = useMemo(() =>
+        Math.min(((userData.dailyXp || 0) / 500) * 100, 100),
+        [userData.dailyXp]
+    );
 
     const messagesEndRef = useRef(null);
     const fileInputRef = useRef(null);
-    
+    const inputRef = useRef(null);
+    const docInputRef = useRef(null);
+
     const activeTheme = useMemo(() => {
         const themeKey = userData?.theme || "DeepSpace";
         return themes[themeKey] || themes.DeepSpace;
     }, [userData?.theme]);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTimer(prev => {
+                const newTime = prev + 1;
+                if (newTime % 180 === 0 && currentUser) { incrementXP(1); }
+                return newTime;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [currentUser]);
 
     useEffect(() => {
         if (activeTheme?.hex) {
@@ -81,11 +233,6 @@ export default function Chat() {
     useEffect(() => {
         if (!authLoading && !currentUser) navigate("/login");
     }, [currentUser, authLoading, navigate]);
-
-    useEffect(() => {
-        const interval = setInterval(() => setTimer(prev => prev + 1), 1000);
-        return () => clearInterval(interval);
-    }, []);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -100,10 +247,10 @@ export default function Chat() {
         const unsubUser = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
             if (docSnap.exists()) {
                 const incomingData = docSnap.data();
-                setUserData(prev => ({ 
-                    ...prev, 
+                setUserData(prev => ({
+                    ...prev,
                     ...incomingData,
-                    theme: incomingData.theme || prev.theme || "DeepSpace" 
+                    theme: incomingData.theme || prev.theme || "DeepSpace"
                 }));
             }
         });
@@ -125,57 +272,160 @@ export default function Chat() {
     const handleFileSelect = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
-        if (file.size > 10 * 1024 * 1024) return toast.error("Image exceeds 10MB limit");
-        setSelectedFile(file);
-        const reader = new FileReader();
-        reader.onloadend = () => setImagePreview(reader.result);
-        reader.readAsDataURL(file);
-    };
 
+        // 1. Show the user something is happening
+        setIsSending(true);
+
+        try {
+            let fileToProcess = file;
+
+            // 2. If it's an image, COMPRESS IT
+            if (file.type.startsWith('image/')) {
+                const options = {
+                    maxSizeMB: 0.5,          // Max 500kb for speed
+                    maxWidthOrHeight: 1280,  // Good enough for AI to see
+                    useWebWorker: true
+                };
+                fileToProcess = await imageCompression(file, options);
+                setFileType('image');
+            } else {
+                setFileType('document');
+            }
+
+            // 3. Convert to Base64 (This is what the AI eats)
+            const reader = new FileReader();
+            reader.readAsDataURL(fileToProcess);
+            reader.onloadend = () => {
+                const base64data = reader.result;
+                setImagePreview(base64data); // This shows the preview in chat
+                setAttachedFile(base64data); // This is what you send to the AI
+                setIsSending(false);
+            };
+
+        } catch (error) {
+            console.error("Compression Error:", error);
+            setIsSending(false);
+        }
+    };
     const sendMessage = async (override = null) => {
         const text = override || input;
-        if (isSending || (!text.trim() && !selectedFile)) return;
+
+        // 1. VALIDATION
+        // Check if both text and file are missing
+        if (isSending || (!text.trim() && !attachedFile)) return;
+
+        // 2. SYSTEM PROMPT & MODE LOGIC
+        const modeBehaviors = {
+            "Explain": "Break down the topic into simple analogies. Use step-by-step logic and clear language.",
+            "Practice": "Do NOT provide direct answers. Present a challenging problem and guide the user.",
+            "Summarize": "Provide a high-level summary with bullet points and bold key terms.",
+            "Deep Dive": "Go beyond the standard curriculum. Explain advanced theory and background."
+        };
+
+        const systemPrompt = `
+You are 'Dhruva AI', an elite academic tutor powered by a Neural Core.
+### ACADEMIC CONTEXT
+- Board: ${userData.board} | Class: ${userData.class}
+- Subject: ${subject} | Chapter: ${chapter}
+- Mode: ${mode} (${modeBehaviors[mode]})
+
+### ATTACHMENT HANDLING
+- If data is provided from a file/image, treat it as the student's PRIMARY notes.
+- Ensure all math/science formulas use LaTeX ($E=mc^2$).
+- If unrelated to ${subject}, politely redirect to the current curriculum.
+`;
+
         setIsSending(true);
+
+        // Capture current states before clearing UI
         const currentInput = text;
-        const currentImg = imagePreview;
+        const currentFile = attachedFile;
+        const currentPreview = imagePreview;
+        const currentFileType = fileType;
+
+        // 3. UI RESET (Immediate feedback for the user)
         setInput("");
         setImagePreview(null);
-        setSelectedFile(null);
-        const userMsg = { role: "user", content: currentInput, image: currentImg, timestamp: Date.now() };
+        setAttachedFile(null);
+        setFileType(null);
+
+        // 4. PREPARE FORMDATA (This bypasses the 1MB limit)
+        const formData = new FormData();
+        formData.append("userId", currentUser.uid);
+        formData.append("message", currentInput);
+        formData.append("systemPrompt", systemPrompt);
+        formData.append("subject", subject);
+        formData.append("chapter", chapter);
+        formData.append("mode", mode);
+        formData.append("board", userData.board);
+        formData.append("class", userData.class);
+
+        // If there is an actual file, append it
+        if (currentFile) {
+            formData.append("file", currentFile);
+        }
+
+        // 5. LOCAL UI UPDATE
+        const userMsg = {
+            role: "user",
+            content: currentInput,
+            attachment: currentPreview,
+            attachmentType: currentFileType,
+            timestamp: Date.now()
+        };
         setMessages(prev => [...prev, userMsg]);
+
+
+
         try {
-            const res = await axios.post(`${API_BASE}/chat`, {
-                userId: currentUser.uid,
-                message: currentInput,
-                mode,
-                subject,
-                chapter,
-                image: currentImg,
-                board: userData.board,
-                class: userData.class
+            // 6. API CALL
+            const res = await axios.post(`${API_BASE}/chat`, formData, {
+                headers: { "Content-Type": "multipart/form-data" }
             });
-            const querySuffix = mode === "Quiz" ? "practice questions" : mode === "HW" ? "solved" : "tutorial";
-            const ytLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} class ${userData.class} ${subject} ${chapter} ${querySuffix}`)}`;
-            const aiMsg = { role: "ai", content: res.data.reply, timestamp: Date.now(), ytLink };
+
+            const ytLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(`${userData.board} class ${userData.class} ${subject} ${chapter}`)}`;
+
+            const aiMsg = {
+                role: "ai",
+                content: res.data.reply,
+                timestamp: Date.now(),
+                ytLink,
+            };
+
             setMessages(prev => {
                 const updated = [...prev, aiMsg];
+
+                // 7. DATABASE SYNC (Saves session to Firestore)
                 setDoc(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), {
                     messages: updated,
                     lastUpdate: Date.now(),
-                    title: sessionTitle === "New Lesson" ? currentInput.slice(0, 20) : sessionTitle,
-                    subject, chapter
+                    title: sessionTitle === "New Lesson" ? currentInput.slice(0, 25) + "..." : sessionTitle,
+                    subject,
+                    chapter,
+                    board: userData.board,
+                    class: userData.class,
+                    activeMode: mode
                 }, { merge: true });
+
                 return updated;
             });
-            await incrementXP(currentImg ? 30 : 15);
-        } catch (err) { toast.error("Signal Lost. Check Connection."); }
-        setIsSending(false);
-    };
 
+            // 8. REWARD SYSTEM
+            await incrementXP(currentFile ? 30 : 15);
+
+        } catch (err) {
+            console.error("Neural Error:", err);
+            toast.error("Signal Lost. Check your neural link.");
+            // Optional: Put the message back in the input if it fails
+            setInput(currentInput);
+        } finally {
+            setIsSending(false);
+        }
+    };
     const quickReplies = useMemo(() => {
-        if (mode === "Quiz") return ["Start 5 MCQ Quiz", "Hard Mode", "Summary of Progress"];
-        if (mode === "HW") return ["Step-by-step Solution", "Clarify this step", "Alternative Method"];
-        return [`Summarize ${chapter || 'this'}`, "Real-world application?", "Simplified explanation"];
+        if (mode === "Quiz") return ["Start 5 MCQ Quiz", "Hard Mode", "Summary"];
+        if (mode === "HW") return ["Step-by-step", "Clarify this", "Alternative"];
+        return [`Summarize ${chapter || 'this'}`, "Real-world application", "Simplify"];
     }, [mode, chapter]);
 
     useEffect(() => {
@@ -184,129 +434,429 @@ export default function Chat() {
         return onSnapshot(q, (snap) => setSessions(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     }, [currentUser]);
 
+    useEffect(() => {
+        if (!currentUser || !currentSessionId) return;
+
+        // Listen to the SPECIFIC active session
+        const unsub = onSnapshot(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+
+                // This restores your messages AND their attachments (images/docs)
+                if (data.messages) {
+                    setMessages(data.messages);
+                }
+
+                // This restores the AI's strict context (Subject/Chapter)
+                if (data.subject) setSubject(data.subject);
+                if (data.chapter) setChapter(data.chapter);
+            }
+        });
+
+        return () => unsub();
+    }, [currentSessionId, currentUser]);
+
     const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
     const calculateLevel = (xp) => Math.floor((xp || 0) / 1000) + 1;
+    const openVaultFile = (base64Data) => {
+        try {
+            // 1. Convert Base64 to a real PDF Blob
+            const base64Parts = base64Data.split(',');
+            const contentType = base64Parts[0].split(':')[1].split(';')[0];
+            const byteCharacters = atob(base64Parts[1]);
+            const byteNumbers = new Array(byteCharacters.length);
 
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: contentType });
+
+            // 2. Create a temporary URL for the Blob
+            const fileURL = URL.createObjectURL(blob);
+
+            // 3. Open it
+            window.open(fileURL, '_blank');
+        } catch (err) {
+            console.error(err);
+            toast.error("Neural Link failed to decode file.");
+        }
+    };
+    // --- CONSOLIDATED VAULT LOGIC ---
+    // --- CONSOLIDATED VAULT LOGIC ---
     const filteredSessions = useMemo(() => {
-        return sessions.filter(s => (s.title || "").toLowerCase().includes(searchQuery.toLowerCase()));
-    }, [sessions, searchQuery]);
+        if (!sessions) return [];
+        const query = (searchVault || "").toLowerCase();
+        return sessions.filter(s =>
+            (s.title || "").toLowerCase().includes(query) ||
+            (s.subject || "").toLowerCase().includes(query)
+        );
+    }, [sessions, searchVault]); // This line should match the 'const filteredSessions' start
 
-    if (authLoading) return (
-      <div className={`h-screen w-full flex flex-col items-center justify-center space-y-4`} style={{ backgroundColor: activeTheme.hex }}>
-        <FaBrain className="text-indigo-500 animate-pulse" size={40}/>
-        <h2 className={`${activeTheme.text} text-xs font-black uppercase tracking-[0.5em]`}>Syncing Neural Link...</h2>
-      </div>
-    );
+
+    if (authLoading) return <div className="h-screen flex items-center justify-center text-xs font-black uppercase tracking-widest">Initialising...</div>;
 
     return (
-        <div className={`flex h-[100dvh] w-full ${activeTheme.bg} ${activeTheme.text} overflow-hidden font-sans selection:bg-indigo-500/30 transition-colors duration-500 relative`}>
-            <div className={`absolute inset-0 -z-20 ${activeTheme.bg}`} />
-            
+        <div className={`flex h-[100dvh] w-full ${activeTheme.bg} ${activeTheme.text} overflow-hidden font-sans relative`}>
             <ToastContainer theme={activeTheme.isDark ? "dark" : "light"} />
 
+            {/* SIDEBAR (PRESERVED) */}
+            {/* --- WIDER SCHOLAR DASHBOARD (STATISTICS) --- */}
             <AnimatePresence>
                 {showSidebar && (
                     <>
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowSidebar(false)} className="fixed inset-0 bg-black/80 backdrop-blur-md z-[800]" />
-                        <motion.div initial={{ x: -400 }} animate={{ x: 0 }} exit={{ x: -400 }} className={`fixed inset-y-0 left-0 w-80 ${activeTheme.isDark ? 'bg-black/40' : 'bg-white/90'} backdrop-blur-2xl border-r ${activeTheme.border} z-[801] p-8 flex flex-col`}>
-                            <div className="flex justify-between items-center mb-10">
-                                <div className="flex items-center gap-2">
-                                    <FaBrain className={activeTheme.accent}/>
-                                    <h3 className="text-xl font-black italic uppercase tracking-tighter">Dhruva OS</h3>
+                        {/* Backdrop Blur */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowSidebar(false)}
+                            className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[800]"
+                        />
+
+                        {/* Main Wide Panel */}
+                        <motion.div
+                            initial={{ x: -600 }}
+                            animate={{ x: 0 }}
+                            exit={{ x: -600 }}
+                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                            className={`fixed inset-y-0 left-0 w-[92%] md:w-[520px] ${activeTheme.isDark ? 'bg-[#080808]' : 'bg-white'} border-r ${activeTheme.border} z-[801] p-8 md:p-14 flex flex-col shadow-[50px_0_100px_rgba(0,0,0,0.5)]`}
+                        >
+                            {/* Header Section */}
+                            <div className="flex justify-between items-start mb-12">
+                                <div className="flex flex-col">
+                                    <h3 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter leading-none">Statistics</h3>
+                                    <p className="text-[10px] md:text-xs font-black uppercase tracking-[0.5em] opacity-30 mt-2 text-indigo-500">Scholar Neural Link</p>
                                 </div>
-                                <button onClick={() => setShowSidebar(false)} className="p-2 opacity-40 hover:opacity-100"><FaChevronLeft/></button>
+                                <button
+                                    onClick={() => setShowSidebar(false)}
+                                    className="p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-all group"
+                                >
+                                    <FaTimes className="group-hover:rotate-90 transition-transform duration-300" />
+                                </button>
                             </div>
-                            <div className="space-y-8 flex-1 overflow-y-auto no-scrollbar">
-                                <div className={`p-6 rounded-[2rem] border ${activeTheme.border} ${activeTheme.card} bg-gradient-to-br from-indigo-600/5 to-transparent`}>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className={`p-3 ${activeTheme.isDark ? 'bg-white/5' : 'bg-indigo-600/20'} rounded-2xl text-indigo-500`}><FaTrophy size={20}/></div>
-                                        <div className="text-right">
-                                            <div className="text-3xl font-black tracking-tighter">LVL {calculateLevel(userData.xp)}</div>
-                                            <div className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{userData.xp || 0} Total XP</div>
+
+                            {/* Content Area with Liquid Scrollbar */}
+                            <div className="flex-1 overflow-y-auto custom-scroll pr-4 space-y-12">
+
+                                {/* Big Phase Badge Card */}
+                                <div className="bg-gradient-to-br from-white/[0.03] to-transparent border border-white/10 p-10 rounded-[3.5rem] flex flex-col items-center relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-6 opacity-10">
+                                        <FaBrain size={80} />
+                                    </div>
+
+                                    <motion.div whileHover={{ scale: 1.05 }} className="relative mb-8">
+                                        <div className="w-36 h-36 rounded-[3.5rem] bg-indigo-600 flex items-center justify-center font-black text-6xl shadow-[0_0_70px_rgba(79,70,229,0.5)] border-4 border-white/10">
+                                            {currentLvl}
+                                        </div>
+                                        {userData.streak >= 3 && (
+                                            <motion.div
+                                                animate={{ y: [0, -12, 0], scale: [1, 1.2, 1] }}
+                                                transition={{ repeat: Infinity, duration: 2 }}
+                                                className="absolute -top-6 -right-6 bg-orange-600 p-5 rounded-[2rem] shadow-[0_0_30px_#ea580c] border-4 border-[#080808]"
+                                            >
+                                                <FaFire size={28} className="text-white" />
+                                            </motion.div>
+                                        )}
+                                    </motion.div>
+
+                                    <div className="text-center">
+                                        <h4 className="text-2xl font-black uppercase tracking-[0.2em]">Academic Phase {currentLvl}</h4>
+                                        <div className="flex items-center justify-center gap-3 mt-4">
+                                            <span className="px-4 py-1.5 bg-indigo-600/20 text-indigo-400 rounded-full text-[10px] font-black border border-indigo-500/30 uppercase tracking-widest">
+                                                {userData.xp} Total XP
+                                            </span>
+                                            <span className="px-4 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-full text-[10px] font-black border border-emerald-500/30 uppercase tracking-widest">
+                                                {userData.streak} Day Streak
+                                            </span>
                                         </div>
                                     </div>
-                                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-2">
-                                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(((userData.dailyXp || 0) / 500) * 100, 100)}%` }} style={{ backgroundColor: activeTheme.primaryHex }} className="h-full" />
+                                </div>
+
+                                {/* Progress Metrics */}
+                                <div className="grid gap-8">
+                                    {/* Level Progress */}
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-[11px] font-black uppercase tracking-[0.3em] opacity-40">Neural Evolution</span>
+                                            <span className="text-lg font-black text-indigo-500">{levelProgress.toFixed(0)}%</span>
+                                        </div>
+                                        <div className="h-4 bg-white/5 rounded-full p-1 border border-white/5 relative">
+                                            <motion.div
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${levelProgress}%` }}
+                                                className="h-full bg-gradient-to-r from-indigo-600 to-blue-400 rounded-full shadow-[0_0_20px_rgba(79,70,229,0.6)]"
+                                            />
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between items-center">
-                                        <p className={`text-[9px] font-black uppercase ${activeTheme.accent}`}>Daily Session</p>
-                                        <p className="text-[9px] font-black uppercase opacity-40">{userData.dailyXp || 0} / 500 XP</p>
+
+                                    {/* Daily Goal */}
+                                    <div className="space-y-4">
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-[11px] font-black uppercase tracking-[0.3em] opacity-40">Daily Quota</span>
+                                            <span className="text-lg font-black text-emerald-500">{userData.dailyXp}<span className="text-[10px] opacity-30">/500</span></span>
+                                        </div>
+                                        <div className="h-4 bg-white/5 rounded-full p-1 border border-white/5">
+                                            <motion.div
+                                                initial={{ width: 0 }}
+                                                animate={{ width: `${dailyProgress}%` }}
+                                                className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.6)]"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="space-y-4">
-                                    <label className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30 px-2 flex items-center gap-2"><FaMedal/> Top Scholars</label>
-                                    <div className="space-y-2">
+
+                                {/* Leaderboard Section (Wide) */}
+                                <div className="space-y-6">
+                                    <label className="text-[11px] font-black uppercase tracking-[0.4em] opacity-30 flex items-center gap-3">
+                                        <FaTrophy className="text-yellow-500" /> Competitive Hierarchy
+                                    </label>
+                                    <div className="grid gap-3">
                                         {leaderboard.map((user, idx) => (
-                                            <div key={user.id} className={`flex items-center justify-between p-4 rounded-2xl border ${activeTheme.border} ${user.id === currentUser?.uid ? 'bg-indigo-600/10 border-indigo-500/30' : 'bg-white/[0.02]'}`}>
-                                                <div className="flex items-center gap-3">
-                                                    <span className={`text-xs font-black ${idx === 0 ? 'text-yellow-500' : 'opacity-20'}`}>0{idx+1}</span>
-                                                    <span className="text-xs font-bold truncate w-24 uppercase tracking-tight">{user.displayName || "Scholar"}</span>
+                                            <motion.div
+                                                key={user.id}
+                                                whileHover={{ x: 10 }}
+                                                className={`flex items-center justify-between p-6 rounded-[2rem] border transition-all ${user.id === currentUser?.uid ? 'bg-indigo-600/10 border-indigo-500/40 shadow-lg shadow-indigo-500/10' : 'bg-white/[0.02] border-white/5'}`}
+                                            >
+                                                <div className="flex items-center gap-5">
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${idx === 0 ? 'bg-yellow-500 text-black' : 'bg-white/5 text-white/40'}`}>
+                                                        0{idx + 1}
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm font-black uppercase tracking-tight">{user.displayName || "Anonymous"}</span>
+                                                        <span className="text-[10px] opacity-30 font-bold uppercase tracking-widest">Level {Math.floor(user.xp / 1000) + 1}</span>
+                                                    </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <span className={`text-[10px] font-black ${activeTheme.accent} block leading-tight`}>{user.xp || 0}</span>
-                                                    <span className="text-[7px] opacity-30 font-black uppercase tracking-tighter">Global XP</span>
+                                                    <span className="text-sm font-black text-indigo-400">{user.xp}</span>
+                                                    <p className="text-[8px] opacity-20 font-black uppercase">Credits</p>
                                                 </div>
-                                            </div>
+                                            </motion.div>
                                         ))}
                                     </div>
                                 </div>
+
+                                {/* Footer Info */}
+                                <div className="pt-10 border-t border-white/5 flex flex-col items-center opacity-20">
+                                    <FaLayerGroup size={24} className="mb-4" />
+                                    <p className="text-[9px] font-black uppercase tracking-[0.5em]">Synchronized Academic Profile</p>
+                                </div>
                             </div>
-                            <button onClick={handleLogout} className="mt-6 flex items-center justify-center gap-3 p-5 rounded-2xl bg-red-500/5 text-red-500 text-[10px] font-black uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all border border-red-500/10">
-                                <FaSignOutAlt /> Terminate Session
-                            </button>
                         </motion.div>
                     </>
                 )}
             </AnimatePresence>
 
+            {/* --- NEW CONTEXT OVERLAY (PHONE OPTIMIZED) --- */}
+            <AnimatePresence>
+                {showContextOverlay && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-2xl p-6 flex flex-col justify-center gap-6"
+                    >
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-2xl font-black uppercase italic tracking-tighter">Subject & Chapter</h2>
+                            <button onClick={() => setShowContextOverlay(false)} className="p-4 bg-white/5 rounded-full"><FaTimes size={18} /></button>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div className="relative">
+                                <label className="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Select Subject</label>
+                                <div onClick={() => setShowSubjDrop(!showSubjDrop)} className={`flex items-center justify-between p-5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border}`}>
+                                    <span className="text-sm font-black uppercase">{subject || "Select Subject"}</span>
+                                    <FaChevronDown size={12} className="opacity-30" />
+                                </div>
+                                {showSubjDrop && (
+                                    <div className="absolute top-full left-0 w-full mt-2 rounded-2xl bg-white/10 border border-white/10 p-2 max-h-40 overflow-y-auto z-50 backdrop-blur-xl">
+                                        {Object.keys(syllabusData[userData.board]?.[userData.class] || {}).map(s => (
+                                            <div key={s} onClick={() => { setSubject(s); setChapter(""); setShowSubjDrop(false); }} className="p-4 rounded-xl text-xs font-bold uppercase hover:bg-white/10">{s}</div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="relative">
+                                <label className="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Select Chapter</label>
+                                <div onClick={() => setShowChapDrop(!showChapDrop)} className={`flex items-center justify-between p-5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border}`}>
+                                    <span className="text-sm font-black uppercase">{chapter || "Select Chapter"}</span>
+                                    <FaChevronDown size={12} className="opacity-30" />
+                                </div>
+                                {showChapDrop && (
+                                    <div className="absolute top-full left-0 w-full mt-2 rounded-2xl bg-white/10 border border-white/10 p-2 max-h-40 overflow-y-auto z-50 backdrop-blur-xl">
+                                        {(syllabusData[userData.board]?.[userData.class]?.[subject] || []).map(ch => (
+                                            <div key={ch} onClick={() => { setChapter(ch); setShowChapDrop(false); }} className="p-4 rounded-xl text-xs font-bold uppercase hover:bg-white/10">{ch}</div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={() => setShowContextOverlay(false)}
+                            className="w-full py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em]"
+                            style={{ backgroundColor: activeTheme.primaryHex }}
+                        >
+                            Sync Changes
+                        </button>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <div className="flex-1 flex flex-col relative h-full">
-                <div className="relative z-[500]">
-                    <Navbar userData={userData} />
-                </div>
-                <div className="w-full max-w-3xl mx-auto px-4 mt-4 space-y-3 z-[400] sticky top-[72px]">
-                    <div className={`flex items-center justify-between p-4 rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-xl shadow-2xl`}>
+                <Navbar userData={userData} />
+
+                {/* --- HEADER (DYNAMICALLY CONDENSED) --- */}
+                <div className="w-full max-w-3xl mx-auto px-4 mt-2 md:mt-4 space-y-2 md:space-y-4 z-[400] sticky top-[72px]">
+
+                    {/* Main Header Bar */}
+                    <div className={`flex items-center justify-between p-3 md:p-4 rounded-2xl md:rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-xl shadow-2xl`}>
                         <div className="flex items-center gap-3">
-                            <FaHistory size={14} className={`opacity-20 ${activeTheme.accent}`}/>
+                            <FaHistory size={12} className={activeTheme.accent} />
                             {isEditingTitle ? (
-                                <input autoFocus value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} onBlur={() => setIsEditingTitle(false)} className="bg-transparent border-none focus:ring-0 outline-none text-xs font-black uppercase p-0 w-32" />
+                                <input autoFocus value={sessionTitle} onChange={(e) => setSessionTitle(e.target.value)} onBlur={() => setIsEditingTitle(false)} className="bg-transparent border-none focus:ring-0 text-[10px] md:text-xs font-black uppercase p-0 w-24 md:w-32 outline-none" />
                             ) : (
-                                <span onClick={() => setIsEditingTitle(true)} className={`text-xs font-black uppercase tracking-tighter cursor-pointer hover:${activeTheme.accent} transition-colors`}>{sessionTitle}</span>
+                                <span onClick={() => setIsEditingTitle(true)} className="text-[10px] md:text-xs font-black uppercase tracking-tighter cursor-pointer truncate max-w-[100px] md:max-w-none">{sessionTitle}</span>
                             )}
                         </div>
-                        <div className="flex items-center gap-4 text-[10px] font-black opacity-40 uppercase tracking-widest">
-                            <span className="flex items-center gap-1.5 px-3 py-1 bg-white/5 rounded-full"><FaClock className={activeTheme.accent}/> {formatTime(timer)}</span>
-                            <span className={activeTheme.accent}>{userData.board} CLS {userData.class}</span>
+
+                        {/* Status Chips - On mobile these trigger the overlay */}
+                        <div className="flex items-center gap-2">
+                            <div
+                                onClick={() => setShowContextOverlay(true)}
+                                className="md:hidden flex items-center gap-2 px-3 py-1.5 bg-white/5 rounded-full border border-white/5 active:bg-white/10"
+                            >
+                                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 truncate max-w-[80px]">
+                                    {subject ? `${subject}` : 'SELECT'}
+                                </span>
+                                <FaSlidersH size={10} className="opacity-40" />
+                            </div>
+                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-full border border-white/5 text-[9px] font-black uppercase">
+                                <FaClock className={activeTheme.accent} size={10} /> {formatTime(timer)}
+                            </span>
                         </div>
                     </div>
-                    <div className={`flex gap-3 p-2 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} backdrop-blur-md`}>
-                        <div className="flex-1 relative">
-                            <select value={subject} onChange={(e) => setSubject(e.target.value)} className={`${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-100'} w-full border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer`}>
-                                {Object.keys(syllabusData[userData?.board]?.[userData?.class] || {}).map(s => <option key={s} value={s} className="bg-slate-900 text-white">{s}</option>)}
-                            </select>
+
+                    {/* Desktop-Only Grid (Hidden on Mobile) */}
+                    <div className="hidden md:grid grid-cols-2 gap-4">
+                        <div className="relative">
+                            <div onClick={() => { setShowSubjDrop(!showSubjDrop); setShowChapDrop(false); }} className={`flex items-center gap-3 p-1.5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer`}>
+                                <div className="p-3 rounded-full bg-white/5"><FaLayerGroup className={activeTheme.accent} size={14} /></div>
+                                <span className="flex-1 text-[10px] font-black uppercase truncate">{subject || "Subject"}</span>
+                                <FaChevronDown size={10} className="mr-4 opacity-30" />
+                            </div>
+                            <AnimatePresence>
+                                {showSubjDrop && (
+                                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="absolute top-full left-0 w-full mt-2 rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl z-50 p-2 max-h-48 overflow-y-auto shadow-2xl no-scrollbar">
+                                        {Object.keys(syllabusData[userData.board]?.[userData.class] || {}).map(s => (
+                                            <div key={s} onClick={() => { setSubject(s); setChapter(""); setShowSubjDrop(false); }} className="p-4 rounded-xl text-[10px] font-black uppercase hover:bg-white/10">{s}</div>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
-                        <div className="flex-1 relative">
-                            <select value={chapter} onChange={(e) => setChapter(e.target.value)} className={`${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-100'} w-full border-none focus:ring-0 outline-none rounded-2xl text-[10px] font-black uppercase py-3 px-4 appearance-none cursor-pointer`}>
-                                <option value="" className="bg-slate-900 text-white">Select Chapter</option>
-                                {(syllabusData[userData?.board]?.[userData?.class]?.[subject] || []).map(ch => <option key={ch} value={ch} className="bg-slate-900 text-white">{ch}</option>)}
-                            </select>
+                        <div className="relative">
+                            <div onClick={() => { setShowChapDrop(!showChapDrop); setShowSubjDrop(false); }} className={`flex items-center gap-3 p-1.5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer`}>
+                                <div className="p-3 rounded-full bg-white/5"><FaBrain className="text-cyan-400" size={14} /></div>
+                                <span className="flex-1 text-[10px] font-black uppercase truncate">{chapter || "Chapter"}</span>
+                                <FaChevronDown size={10} className="mr-4 opacity-30" />
+                            </div>
+                            <AnimatePresence>
+                                {showChapDrop && (
+                                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }} className="absolute top-full left-0 w-full mt-2 rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl z-50 p-2 max-h-48 overflow-y-auto shadow-2xl no-scrollbar">
+                                        {(syllabusData[userData.board]?.[userData.class]?.[subject] || []).map(ch => (
+                                            <div key={ch} onClick={() => { setChapter(ch); setShowChapDrop(false); }} className="p-4 rounded-xl text-[10px] font-black uppercase hover:bg-white/10">{ch}</div>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar pb-72 relative z-[100]">
+                {/* MESSAGES AREA */}
+                <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar pb-40">
                     <div className="max-w-3xl mx-auto space-y-10">
                         {messages.length === 0 && (
-                            <div className="h-64 flex flex-col items-center justify-center">
-                                <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 10, ease: "linear" }} className="mb-6 opacity-10"><FaWaveSquare size={60} className={activeTheme.accent}/></motion.div>
-                                <h2 className="text-lg font-black uppercase tracking-[0.8em] opacity-10">Neural Interface Ready</h2>
+                            <div className="h-48 flex flex-col items-center justify-center opacity-5">
+                                <FaWaveSquare size={40} className="animate-pulse" />
                             </div>
                         )}
                         {messages.map((msg, i) => (
-                            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`p-6 rounded-[2.5rem] max-w-[90%] shadow-2xl relative ${msg.role === 'user' ? `text-white rounded-tr-none` : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`}`} style={msg.role === 'user' ? {backgroundColor: activeTheme.primaryHex} : {}}>
-                                    {msg.image && <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-black/50"><img src={msg.image} alt="analysis" className="w-full max-h-[500px] object-contain" /></div>}
-                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]} className={`prose ${activeTheme.isDark ? 'prose-invert' : 'prose-slate'} text-sm leading-relaxed prose-p:my-2`}>{msg.content}</ReactMarkdown>
-                                    {msg.ytLink && <a href={msg.ytLink} target="_blank" rel="noreferrer" className="mt-6 flex items-center justify-center gap-3 py-4 bg-red-600 text-white text-[10px] font-black uppercase rounded-2xl hover:bg-red-700 transition-all shadow-lg"><FaYoutube size={16}/> Visual Supplement Found</a>}
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                key={i}
+                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+                            >
+                                <div
+                                    className={`p-6 rounded-[2.5rem] max-w-[85%] shadow-xl ${msg.role === 'user'
+                                        ? 'text-white rounded-tr-none'
+                                        : `${activeTheme.card} border ${activeTheme.border} rounded-tl-none`
+                                        }`}
+                                    style={msg.role === 'user' ? { backgroundColor: activeTheme.primaryHex } : {}}
+                                >
+                                    {/* --- ATTACHMENT RENDERER --- */}
+                                    {/* Inside your messages.map, replace the attachment block with this */}
+                                    {msg.attachment && (
+                                        <div className="mb-4 rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-2xl max-w-sm">
+                                            {msg.attachmentType === 'image' ? (
+                                                <img
+                                                    src={msg.attachment}
+                                                    alt="Neural Context"
+                                                    className="w-full h-auto max-h-80 object-cover"
+                                                />
+                                            ) : (
+                                                /* PDF / Document Thumbnail Card */
+                                                <div className="flex items-center gap-4 p-5 group cursor-default">
+                                                    <div className="p-3 bg-red-500/20 rounded-2xl group-hover:bg-red-500/30 transition-colors">
+                                                        <FaFilePdf className="text-red-400" size={24} />
+                                                    </div>
+                                                    <div className="flex flex-col flex-1 min-w-0">
+                                                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-red-400/60">
+                                                            Document Established
+                                                        </span>
+                                                        <span className="text-sm text-white/90 font-semibold truncate">
+                                                            {/* If you save the filename in your userMsg, you can show it here */}
+                                                            Neural_Knowledge_Base.pdf
+                                                        </span>
+                                                        {/* Replace the old <a> tag with this button */}
+                                                        <button
+                                                            onClick={() => openVaultFile(msg.attachment)}
+                                                            className="w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-[10px] text-center font-bold uppercase tracking-widest text-indigo-400 rounded-lg transition-all border border-indigo-500/20"
+                                                        >
+                                                            Open Knowledge Vault
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* --- MESSAGE TEXT --- */}
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                        rehypePlugins={[rehypeKatex]}
+                                        className="prose prose-invert text-sm leading-relaxed"
+                                    >
+                                        {msg.content}
+                                    </ReactMarkdown>
+
+                                    {/* --- YOUTUBE LINK (AI ONLY) --- */}
+                                    {msg.role === 'ai' && msg.ytLink && (
+                                        <div className="mt-4 pt-3 border-t border-white/5">
+                                            <a
+                                                href={msg.ytLink}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-red-500 hover:text-red-400 transition-all"
+                                            >
+                                                <FaYoutube size={14} /> Watch Related Lesson
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
                             </motion.div>
                         ))}
@@ -314,76 +864,350 @@ export default function Chat() {
                     </div>
                 </div>
 
-                <div className={`fixed bottom-0 left-0 w-full p-6 bg-gradient-to-t ${activeTheme.isDark ? 'from-black/80 via-black/40' : 'from-white/80 via-white/40'} to-transparent z-[600]`}>
-                    <div className="max-w-3xl mx-auto space-y-4">
-                        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-                            {quickReplies.map(q => (
-                                <button key={q} onClick={() => sendMessage(q)} className={`whitespace-nowrap px-6 py-3 rounded-2xl border ${activeTheme.border} ${activeTheme.card} text-[10px] font-black uppercase tracking-widest hover:text-white transition-all hover:scale-105 active:scale-95 shadow-lg`} style={{ "--hover-bg": activeTheme.primaryHex }}>{q}</button>
-                            ))}
-                        </div>
-                        <div className="flex items-center justify-between">
-                            <div className={`flex gap-1 p-1.5 ${activeTheme.isDark ? 'bg-white/5' : 'bg-slate-200'} rounded-2xl border ${activeTheme.border} backdrop-blur-md`}>
-                                {["Explain", "Quiz", "HW"].map(m => (
-                                    <button key={m} onClick={() => setMode(m)} className={`px-5 py-2 rounded-xl text-[9px] font-black uppercase transition-all ${mode === m ? `text-white shadow-lg` : 'opacity-40 hover:opacity-100'}`} style={mode === m ? {backgroundColor: activeTheme.primaryHex} : {}}>{m}</button>
-                                ))}
-                            </div>
-                            <div className="flex gap-3">
-                                <button onClick={() => setShowSessionPicker(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:${activeTheme.accent} transition-colors shadow-xl`}><FaLayerGroup size={16}/></button>
-                                <button onClick={() => setShowSidebar(true)} className={`p-4 rounded-2xl border ${activeTheme.border} ${activeTheme.card} hover:${activeTheme.accent} transition-colors shadow-xl`}><FaChartLine size={16}/></button>
-                            </div>
-                        </div>
+                {/* --- REFINED BOTTOM INTERFACE --- */}
+                <div className="fixed bottom-0 left-0 w-full z-[600] pointer-events-none">
+                    <div className="max-w-4xl mx-auto p-2 md:p-4 pointer-events-auto">
+
+                        {/* 1. Quick Replies */}
                         <AnimatePresence>
-                            {imagePreview && (
-                                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="relative w-24 h-24 ml-4 mb-2">
-                                    <img src={imagePreview} className={`w-full h-full object-cover rounded-2xl border-2 shadow-2xl`} style={{borderColor: activeTheme.primaryHex}} alt="preview" />
-                                    <button onClick={() => {setImagePreview(null); setSelectedFile(null)}} className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-xl"><FaTimes size={10}/></button>
+                            {input.length < 10 && (
+                                <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 20, opacity: 0 }} className="flex gap-2 overflow-x-auto no-scrollbar mb-2 px-4">
+                                    {quickReplies.map(q => (
+                                        <button key={q} onClick={() => sendMessage(q)} className={`whitespace-nowrap px-4 py-2 rounded-full border ${activeTheme.border} ${activeTheme.card} backdrop-blur-xl text-[10px] font-black uppercase tracking-tighter hover:bg-white/10 transition-all`}>
+                                            {q}
+                                        </button>
+                                    ))}
                                 </motion.div>
                             )}
                         </AnimatePresence>
-                        <div className={`${activeTheme.isDark ? 'bg-white/10 border-white/10' : 'bg-white border-slate-200'} border rounded-[2.5rem] p-2 flex items-end gap-2 shadow-2xl backdrop-blur-xl`}>
-                            <button onClick={() => fileInputRef.current?.click()} className="p-5 opacity-30 hover:opacity-100 transition-all hover:text-indigo-500"><FaImage size={22}/><input type="file" ref={fileInputRef} hidden accept="image/*" onChange={handleFileSelect} /></button>
-                            <textarea value={input} onChange={(e) => setInput(e.target.value)} placeholder={`Neural inquiry: ${chapter || subject}...`} rows="1" className="flex-1 bg-transparent border-none focus:ring-0 outline-none text-sm py-5 resize-none no-scrollbar font-medium" onKeyDown={(e) => { if(e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}} />
-                            <div className="flex gap-2 pr-2 pb-2">
-                                <button onClick={() => sendMessage()} disabled={isSending} className={`p-5 text-white rounded-full shadow-lg active:scale-90 transition-all disabled:opacity-50`} style={{backgroundColor: activeTheme.primaryHex}}>
-                                    {isSending ? <FaSyncAlt className="animate-spin" size={22}/> : <FaPaperPlane size={22}/>}
-                                </button>
+
+                        {/* 2. Main Control Bar */}
+                        <div className={`relative flex flex-col gap-2 p-2 md:p-3 rounded-[2.5rem] md:rounded-[3rem] ${activeTheme.isDark ? 'bg-black/60' : 'bg-white/90'} backdrop-blur-3xl border ${activeTheme.border} shadow-2xl`}>
+
+                            <div className="flex items-center justify-between px-2">
+                                <div className="flex bg-white/5 p-1 rounded-xl border border-white/5">
+                                    {["Explain", "Quiz", "HW"].map(m => (
+                                        <button key={m} onClick={() => setMode(m)} className={`px-3 py-1.5 rounded-lg text-[9px] md:text-[10px] font-black uppercase transition-all ${mode === m ? 'bg-white text-black' : 'opacity-40 hover:opacity-100'}`}>
+                                            {m}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <div className="hidden md:flex gap-2">
+                                        <button onClick={() => setShowSessionPicker(true)} className="p-2.5 rounded-full bg-white/5 hover:bg-white/10"><FaLayerGroup size={12} /></button>
+                                        <button onClick={() => setShowSidebar(true)} className="p-2.5 rounded-full bg-white/5 hover:bg-white/10"><FaChartLine size={12} /></button>
+                                        <button onClick={() => fileInputRef.current?.click()} className="p-2.5 rounded-full bg-white/5 hover:bg-white/10"><FaImage size={12} /></button>
+                                        <button
+                                            onClick={() => docInputRef.current?.click()}
+                                            className="p-2.5 rounded-full bg-white/5 hover:bg-white/10 text-blue-400 border border-blue-500/20"
+                                        >
+                                            <FaFileAlt size={12} />
+                                        </button>
+                                    </div>
+                                    <div className="md:hidden relative">
+                                        <button onClick={() => setShowPlusMenu(!showPlusMenu)} className={`p-2.5 rounded-full transition-all ${showPlusMenu ? 'bg-white text-black rotate-45' : 'bg-white/5'}`}><FaPlus size={12} /></button>
+                                        <AnimatePresence>
+                                            {showPlusMenu && (
+                                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1, y: -50 }} exit={{ scale: 0 }} className="absolute bottom-10 right-0 flex flex-col gap-2 z-50">
+                                                    <button onClick={() => { setShowSessionPicker(true); setShowPlusMenu(false) }} className="p-3.5 rounded-full bg-black border border-white/10 text-white"><FaLayerGroup size={14} /></button>
+                                                    <button onClick={() => { setShowSidebar(true); setShowPlusMenu(false) }} className="p-3.5 rounded-full bg-black border border-white/10 text-white"><FaChartLine size={14} /></button>
+                                                    <button onClick={() => { fileInputRef.current?.click(); setShowPlusMenu(false) }} className="p-3.5 rounded-full bg-black border border-white/10 text-white"><FaImage size={14} /></button>
+                                                    <button
+                                                        onClick={() => { docInputRef.current?.click(); setShowPlusMenu(false) }}
+                                                        className="p-3.5 rounded-full bg-black border border-blue-500/40 text-blue-400"
+                                                    >
+                                                        <FaFileAlt size={14} />
+                                                    </button>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="relative flex items-center gap-2 bg-white/5 rounded-[2rem] p-1 border border-white/10">
+                                {imagePreview && (
+                                    <div className="absolute -top-16 left-4 w-12 h-12 rounded-xl border-2 border-indigo-500 overflow-hidden shadow-2xl">
+                                        <img src={imagePreview} className="w-full h-full object-cover" />
+                                        <button onClick={() => setImagePreview(null)} className="absolute inset-0 bg-black/40 flex items-center justify-center text-white"><FaTimes size={10} /></button>
+                                    </div>
+                                )}
+                                {(imagePreview || isAnalyzing) && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className="absolute -top-24 left-4 flex items-center gap-3"
+                                    >
+                                        <div className="relative group">
+                                            {isAnalyzing ? (
+                                                /* --- NEURAL ANALYZING LOADER --- */
+                                                <div className="w-16 h-16 rounded-2xl bg-indigo-950/50 flex flex-col items-center justify-center border-2 border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.4)] relative overflow-hidden">
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/20 to-transparent animate-pulse" />
+                                                    <div className="w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-1" />
+                                                    <span className="text-[8px] font-bold text-indigo-300 animate-pulse">SYNCING</span>
+                                                </div>
+                                            ) : (
+                                                /* --- ACTUAL FILE PREVIEW --- */
+                                                <>
+                                                    {fileType === 'image' ? (
+                                                        <img
+                                                            src={imagePreview}
+                                                            className="w-16 h-16 rounded-2xl object-cover border-2 border-indigo-500 shadow-2xl transition-transform hover:scale-105"
+                                                            alt="Neural Upload"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-16 h-16 rounded-2xl bg-indigo-600 flex items-center justify-center border-2 border-indigo-400 shadow-2xl">
+                                                            <FaFilePdf className="text-white" size={24} />
+                                                        </div>
+                                                    )}
+
+                                                    {/* Delete Button */}
+                                                    <button
+                                                        onClick={() => { setImagePreview(null); setAttachedFile(null); }}
+                                                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1.5 shadow-lg hover:bg-red-600 hover:scale-110 transition-all z-10"
+                                                    >
+                                                        <FaTimes size={12} />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* --- STATUS BADGE --- */}
+                                        <div className="flex flex-col gap-1">
+                                            <div className="bg-black/60 backdrop-blur-xl px-3 py-1.5 rounded-xl border border-white/10 shadow-xl">
+                                                <span className="text-[9px] font-black uppercase text-indigo-400 tracking-[0.2em] flex items-center gap-2">
+                                                    {isAnalyzing ? (
+                                                        <>
+                                                            <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-ping" />
+                                                            Neural Extraction Active
+                                                        </>
+                                                    ) : (
+                                                        fileType === 'image' ? 'Neural Image Optimized' : 'Knowledge Vault PDF'
+                                                    )}
+                                                </span>
+                                            </div>
+                                            {!isAnalyzing && (
+                                                <span className="text-[8px] text-white/40 ml-1 font-medium italic">
+                                                    Ready for Core Analysis
+                                                </span>
+                                            )}
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                <textarea
+                                    ref={inputRef} // <--- Add this line
+                                    value={input}
+                                    value={input}
+                                    onChange={(e) => {
+                                        setInput(e.target.value);
+                                        // This makes the box grow up to its max-height
+                                        e.target.style.height = 'auto';
+                                        e.target.style.height = `${e.target.scrollHeight}px`;
+                                    }}
+                                    placeholder="Neural pulse command..."
+                                    rows="1"
+                                    className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3 px-4 resize-none no-scrollbar max-h-24 outline-none placeholder:opacity-30 shadow-none"
+                                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())}
+                                />
+                                <motion.button
+                                    disabled={isSending || isAnalyzing}
+                                    whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                                    onClick={() => sendMessage()}
+
+                                    disabled={isSending}
+                                    className="p-4 md:p-5 rounded-full shadow-lg disabled:opacity-50 overflow-hidden group flex items-center justify-center"
+                                    style={{ backgroundColor: activeTheme.primaryHex }}
+                                >
+                                    {isAnalyzing ? "Processing..." : "Send"}
+                                    <AnimatePresence mode="wait">
+                                        {isSending ? (
+                                            <motion.div key="spin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><FaSyncAlt className="animate-spin text-white" size={18} /></motion.div>
+                                        ) : (
+                                            <motion.div key="plane" initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-white"><FaPaperPlane size={18} /></motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </motion.button>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
+            {/* THE VAULT (PRESERVED) */}
+            {/* --- THE VAULT (SESSION HISTORY) - REMASTERED --- */}
             <AnimatePresence>
                 {showSessionPicker && (
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={`fixed inset-0 z-[1000] ${activeTheme.isDark ? 'bg-black/95' : 'bg-slate-50/95'} backdrop-blur-3xl p-8 flex flex-col items-center`}>
-                        <div className="w-full max-w-4xl flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
-                            <div>
-                                <h2 className={`text-4xl font-black uppercase italic tracking-tighter ${activeTheme.accent}`}>The Vault</h2>
-                                <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.5em] mt-2">Historical Neural Patterns</p>
-                            </div>
-                            <div className="flex items-center gap-4 w-full md:w-auto">
-                                <div className="relative flex-1 md:w-64">
-                                    <FaSearch className={`absolute left-4 top-1/2 -translate-y-1/2 ${activeTheme.isDark ? 'text-white/20' : 'text-black/20'}`} size={12}/>
-                                    <input type="text" placeholder="SEARCH NODES..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full ${activeTheme.card} border ${activeTheme.border} rounded-2xl py-3 pl-10 pr-4 text-[10px] font-black uppercase tracking-widest focus:border-indigo-500/50 focus:ring-0 outline-none transition-all`} />
+                    <>
+                        {/* Glass Backdrop */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowSessionPicker(false)}
+                            className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[1000]"
+                        />
+
+                        {/* Main Vault Panel (Right Side Slide-out) */}
+                        <motion.div
+                            initial={{ x: 600 }}
+                            animate={{ x: 0 }}
+                            exit={{ x: 600 }}
+                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                            className={`fixed inset-y-0 right-0 w-[92%] md:w-[520px] ${activeTheme.isDark ? 'bg-[#080808]' : 'bg-white'} border-l ${activeTheme.border} z-[1001] p-8 md:p-14 flex flex-col shadow-[-50px_0_100px_rgba(0,0,0,0.5)]`}
+                        >
+                            {/* Vault Header */}
+                            <div className="flex justify-between items-start mb-10">
+                                <div className="flex flex-col">
+                                    <h3 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter leading-none">The Vault</h3>
+                                    <p className="text-[10px] md:text-xs font-black uppercase tracking-[0.5em] opacity-30 mt-2 text-indigo-500">Archived Neural Links</p>
                                 </div>
-                                <button onClick={() => {setShowSessionPicker(false); setSearchQuery("");}} className={`p-6 ${activeTheme.card} border ${activeTheme.border} rounded-full transition-all`}><FaTimes size={20}/></button>
+                                <button
+                                    onClick={() => setShowSessionPicker(false)}
+                                    className="p-4 bg-white/5 rounded-2xl hover:bg-white/10 transition-all group"
+                                >
+                                    <FaTimes className="group-hover:rotate-90 transition-transform duration-300" />
+                                </button>
                             </div>
-                        </div>
-                        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto no-scrollbar pb-20">
-                            {filteredSessions.map(s => (
-                                <div key={s.id} onClick={() => { setMessages(s.messages || []); setCurrentSessionId(s.id); setSessionTitle(s.title || "Untitled"); setShowSessionPicker(false); setSearchQuery(""); }} className={`p-8 rounded-[3rem] border ${activeTheme.border} ${activeTheme.card} hover:border-indigo-500/50 cursor-pointer transition-all flex justify-between items-center group relative overflow-hidden shadow-xl`}>
-                                    <div className={`absolute top-0 left-0 w-1 h-full opacity-0 group-hover:opacity-100 transition-all`} style={{backgroundColor: activeTheme.primaryHex}}/>
-                                    <div>
-                                        <h4 className={`font-black uppercase text-sm tracking-tight group-hover:${activeTheme.accent} transition-colors`}>{s.title || "Untitled Lesson"}</h4>
-                                        <p className="text-[9px] opacity-30 mt-3 uppercase font-black tracking-widest">{s?.subject} • {s.lastUpdate ? new Date(s.lastUpdate).toLocaleDateString() : 'New'}</p>
-                                    </div>
-                                    <button onClick={(e) => { e.stopPropagation(); deleteDoc(doc(db, `users/${currentUser?.uid}/sessions`, s.id)); }} className="opacity-0 group-hover:opacity-100 text-red-500 p-3 hover:bg-red-500/10 rounded-xl transition-all"><FaTrash size={14}/></button>
+
+                            {/* Wide Search Bar Integration */}
+                            <div className="relative mb-10">
+                                <div className="absolute left-6 top-1/2 -translate-y-1/2 pointer-events-none">
+                                    <FaSearch size={14} className="text-indigo-500 opacity-40" />
                                 </div>
-                            ))}
-                        </div>
-                    </motion.div>
+                                <input
+                                    type="text"
+                                    placeholder="FILTER BY SUBJECT OR TITLE..."
+                                    value={searchVault}
+                                    onChange={(e) => setSearchVault(e.target.value)}
+                                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-5 pl-14 pr-6 text-[11px] font-black uppercase tracking-[0.2em] outline-none focus:border-indigo-500/50 focus:bg-white/[0.05] transition-all placeholder:opacity-20"
+                                />
+                                {/* --- HIDDEN SYSTEM INPUTS --- */}
+                                <input
+                                    type="file"
+                                    ref={docInputRef}
+                                    className="hidden"
+                                    accept=".pdf,.doc,.docx,.txt"
+                                    onChange={handleFileUpload}
+                                />
+                                {/* This ensures your existing image button also works with the new function */}
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={handleFileUpload}
+                                />
+                            </div>
+
+                            {/* Sessions List with Liquid Scrollbar */}
+                            <div className="flex-1 overflow-y-auto custom-scroll pr-4 space-y-4 no-scrollbar">
+                                {filteredSessions.length === 0 ? (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        className="h-60 flex flex-col items-center justify-center border border-dashed border-white/10 rounded-[3rem] opacity-20"
+                                    >
+                                        <FaLayerGroup size={40} className="mb-4 text-indigo-500" />
+                                        <span className="text-[10px] font-black uppercase tracking-[0.4em]">Archive Empty</span>
+                                    </motion.div>
+                                ) : (
+                                    filteredSessions.map((s) => (
+                                        <motion.div
+                                            key={s.id}
+                                            layout
+                                            initial={{ opacity: 0, x: 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            whileHover={{ x: -10 }}
+                                            className={`group relative p-8 rounded-[2.5rem] border transition-all cursor-pointer ${currentSessionId === s.id ? 'bg-indigo-600/10 border-indigo-500/40 shadow-xl' : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04]'}`}
+                                            onClick={() => {
+                                                setCurrentSessionId(s.id);
+                                                setMessages(s.messages || []);
+                                                setSessionTitle(s.title || "New Lesson");
+                                                setSubject(s.subject || "");
+                                                setChapter(s.chapter || "");
+                                                setShowSessionPicker(false);
+                                            }}
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex flex-col gap-1 pr-12">
+                                                    <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-1">
+                                                        {s.subject || 'GENERAL UPLINK'}
+                                                    </span>
+                                                    <h4 className="text-base font-black uppercase tracking-tight leading-tight truncate max-w-[280px]">
+                                                        {s.title || "Untitled Fragment"}
+                                                    </h4>
+                                                </div>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        deleteDoc(doc(db, `users/${currentUser?.uid}/sessions`, s.id));
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 p-4 hover:bg-red-500/20 hover:text-red-500 rounded-xl transition-all absolute top-6 right-6"
+                                                >
+                                                    <FaTrash size={14} />
+                                                </button>
+                                            </div>
+
+                                            <div className="flex items-center gap-6 mt-6 pt-6 border-t border-white/5 opacity-40">
+                                                <div className="flex items-center gap-2">
+                                                    <FaClock size={10} className="text-indigo-400" />
+                                                    <span className="text-[9px] font-black uppercase tracking-widest">
+                                                        {new Date(s.lastUpdate).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <FaWaveSquare size={10} className="text-indigo-400" />
+                                                    <span className="text-[9px] font-black uppercase tracking-widest">
+                                                        {s.messages?.length || 0} DATA NODES
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Vault Footer Action */}
+                            <div className="mt-8 pt-8 border-t border-white/5">
+                                <motion.button
+                                    whileTap={{ scale: 0.98 }}
+                                    onClick={() => {
+                                        setCurrentSessionId(Date.now().toString());
+
+                                        setMessages([]);
+                                        setSessionTitle("New Lesson");
+                                        setSubject("");
+                                        setChapter("");
+                                        setShowSessionPicker(false);
+                                        setTimeout(() => inputRef.current?.focus(), 100);
+                                    }}
+                                    className="w-full py-6 rounded-[2rem] bg-indigo-600 text-white text-[11px] font-black uppercase tracking-[0.4em] flex items-center justify-center gap-4 hover:bg-indigo-500 shadow-[0_20px_40px_rgba(79,70,229,0.3)] transition-all"
+                                >
+                                    <FaPlus size={14} /> Initialize Fresh Link
+                                </motion.button>
+                            </div>
+                        </motion.div>
+                    </>
                 )}
             </AnimatePresence>
+            <input
+                type="file"
+                ref={docInputRef}
+                className="hidden"
+                accept=".pdf,.doc,.docx,.txt"
+                onChange={handleFileUpload}
+            />
+
+            <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleFileUpload}
+            />
         </div>
     );
 }
+
