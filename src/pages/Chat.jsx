@@ -821,13 +821,8 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                             </div>
                         </div>
 
-                        <button
-                            onClick={() => syncContext(subject, chapter)}
-                            className="w-full py-5 rounded-[2rem] font-black uppercase text-xs tracking-[0.2em] text-white shadow-[0_0_30px_rgba(99,102,241,0.3)] active:scale-95 transition-all"
-                            style={{ backgroundColor: activeTheme.primaryHex }}
-                        >
-                            Establish Connection
-                        </button>
+
+
                     </motion.div>
                 )}
             </AnimatePresence>
