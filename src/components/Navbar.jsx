@@ -1,16 +1,16 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { FaPalette, FaChevronDown, FaSignOutAlt, FaHourglassHalf, FaBolt } from "react-icons/fa";
+import { FaPalette, FaSignOutAlt, FaHourglassHalf, FaBolt, FaCheckCircle } from "react-icons/fa";
 import { auth, db } from "../firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 
-// Standardizing themes to match Chat.js for consistency
+// SOLID COLORS - No Translucency
 const themeConfigs = {
-    DeepSpace: { primaryHex: "#4f46e5", text: "text-white", border: "border-white/10", navBg: "bg-black/20" },
-    Light: { primaryHex: "#4f46e5", text: "text-slate-900", border: "border-slate-200", navBg: "bg-white/40" },
-    Sakura: { primaryHex: "#f43f5e", text: "text-rose-50", border: "border-rose-500/20", navBg: "bg-rose-950/10" },
-    Cyberpunk: { primaryHex: "#06b6d4", text: "text-cyan-50", border: "border-cyan-500/20", navBg: "bg-cyan-950/10" }
+    DeepSpace: { primary: "#4f46e5", text: "#ffffff", sub: "#6366f1", border: "#1e1b4b", navBg: "#000000", btnBg: "#111111" },
+    Light: { primary: "#4f46e5", text: "#020617", sub: "#64748b", border: "#cbd5e1", navBg: "#ffffff", btnBg: "#f1f5f9" },
+    Sakura: { primary: "#f43f5e", text: "#fff1f2", sub: "#fb7185", border: "#4c0519", navBg: "#2d0611", btnBg: "#3d0a1a" },
+    Cyberpunk: { primary: "#06b6d4", text: "#ecfeff", sub: "#22d3ee", border: "#083344", navBg: "#020c1b", btnBg: "#031e30" }
 };
 
 export default function Navbar({ userData }) {
@@ -19,120 +19,137 @@ export default function Navbar({ userData }) {
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
 
-    // Mapping variables with safety checks
     const currentThemeKey = userData?.theme || "DeepSpace";
     const activeTheme = themeConfigs[currentThemeKey] || themeConfigs.DeepSpace;
-    
-    const photoURL = userData?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData?.uid || 'default'}`;
-    const displayName = userData?.displayName || "Scholar";
-    const environments = ["DeepSpace", "Light", "Sakura", "Cyberpunk"];
 
-    const setTheme = async (newTheme) => {
-        if (!auth.currentUser) return;
-        try {
-            await updateDoc(doc(db, "users", auth.currentUser.uid), { theme: newTheme });
-        } catch (err) { 
-            console.error("Theme Error", err); 
-        }
-    };
-
-    const handleLogout = async () => {
-        setIsLoggingOut(true);
-        try { 
-            await auth.signOut(); 
-            navigate("/login"); 
-        } catch (err) { 
-            setIsLoggingOut(false); 
-        }
-    };
+    const photoURL = userData?.pfp || userData?.photoURL || auth.currentUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userData?.uid || 'default'}`;
+    const displayName = userData?.name || userData?.displayName || "Scholar";
+    const logoLetters = "DHRUVA".split("");
 
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setDropdownOpen(false);
-            }
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target)) setDropdownOpen(false);
         };
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
     return (
-        <nav className={`sticky top-0 z-[1000] w-full border-b ${activeTheme.border} ${activeTheme.navBg} backdrop-blur-xl transition-all duration-500`}>
+        <nav
+            className="sticky top-0 z-[1000] w-full border-b transition-all duration-500 shadow-2xl"
+            style={{ backgroundColor: activeTheme.navBg, borderColor: activeTheme.border }}
+        >
             <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
-                
-                {/* Brand & User Profile Section */}
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate("/")}>
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-lg" style={{ backgroundColor: activeTheme.primaryHex }}>
-                            <FaBolt className="text-white text-sm" />
-                        </div>
-                        <span className={`font-black tracking-tighter uppercase text-lg ${activeTheme.text}`}>
-                            Dhruva
-                        </span>
-                    </div>
 
-                    <motion.div 
-                        whileHover={{ x: 4 }}
-                        className="flex items-center gap-3 cursor-pointer group border-l border-white/10 pl-6"
+                <div className="flex items-center gap-6">
+                    {/* BRAND: Kinetic Pulse (RETAINED OLD ANIMATIONS) */}
+                    <motion.div
+                        whileHover="hover" whileTap="tap"
+                        className="flex items-center gap-2 cursor-pointer relative group"
+                        onClick={() => navigate("/")}
+                    >
+                        <div className="absolute -inset-2 rounded-xl blur-lg opacity-0 group-hover:opacity-30 transition-all" style={{ backgroundColor: activeTheme.primary }} />
+                        <motion.div variants={{ hover: { scale: 1.1, rotate: [0, -10, 10, 0] } }} className="relative w-9 h-9 rounded-xl flex items-center justify-center shadow-lg overflow-hidden" style={{ backgroundColor: activeTheme.primary }}>
+                            <FaBolt className="text-white text-base relative z-10" />
+                            <motion.div variants={{ hover: { x: ["-100%", "200%"] } }} transition={{ repeat: Infinity, duration: 1 }} className="absolute inset-0 bg-white/40 skew-x-12" />
+                        </motion.div>
+                        <div className="flex">
+                            {logoLetters.map((l, i) => (
+                                <motion.span
+                                    key={i}
+                                    variants={{ hover: { y: -3, color: activeTheme.primary } }}
+                                    transition={{ delay: i * 0.02 }}
+                                    className="font-black tracking-tighter uppercase text-xl"
+                                    style={{ color: activeTheme.text }}
+                                >
+                                    {l}
+                                </motion.span>
+                            ))}
+                        </div>
+                    </motion.div>
+
+                    {/* AVATAR: Orbital Scanner (Idle + Hyper-hover) */}
+                    <motion.div
+                        whileHover="hover"
+                        className="flex items-center gap-4 cursor-pointer border-l pl-6"
+                        style={{ borderColor: activeTheme.border }}
                         onClick={() => navigate("/profile")}
                     >
-                        <div className="relative">
-                            <img 
-                                src={photoURL} 
-                                className="relative w-9 h-9 rounded-full object-cover border border-white/10 group-hover:border-indigo-500/50 transition-all" 
-                                alt="Avatar" 
-                            />
-                            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-black bg-emerald-500" />
+                        <div className="relative flex items-center justify-center">
+                            <motion.div animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.4, 0.1] }} transition={{ repeat: Infinity, duration: 3 }} className="absolute w-12 h-12 rounded-full border" style={{ borderColor: activeTheme.border }} />
+                            <motion.div variants={{ hover: { rotate: 360, opacity: 1, scale: 1.3 } }} initial={{ opacity: 0 }} transition={{ duration: 1, repeat: Infinity, ease: "linear" }} className="absolute w-12 h-12 rounded-full border-2 border-dashed" style={{ borderColor: activeTheme.primary }} />
+                            <div className="relative">
+                                <img src={photoURL} className="relative w-10 h-10 rounded-full object-cover border-2 z-10" style={{ borderColor: activeTheme.border }} alt="Avatar" />
+                            </div>
                         </div>
-                        <div className="hidden sm:block">
-                            <span className={`font-bold text-xs tracking-tight ${activeTheme.text}`}>{displayName}</span>
-                            <p className={`text-[8px] font-black uppercase tracking-[0.2em] opacity-40 ${activeTheme.text}`}>Verified</p>
+                        <div className="hidden sm:flex flex-col">
+                            <motion.span variants={{ hover: { x: 5, letterSpacing: "0.05em", color: activeTheme.primary } }} className="font-black text-sm tracking-tight transition-all" style={{ color: activeTheme.text }}>
+                                {displayName}
+                            </motion.span>
+                            <motion.p animate={{ opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 2 }} className="text-[7px] font-black uppercase tracking-[0.4em]" style={{ color: activeTheme.sub }}>
+                                {currentThemeKey}_READY
+                            </motion.p>
                         </div>
                     </motion.div>
                 </div>
 
-                {/* Theme & Logout Controls */}
-                <div className="flex items-center gap-3" ref={dropdownRef}>
+                <div className="flex items-center gap-4" ref={dropdownRef}>
+                    {/* INTERFACE: Float Idle + Scale Hover */}
                     <div className="relative">
-                        <button 
+                        <motion.button
+                            animate={{ y: [0, -4, 0] }}
+                            transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
+                            whileHover={{ scale: 1.1 }}
                             onClick={() => setDropdownOpen(!dropdownOpen)}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${activeTheme.border} bg-white/5 hover:bg-white/10 transition-all`}
+                            className="relative flex items-center gap-3 px-5 py-2.5 rounded-2xl border shadow-lg"
+                            style={{ borderColor: activeTheme.border, backgroundColor: activeTheme.btnBg }}
                         >
-                            <FaPalette className="text-xs" style={{ color: activeTheme.primaryHex }} />
-                            <span className={`hidden lg:inline text-[10px] font-bold uppercase tracking-widest ${activeTheme.text}`}>Style</span>
-                            <FaChevronDown className={`text-[8px] transition-transform ${activeTheme.text} ${dropdownOpen ? 'rotate-180' : ''}`} />
-                        </button>
+                            <FaPalette style={{ color: activeTheme.primary }} />
+                            <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest" style={{ color: activeTheme.text }}>Interface</span>
+                        </motion.button>
 
                         <AnimatePresence>
                             {dropdownOpen && (
-                                <motion.div 
-                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className={`absolute right-0 mt-3 w-48 p-2 rounded-2xl border ${activeTheme.border} bg-black/90 backdrop-blur-2xl shadow-2xl`}
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.9, y: 10 }}
+                                    className="absolute right-0 mt-4 w-64 p-2 rounded-[1.5rem] border shadow-2xl z-[2000]"
+                                    style={{ backgroundColor: activeTheme.navBg, borderColor: activeTheme.border }}
                                 >
-                                    {environments.map((env) => (
-                                        <button 
+                                    {Object.keys(themeConfigs).map((env, i) => (
+                                        <motion.button
                                             key={env}
-                                            onClick={() => { setTheme(env); setDropdownOpen(false); }}
-                                            className={`flex items-center justify-between w-full p-3 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${currentThemeKey === env ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white hover:bg-white/5'}`}
+                                            whileHover={{ x: 10, backgroundColor: activeTheme.btnBg }}
+                                            onClick={() => { updateDoc(doc(db, "users", auth.currentUser.uid), { theme: env }); setDropdownOpen(false); }}
+                                            className="flex items-center justify-between w-full p-4 rounded-xl transition-all"
+                                            style={{ color: currentThemeKey === env ? activeTheme.primary : activeTheme.text }}
                                         >
-                                            {env}
-                                            {currentThemeKey === env && <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: activeTheme.primaryHex }} />}
-                                        </button>
+                                            <span className="text-[10px] font-black uppercase tracking-widest">{env}</span>
+                                            {currentThemeKey === env && <FaCheckCircle className="text-xs" />}
+                                        </motion.button>
                                     ))}
                                 </motion.div>
                             )}
                         </AnimatePresence>
                     </div>
 
-                    <button 
-                        onClick={handleLogout} 
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all"
+                    {/* EXIT: Pulse Idle + Jitter Hover */}
+                    <motion.button
+                        animate={{ opacity: [0.5, 1, 0.5] }}
+                        transition={{ repeat: Infinity, duration: 2 }}
+                        whileHover={{
+                            x: [0, -3, 3, -3, 3, 0],
+                            backgroundColor: "#ef4444",
+                            color: "#ffffff",
+                            scale: 1.1
+                        }}
+                        onClick={() => auth.signOut()}
+                        className="p-3.5 rounded-2xl border transition-all"
+                        style={{ borderColor: activeTheme.border, backgroundColor: activeTheme.btnBg, color: activeTheme.text }}
                     >
-                        {isLoggingOut ? <FaHourglassHalf className="animate-spin text-xs" /> : <FaSignOutAlt className="text-xs" />}
-                        <span className="hidden md:inline text-[10px] font-black uppercase tracking-widest">Exit</span>
-                    </button>
+                        <FaSignOutAlt className="text-xl" />
+                    </motion.button>
                 </div>
             </div>
         </nav>
