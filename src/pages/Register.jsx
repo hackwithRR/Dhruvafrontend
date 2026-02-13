@@ -16,12 +16,12 @@ export default function Register() {
     const [password, setPassword] = useState("");
     const [gender, setGender] = useState("other"); // Default state
     const [selectedAvatar, setSelectedAvatar] = useState(1);
-    const [isVerified, setIsVerified] = useState(false);
+    const [isVerified] = useState(false);
     const [loading, setLoading] = useState(false);
     const [countdown, setCountdown] = useState(8);
     const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-    const { register, logout, googleLogin } = useAuth();
+    const { register, googleLogin } = useAuth();
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -37,9 +37,9 @@ export default function Register() {
             timer = setTimeout(() => navigate("/login"), 8000);
             interval = setInterval(() => setCountdown(c => (c > 0 ? c - 1 : 0)), 1000);
         }
-        return () => { 
-            clearTimeout(timer); 
-            clearInterval(interval); 
+        return () => {
+            clearTimeout(timer);
+            clearInterval(interval);
         };
     }, [isVerified, navigate]);
 
@@ -63,11 +63,11 @@ export default function Register() {
 
         try {
             const avatarUrl = avatars.find(a => a.id === selectedAvatar).url;
-            
+
             // FIX: We only pass email and password to the register function
             // Then we handle the name and avatar in the Firestore sync
             const userCredential = await register(currentEmail, password);
-            
+
             // Immediate Firestore Sync
             await setDoc(doc(db, "users", userCredential.user.uid), {
                 uid: userCredential.user.uid,
@@ -81,12 +81,12 @@ export default function Register() {
                 createdAt: serverTimestamp()
             }, { merge: true });
 
-            await logout();
-            setIsVerified(true);
+            // Navigate directly to /chat after successful registration
+            navigate("/chat");
         } catch (err) {
             // Handle specific Firebase errors for better UX
-            const errorMessage = err.code === 'auth/email-already-in-use' 
-                ? "This email is already registered." 
+            const errorMessage = err.code === 'auth/email-already-in-use'
+                ? "This email is already registered."
                 : (err.message || "Registration failed.");
             toast.error(errorMessage);
             setLoading(false);
@@ -111,7 +111,7 @@ export default function Register() {
                 className="relative z-10 w-full max-w-6xl"
             >
                 <div className="grid grid-cols-1 lg:grid-cols-12 bg-black/50 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] md:rounded-[4rem] overflow-hidden shadow-2xl">
-                    
+
                     {/* Left Panel */}
                     <div className="lg:col-span-5 p-8 md:p-16 bg-gradient-to-br from-purple-900/40 to-transparent flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/5">
                         <div>

@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 
 const themeConfigs = {
     DeepSpace: { primary: "#4f46e5", text: "#ffffff", sub: "#6366f1", border: "#1e1b4b", navBg: "#000000", btnBg: "#111111" },
-    Light: { primary: "#4f46e5", text: "#020617", sub: "#64748b", border: "#cbd5e1", navBg: "#ffffff", btnBg: "#f1f5f9" },
+    Light: { primary: "#4f46e5", text: "#000000", sub: "#64748b", border: "#cbd5e1", navBg: "#ffffff", btnBg: "#f1f5f9" },
     Sakura: { primary: "#f43f5e", text: "#fff1f2", sub: "#fb7185", border: "#4c0519", navBg: "#2d0611", btnBg: "#3d0a1a" },
     Cyberpunk: { primary: "#06b6d4", text: "#ecfeff", sub: "#22d3ee", border: "#083344", navBg: "#020c1b", btnBg: "#031e30" }
 };

@@ -4,7 +4,6 @@ import { useAuth } from "./context/AuthContext";
 import { AnimatePresence, motion } from "framer-motion";
 import { FaBrain } from "react-icons/fa";
 
-// Standardizing imports - ensure folder names (pages/components) match exactly in Git
 import Background from "./components/Background";
 import Background2 from "./components/Background2";
 import Chat from "./pages/Chat";
@@ -12,52 +11,44 @@ import Profile from "./pages/Profile";
 import LoginPage from "./pages/LoginPage";
 import Register from "./pages/Register";
 
-// Simple fallback to prevent white screen during internal transitions
 const GlobalLoader = () => (
-  <div className="h-screen w-full flex flex-col items-center justify-center bg-[#050505] space-y-4">
-    <FaBrain className="text-indigo-500 animate-pulse" size={40}/>
-    <h2 className="text-white text-[10px] font-black uppercase tracking-[0.5em] opacity-50">
-      Initializing Dhruva OS...
-    </h2>
+  <div className="h-screen w-full flex flex-col items-center justify-center bg-[#05000a]">
+    <FaBrain className="text-fuchsia-500 animate-pulse mb-4" size={40}/>
+    <div className="w-32 h-1 bg-white/5 rounded-full overflow-hidden">
+      <div className="h-full bg-fuchsia-500 animate-[loading_2s_ease-in-out_infinite]" />
+    </div>
+    <style>{`@keyframes loading { 0% { width: 0; } 50% { width: 100%; } 100% { width: 0; } }`}</style>
   </div>
 );
 
 function AppContent() {
   const location = useLocation();
   const { currentUser, userData, loading } = useAuth();
-
-  // Guard against undefined context which triggers Error #130
+  
+  // Guard theme against null userData
   const theme = useMemo(() => userData?.theme || "DeepSpace", [userData]);
 
+  // If AuthContext is still initializing, show Loader
   if (loading) return <GlobalLoader />;
 
   return (
     <>
-      {/* Background Layer */}
-      <div className="fixed inset-0 z-0">
+      <div className="fixed inset-0 z-0 pointer-events-none">
         <AnimatePresence mode="wait">
           <motion.div 
             key={location.pathname === "/register" ? "bg2" : "bg1"}
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="h-full w-full"
           >
-            {location.pathname === "/register" ? (
-              <Background2 theme={theme} />
-            ) : (
-              <Background theme={theme} />
-            )}
+            {location.pathname === "/register" ? <Background2 theme={theme} /> : <Background theme={theme} />}
           </motion.div>
         </AnimatePresence>
       </div>
 
-      {/* Routing Layer */}
       <div className="relative z-10">
         <Suspense fallback={<GlobalLoader />}>
-          <Routes location={location} key={location.pathname}>
-            {/* Public Routes */}
+          <Routes location={location}>
+            {/* PUBLIC ROUTES */}
             <Route 
               path="/login" 
               element={!currentUser ? <LoginPage /> : <Navigate to="/chat" replace />} 
@@ -67,18 +58,30 @@ function AppContent() {
               element={!currentUser ? <Register /> : <Navigate to="/chat" replace />} 
             />
             
-            {/* Protected Routes */}
+            {/* PROTECTED ROUTES - The "Double Guard" Fix */}
             <Route 
               path="/chat" 
-              element={currentUser ? <Chat /> : <Navigate to="/login" replace />} 
+              element={
+                currentUser ? (
+                  userData ? <Chat /> : <GlobalLoader />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              } 
             />
             <Route 
               path="/profile" 
-              element={currentUser ? <Profile /> : <Navigate to="/login" replace />} 
+              element={
+                currentUser ? (
+                  userData ? <Profile /> : <GlobalLoader />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              } 
             />
             
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/chat" replace />} />
+            {/* FALLBACK */}
+            <Route path="*" element={<Navigate to={currentUser ? "/chat" : "/login"} replace />} />
           </Routes>
         </Suspense>
       </div>
@@ -86,7 +89,6 @@ function AppContent() {
   );
 }
 
-// Main App Wrapper
 export default function App() {
   return (
     <Router>

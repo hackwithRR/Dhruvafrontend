@@ -14,7 +14,7 @@ export default function LiveMode() {
     const [isListening, setIsListening] = useState(false);
     const [isAiSpeaking, setIsAiSpeaking] = useState(false);
     const [status, setStatus] = useState("Initializing Link...");
-    
+
     const recognitionRef = useRef(null);
     const synthesisRef = useRef(window.speechSynthesis);
 
@@ -27,11 +27,11 @@ export default function LiveMode() {
     const speak = useCallback(async (text) => {
         synthesisRef.current.cancel();
         const cleanText = text.replace(/[*_`~]/g, '').replace(/\\\[.*?\\\]/g, '').trim();
-        
+
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.voice = getMaleVoice();
         utterance.rate = 1.0;
-        
+
         utterance.onstart = () => {
             setIsAiSpeaking(true);
             setStatus("Dhruva is speaking...");
@@ -61,7 +61,7 @@ export default function LiveMode() {
             const transcript = event.results[0][0].transcript;
             setIsListening(false);
             setStatus("Processing...");
-            
+
             try {
                 const res = await axios.post(`${API_BASE}/chat`, {
                     message: transcript,
@@ -99,10 +99,10 @@ export default function LiveMode() {
 
             {/* Visualizer Orb */}
             <div className="relative flex items-center justify-center">
-                <motion.div 
-                    animate={{ 
+                <motion.div
+                    animate={{
                         scale: isAiSpeaking ? [1, 1.2, 1] : isListening ? [1, 1.1, 1] : 1,
-                        rotate: 360 
+                        rotate: 360
                     }}
                     transition={{ repeat: Infinity, duration: 3, ease: "linear" }}
                     className={`w-64 h-64 rounded-full border-2 border-dashed ${isAiSpeaking ? 'border-indigo-500' : 'border-white/10'}`}
@@ -123,7 +123,7 @@ export default function LiveMode() {
 
             <div className="flex flex-col items-center gap-8">
                 <p className="text-xs font-bold uppercase tracking-widest text-white/40">{status}</p>
-                <button 
+                <button
                     onClick={() => navigate(-1)}
                     className="group flex items-center gap-3 px-8 py-4 bg-white/5 border border-white/10 rounded-full hover:bg-red-500/20 hover:border-red-500/50 transition-all"
                 >

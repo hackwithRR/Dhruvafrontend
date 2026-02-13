@@ -61,7 +61,6 @@ body {
   margin: 0;
   font-family: "Inter", system-ui, sans-serif;
   /* Remove the background gradient here so the JS theme can take over */
-  color: white;
   min-height: 100vh;
 }
 
