@@ -1,4 +1,6 @@
-// 1. ALL IMPORTS MUST BE AT THE VERY TOP
+
+
+
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import imageCompression from 'browser-image-compression'; // <--- Move here
@@ -8,10 +10,11 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast, ToastContainer } from "react-toastify";
 import {
-    FaPaperPlane, FaSyncAlt, FaTimes, FaImage, FaHistory, FaTrash,
+    FaPaperPlane, FaSyncAlt, FaTimes, FaImage, FaHistory, FaTrashmer
+    ,
     FaTrophy, FaChartLine, FaLayerGroup, FaWaveSquare,
-    FaClock, FaSignOutAlt, FaMedal, FaBrain, FaSearch, FaChevronDown, FaPlus,
-    FaSlidersH, FaFire, FaGem, FaStar, FaLock, FaBolt, FaFilePdf, FaFileWord, FaFileAlt, FaYoutube, FaChevronRight, FaChevronLeft,
+    FaClock, FaSignOutAlt, FaMedal, FaBrain, FaSearch, FaChevronDown, FaPlus, FaTrash,
+    FaSlidersH, FaFire, FaGem, FaStar, FaLock, FaBolt, FaFilePdf, FaFileWord, FaFileAlt, FaYoutube, FaChevronRight, FaChevronLeft, FaVolumeUp,
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -110,9 +113,36 @@ const themes = {
     Cyberpunk: { bg: "bg-[#0a0a0f]", hex: "#0a0a0f", primary: "cyan-500", primaryHex: "#06b6d4", text: "text-cyan-50", accent: "text-cyan-400", card: "bg-cyan-950/20", border: "border-cyan-500/20", isDark: true }
 };
 
+const Typewriter = ({ text }) => {
+    const [displayText, setDisplayText] = useState('');
+
+    useEffect(() => {
+        let i = 0;
+        const timer = setInterval(() => {
+            if (i < text.length) {
+                setDisplayText(text.slice(0, i + 1));
+                i++;
+            } else {
+                clearInterval(timer);
+            }
+        }, 20); // Adjust speed as needed
+        return () => clearInterval(timer);
+    }, [text]);
+
+    return (
+        <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+        >
+            {displayText}
+        </ReactMarkdown>
+    );
+};
+
 export default function Chat() {
-    const { currentUser, loading: authLoading } = useAuth();
+    const { currentUser, userData, loading: authLoading, theme, setTheme, logout } = useAuth();
     const navigate = useNavigate();
+    const mainRef = useRef(null);
 
     // --- BASIC STATES ---
     const [messages, setMessages] = useState([]);
@@ -124,13 +154,239 @@ export default function Chat() {
     const [searchQuery, setSearchQuery] = useState("");
     const [input, setInput] = useState(""); // <--- Only keep this ONE
     const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [isTyping, setIsTyping] = useState(false);
+    const [speakingMessageId, setSpeakingMessageId] = useState(null);
+    const [voices, setVoices] = useState([]);
+    const [voiceEnabled, setVoiceEnabled] = useState(false);
+
+    // --- FILE & UI STATES ---
+    const [attachedFile, setAttachedFile] = useState(null);
+    const [fileType, setFileType] = useState(null);
+    const [mode, setMode] = useState("Explain");
+    const [subject, setSubject] = useState("");
+    const [chapter, setChapter] = useState("");
+    const [isSending, setIsSending] = useState(false);
+    // ✅ DO THIS (Import it from your context)
+    const [timer, setTimer] = useState(0);
+    const [showSessionPicker, setShowSessionPicker] = useState(false);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState(null);
+    const [showSubjDrop, setShowSubjDrop] = useState(false);
+    const [showChapDrop, setShowChapDrop] = useState(false);
+    const [showPlusMenu, setShowPlusMenu] = useState(false);
+    const [showContextOverlay, setShowContextOverlay] = useState(false);
+    const [searchVault, setSearchVault] = useState("");
+    const [showSidebar, setShowSidebar] = useState(false);
+    const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [showProfileModal, setShowProfileModal] = useState(false);
+    const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+
+    // --- REFS ---
+    const fileInputRef = useRef(null);
+    const inputRef = useRef(null);
+    const docInputRef = useRef(null);
+    const bottomRef = useRef(null);
+    const chatContainerRef = useRef(null);
+    const messagesEndRef = useRef(null);
+
+    // --- CALCULATED STATISTICS ---
+    const levelProgress = useMemo(() =>
+        ((userData?.xp || 0) % 1000) / 10,
+        [userData?.xp]
+    );
+
+    const dailyProgress = useMemo(() =>
+        Math.min(((userData?.dailyXp || 0) / 500) * 100, 100),
+        [userData?.dailyXp]
+    );
+
+    const currentLvl = useMemo(() =>
+        Math.floor((userData?.xp || 0) / 1000) + 1,
+        [userData?.xp]
+    );
+
+    const userClass = useMemo(() => {
+        const cls = userData?.class || userData?.classLevel;
+        if (typeof cls === 'string') {
+            const match = cls.match(/\d+/);
+            if (match) return match[0];
+        }
+        return "10";
+    }, [userData]);
+
+    const activeTheme = useMemo(() => {
+        const themeKey = userData?.theme || "DeepSpace";
+        return themes[themeKey] || themes.DeepSpace;
+    }, [userData?.theme]);
+
+    const filteredSessions = useMemo(() => {
+        if (!sessions) return [];
+        const query = (searchVault || "").toLowerCase();
+        return sessions.filter(s =>
+            (s.title || "").toLowerCase().includes(query) ||
+            (s.subject || "").toLowerCase().includes(query)
+        );
+    }, [sessions, searchVault]);
+
+    const quickReplies = useMemo(() => {
+        if (mode === "Quiz") return ["Start 5 MCQ Quiz", "Hard Mode", "Summary"];
+        if (mode === "HW") return ["Step-by-step", "Clarify this", "Alternative"];
+        return [`Summarize ${chapter || 'this'}`, "Real-world application", "Simplify"];
+    }, [mode, chapter]);
+
+    // --- EFFECTS ---
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setTimer(prev => {
+                const newTime = prev + 1;
+                if (newTime % 180 === 0 && currentUser) { incrementXP(1); }
+                return newTime;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [currentUser]);
+
+    useEffect(() => {
+        if (activeTheme?.hex) {
+            document.body.style.backgroundColor = activeTheme.hex;
+            document.documentElement.style.backgroundColor = activeTheme.hex;
+            document.body.style.color = activeTheme.isDark ? '#ffffff' : '#1e293b';
+        }
+    }, [activeTheme]);
+
+    useEffect(() => {
+        if (!authLoading && !currentUser) navigate("/login");
+    }, [currentUser, authLoading, navigate]);
+
+    // Load voices for TTS and handle cleanup
+    useEffect(() => {
+        const loadVoices = () => {
+            const availableVoices = window.speechSynthesis.getVoices();
+            setVoices(availableVoices);
+        };
+
+        loadVoices();
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+
+        // Stop speech on page unload/reload/close
+        const handleBeforeUnload = () => {
+            window.speechSynthesis.cancel();
+        };
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                window.speechSynthesis.cancel();
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.speechSynthesis.onvoiceschanged = null;
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.speechSynthesis.cancel(); // Stop on unmount
+        };
+    }, []);
+
+    useEffect(() => {
+        if (userData && (userData.name === 'Scholar' || !userData.board)) {
+            setShowOnboardingModal(true);
+        }
+    }, [userData]);
+
+    // Auto-scroll to bottom when new messages are added
+    useEffect(() => {
+        const messagesContainer = messagesEndRef.current?.parentElement;
+        if (messagesContainer) {
+            const isAtBottom = messagesContainer.scrollTop + messagesContainer.clientHeight >= messagesContainer.scrollHeight - 100;
+            if (isAtBottom) {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }
+        }
+    }, [messages]);
+
+    // Detect if user scrolled up
+    useEffect(() => {
+        const messagesContainer = chatContainerRef.current;
+        if (messagesContainer) {
+            const handleScroll = () => {
+                if (messagesContainer) {
+                    const { scrollTop, scrollHeight, clientHeight } = messagesContainer;
+                    // If user is more than 300px away from the bottom, show the button
+                    const isFarUp = scrollHeight - scrollTop - clientHeight > 300;
+                    setShowScrollToBottom(isFarUp);
+                }
+            };
+            messagesContainer.addEventListener('scroll', handleScroll);
+            return () => messagesContainer.removeEventListener('scroll', handleScroll);
+        }
+    }, []);
+
+    useEffect(() => {
+        const q = query(collection(db, "users"), orderBy("xp", "desc"), limit(5));
+        const unsubLeader = onSnapshot(q, (snap) => {
+            setLeaderboard(snap.docs.map((d, idx) => ({ id: d.id, rank: idx + 1, ...d.data() })));
+        });
+        return () => unsubLeader();
+    }, []);
+
+    useEffect(() => {
+        if (!currentUser) return;
+        const q = query(collection(db, `users/${currentUser.uid}/sessions`), orderBy("lastUpdate", "desc"), limit(10));
+        return onSnapshot(q, (snap) => setSessions(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    }, [currentUser]);
+
+    useEffect(() => {
+        if (!currentUser || !currentSessionId) return;
+
+        // Listen to the SPECIFIC active session
+        const unsub = onSnapshot(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), (docSnap) => {
+            if (docSnap.exists()) {
+                const data = docSnap.data();
+
+                // This restores your messages AND their attachments (images/docs)
+                if (data.messages) {
+                    setMessages(data.messages);
+                }
+
+                // This restores the AI's strict context (Subject/Chapter)
+                if (data.subject) setSubject(data.subject);
+                if (data.chapter) setChapter(data.chapter);
+            }
+        });
+
+        return () => unsub();
+    }, [currentSessionId, currentUser, userData]);
+
+    // Update session's board and class when userData changes
+    useEffect(() => {
+        if (!currentUser || !currentSessionId || !userData) return;
+        const sessionRef = doc(db, `users/${currentUser.uid}/sessions`, currentSessionId);
+        setDoc(sessionRef, {
+            board: userData.board || "CBSE",
+            class: String(userData.classLevel || userData.class || "10")
+        }, { merge: true });
+    }, [userData?.board, userData?.classLevel, userData?.class, currentUser, currentSessionId]);
+
+    // Component Guard: Loading check
+    if (authLoading || !userData) {
+        return (
+            <div className="h-screen flex items-center justify-center bg-[#050505]">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-cyan-400 text-sm font-black uppercase tracking-widest">Initializing Neural Link...</span>
+                </div>
+            </div>
+        );
+    }
 
     // Function to Sync all Header/Overlay changes to Firestore
-    const syncContext = async (overrideSubj, overrideChap) => {
+    const syncContext = async (overrideSubj, overrideChap, overrideTitle) => {
         // Determine the class from profile data
-        const effectiveClass = userData?.classLevel || userData?.class;
+        const userClass = userData?.classLevel || userData?.class;
 
-        if (!currentSessionId || !effectiveClass) {
+        if (!currentSessionId || !userClass) {
             toast.error("Profile Class not detected.");
             return;
         }
@@ -141,26 +397,22 @@ export default function Chat() {
             // We use the arguments if they exist, otherwise fallback to the current state
             const finalSubject = overrideSubj !== undefined ? overrideSubj : subject;
             const finalChapter = overrideChap !== undefined ? overrideChap : chapter;
+            const finalTitle = overrideTitle !== undefined ? overrideTitle : sessionTitle;
 
             const updates = {
                 subject: finalSubject || "",
                 chapter: finalChapter || "",
+                title: finalTitle || "New Lesson",
                 board: userData.board || "CBSE",
-                class: String(effectiveClass),
+                class: String(userClass),
                 lastUpdate: Date.now(),
             };
-
-            // Rename session if it's the first time setting a chapter
-            if (finalChapter && (sessionTitle === "New Lesson" || !sessionTitle)) {
-                updates.title = finalChapter;
-                setSessionTitle(finalChapter);
-            }
 
             await setDoc(sessionRef, updates, { merge: true });
 
             // Only show success toast if we are manually syncing via button
-            if (overrideSubj === undefined) {
-                toast.success(`Synced: ${userData.board} Class ${effectiveClass}`);
+            if (overrideSubj === undefined && overrideChap === undefined && overrideTitle === undefined) {
+                toast.success(`Synced: ${userData.board} Class ${userClass}`);
                 setShowContextOverlay(false);
             }
         } catch (err) {
@@ -178,32 +430,110 @@ export default function Chat() {
     };
 
 
-    // --- FILE & UI STATES ---
-    const [attachedFile, setAttachedFile] = useState(null);
-    const [fileType, setFileType] = useState(null);
-    const [mode, setMode] = useState("Explain");
-    const [subject, setSubject] = useState("");
-    const [chapter, setChapter] = useState("");
-    const [isSending, setIsSending] = useState(false);
-    const [userData, setUserData] = useState({ board: "CBSE", class: "10", xp: 0, dailyXp: 0, streak: 0, theme: "DeepSpace", displayName: "" });
-    const [timer, setTimer] = useState(0);
-    const [showSessionPicker, setShowSessionPicker] = useState(false);
-    const [selectedFile, setSelectedFile] = useState(null);
-    const [imagePreview, setImagePreview] = useState(null);
-    const [showSubjDrop, setShowSubjDrop] = useState(false);
-    const [showChapDrop, setShowChapDrop] = useState(false);
-    const [showPlusMenu, setShowPlusMenu] = useState(false);
-    const [showContextOverlay, setShowContextOverlay] = useState(false);
-    const [searchVault, setSearchVault] = useState("");
-    const [showSidebar, setShowSidebar] = useState(false);
-
-
     // --- LOGIC FUNCTIONS ---
     // 1. Make sure you have this state defined at the top of your component:
     // const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+    const speak = (text) => {
+        if (!text) return;
+
+        // Clean text: remove markdown syntax
+        const cleanText = text.replace(/[*_`~#]/g, '').replace(/\n/g, ' ').trim();
+
+        if (!cleanText) return;
+
+        const synth = window.speechSynthesis;
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+
+        // Set language based on user preference
+        const lang = userData?.language === 'Hinglish' ? 'hi-IN' : 'en-IN';
+        utterance.lang = lang;
+
+        // Force male voice selection with aggressive fallback
+        const voices = synth.getVoices();
+        let preferredVoice = null;
+
+        // Priority 1: Exact language match with male indicator
+        preferredVoice = voices.find(voice =>
+            voice.lang === lang &&
+            (voice.name.toLowerCase().includes('male') ||
+                voice.name.toLowerCase().includes('man') ||
+                voice.name.toLowerCase().includes('boy') ||
+                voice.name.toLowerCase().includes('kumar') ||
+                voice.name.toLowerCase().includes('arjun') ||
+                voice.name.toLowerCase().includes('rahul'))
+        );
+
+        // Priority 2: Language match with male indicator (broader language match)
+        if (!preferredVoice) {
+            preferredVoice = voices.find(voice =>
+                voice.lang.startsWith(lang.split('-')[0]) &&
+                (voice.name.toLowerCase().includes('male') ||
+                    voice.name.toLowerCase().includes('man') ||
+                    voice.name.toLowerCase().includes('boy') ||
+                    voice.name.toLowerCase().includes('kumar') ||
+                    voice.name.toLowerCase().includes('arjun') ||
+                    voice.name.toLowerCase().includes('rahul'))
+            );
+        }
+
+        // Priority 3: Any male voice
+        if (!preferredVoice) {
+            preferredVoice = voices.find(voice =>
+                voice.name.toLowerCase().includes('male') ||
+                voice.name.toLowerCase().includes('man') ||
+                voice.name.toLowerCase().includes('boy') ||
+                voice.name.toLowerCase().includes('kumar') ||
+                voice.name.toLowerCase().includes('arjun') ||
+                voice.name.toLowerCase().includes('rahul')
+            );
+        }
+
+        // Priority 4: Exact language match (any voice)
+        if (!preferredVoice) {
+            preferredVoice = voices.find(voice => voice.lang === lang);
+        }
+
+        // Priority 5: Language family match
+        if (!preferredVoice) {
+            preferredVoice = voices.find(voice => voice.lang.startsWith(lang.split('-')[0]));
+        }
+
+        // Priority 6: First available voice
+        if (!preferredVoice && voices.length > 0) {
+            preferredVoice = voices[0];
+        }
+
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+            // Aggressive pitch adjustment to force male-like voice
+            if (preferredVoice.name.toLowerCase().includes('female') ||
+                preferredVoice.name.toLowerCase().includes('woman') ||
+                preferredVoice.name.toLowerCase().includes('girl') ||
+                preferredVoice.name.toLowerCase().includes('zira') ||
+                preferredVoice.name.toLowerCase().includes('hazel')) {
+                utterance.pitch = 0.7; // Very low pitch for female voices
+            } else {
+                utterance.pitch = 0.7; // Lower pitch for male voices
+            }
+        } else {
+            utterance.pitch = 0.7; // Default low pitch
+        }
+
+        // Adjust parameters for more natural male speech
+        utterance.rate = 0.8; // Slightly faster for natural flow
+        utterance.volume = 1.0;
+
+        synth.speak(utterance);
+    };
+
+    const stopSpeech = () => {
+        window.speechSynthesis.cancel();
+    };
 
     const handleFileUpload = async (e) => {
+        if (!userData) return;
+
         let file = e.target.files[0];
         if (!file) return;
 
@@ -230,12 +560,13 @@ export default function Chat() {
                 };
 
                 const compressedFile = await imageCompression(file, options);
-                setAttachedFile(compressedFile);
+                setAttachedFile(compressedFile); // Keep the file for sending
 
-                // Convert to Base64 so it STAYS in chat history after refresh
+                // Convert to Base64 for preview and storage
                 const reader = new FileReader();
                 reader.onloadend = () => {
-                    setImagePreview(reader.result);
+                    const base64data = reader.result;
+                    setImagePreview(base64data);
                 };
                 reader.readAsDataURL(compressedFile);
 
@@ -247,10 +578,15 @@ export default function Chat() {
                 // This flattens the PDF and removes unneeded metadata to save space
                 const compressedBytes = await pdfDoc.save({ useObjectStreams: true });
                 const optimizedPDF = new Blob([compressedBytes], { type: 'application/pdf' });
+                setAttachedFile(optimizedPDF); // Keep the blob for sending
 
-                setAttachedFile(optimizedPDF);
-                // For PDFs, we use a generic icon or local URL as preview
-                setImagePreview(URL.createObjectURL(optimizedPDF));
+                // Convert to Base64 for preview and storage
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const base64data = reader.result;
+                    setImagePreview(base64data);
+                };
+                reader.readAsDataURL(optimizedPDF);
 
             } else {
                 // Fallback for other document types
@@ -269,85 +605,6 @@ export default function Chat() {
             setIsAnalyzing(false);
         }
     };
-
-
-    // --- CALCULATED STATISTICS ---
-    // This defines the variables the ESLint error is complaining about
-    const currentLvl = useMemo(() =>
-        Math.floor((userData.xp || 0) / 1000) + 1,
-        [userData.xp]
-    );
-
-    const levelProgress = useMemo(() =>
-        (userData.xp % 1000) / 10,
-        [userData.xp]
-    );
-
-
-
-    const dailyProgress = useMemo(() =>
-        Math.min(((userData.dailyXp || 0) / 500) * 100, 100),
-        [userData.dailyXp]
-    );
-
-    const messagesEndRef = useRef(null);
-    const fileInputRef = useRef(null);
-    const inputRef = useRef(null);
-    const docInputRef = useRef(null);
-
-    const activeTheme = useMemo(() => {
-        const themeKey = userData?.theme || "DeepSpace";
-        return themes[themeKey] || themes.DeepSpace;
-    }, [userData?.theme]);
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            setTimer(prev => {
-                const newTime = prev + 1;
-                if (newTime % 180 === 0 && currentUser) { incrementXP(1); }
-                return newTime;
-            });
-        }, 1000);
-        return () => clearInterval(interval);
-    }, [currentUser]);
-
-    useEffect(() => {
-        if (activeTheme?.hex) {
-            document.body.style.backgroundColor = activeTheme.hex;
-            document.documentElement.style.backgroundColor = activeTheme.hex;
-        }
-    }, [activeTheme]);
-
-    useEffect(() => {
-        if (!authLoading && !currentUser) navigate("/login");
-    }, [currentUser, authLoading, navigate]);
-
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
-
-    const handleLogout = async () => {
-        try { await auth.signOut(); navigate("/login"); } catch (err) { toast.error("Logout Failed"); }
-    };
-
-    useEffect(() => {
-        if (!currentUser?.uid) return;
-        const unsubUser = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
-            if (docSnap.exists()) {
-                const incomingData = docSnap.data();
-                setUserData(prev => ({
-                    ...prev,
-                    ...incomingData,
-                    theme: incomingData.theme || prev.theme || "DeepSpace"
-                }));
-            }
-        });
-        const q = query(collection(db, "users"), orderBy("xp", "desc"), limit(5));
-        const unsubLeader = onSnapshot(q, (snap) => {
-            setLeaderboard(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
-        return () => { unsubUser(); unsubLeader(); };
-    }, [currentUser]);
 
     const incrementXP = async (amount) => {
         if (!currentUser) return;
@@ -401,6 +658,12 @@ export default function Chat() {
         // 1. VALIDATION
         if (isSending || (!text.trim() && !attachedFile)) return;
 
+        // Check for userData
+        if (!userData) {
+            toast.error("Profile data not loaded. Please wait.");
+            return;
+        }
+
         // 2. SYSTEM PROMPT & MODE BEHAVIORS
         const modeBehaviors = {
             "Explain": "You are a proactive teacher. Focus on conceptual understanding and analogies. Clarify doubts deeply and use step-by-step logic.",
@@ -409,19 +672,16 @@ export default function Chat() {
             "Deep Dive": "Go beyond the standard curriculum. Explain advanced theory, research, and real-world applications."
         };
 
-        const systemPrompt = `
-You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class ${userData.class}.
-### ACADEMIC CONTEXT
-- Subject: ${subject} | Chapter: ${chapter}
-- Mode: ${mode} (${modeBehaviors[mode]})
+        // Standardize userClass
+        const userClass = userData?.class || userData?.classLevel;
 
-### RULES
-- Use LaTeX for ALL math/science formulas ($E=mc^2$).
-- If Mode is Explain: Focus on teaching. If the user has a doubt, use a new analogy.
-- For small talk (Hi, Hello, Thanks), be warm but very brief.
-`;
+        const userLang = userData.language;
+
+        const systemInstruction = userLang === 'Hinglish' ? `You are a Dhruva AI Tutor for Class ${userClass}. Respond in Hinglish (a natural mix of Hindi and English). Use English for technical terms and Hindi for explanations.` : `You are a Dhruva AI Tutor for Class ${userClass}. Respond in formal English.`;
+
 
         setIsSending(true);
+        setIsTyping(true); // Start typing indicator
 
         // Capture states before UI reset
         const currentInput = text;
@@ -439,13 +699,12 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
         const formData = new FormData();
         formData.append("userId", currentUser.uid);
         formData.append("message", currentInput);
-        formData.append("systemPrompt", systemPrompt);
+        formData.append("systemInstruction", systemInstruction);
         formData.append("subject", subject);
         formData.append("chapter", chapter);
         formData.append("mode", mode);
         formData.append("board", userData.board);
-        formData.append("class", userData.class);
-        if (currentFile) formData.append("file", currentFile);
+        formData.append("class", userData.class || userData.classLevel);
 
         // 5. LOCAL UI UPDATE
         const userMsg = {
@@ -460,10 +719,15 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
         setMessages(prev => [...prev, userMsg]);
 
         try {
+            console.log("SENDING TO AI -> Board:", userData.board, "Class:", userData.classLevel || userData.class);
+
             // 6. API CALL
             const res = await axios.post(`${API_BASE}/chat`, formData, {
-                headers: { "Content-Type": "multipart/form-data" }
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                },
             });
+
 
             const aiResponse = res.data.reply;
             const lowRes = aiResponse.toLowerCase();
@@ -480,16 +744,19 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                 const teachingKeywords = ["define", "explain", "because", "process", "concept", "example", "formula", "law", "theory", "step", "understand", "meaning", "doubt"];
                 const containsTeachingContent = teachingKeywords.some(word => lowRes.includes(word));
 
-                // CRITERIA: 
+                // CRITERIA:
                 // 1. Must be longer than 120 chars (prevents link on short replies)
                 // 2. Must not start with small talk (prevents link on "Hello! How can I help?")
                 // 3. Must contain academic keywords (ensures it's an actual explanation)
                 if (aiResponse.length > 120 && !startsWithSmallTalk && containsTeachingContent) {
                     ytLink = `https://www.youtube.com/results?search_query=${encodeURIComponent(
-                        `${userData.board} class ${userData.class} ${subject} ${chapter} explanation tutorial`
+                        `${userData.board} class ${userClass} ${subject} ${chapter} explanation tutorial`
                     )}`;
                 }
             }
+
+
+
 
             const aiMsg = {
                 role: "ai",
@@ -503,16 +770,21 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                 const finalHistory = [...prev, aiMsg];
                 const sessionRef = doc(db, `users/${currentUser.uid}/sessions`, currentSessionId);
 
-                setDoc(sessionRef, {
+                updateDoc(sessionRef, {
                     messages: finalHistory,
                     lastUpdate: Date.now(),
                     title: sessionTitle === "New Lesson" ? currentInput.slice(0, 25) + "..." : sessionTitle,
                     subject,
                     chapter,
                     board: userData.board,
-                    class: userData.class,
+                    class: userClass,
                     activeMode: mode
                 }, { merge: true });
+
+                // Speak the AI response if voice is enabled
+                if (voiceEnabled) {
+                    speak(aiResponse);
+                }
 
                 return finalHistory;
             });
@@ -527,47 +799,27 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
             setMessages(prev => prev.filter(m => m !== userMsg)); // Remove failed message
         } finally {
             setIsSending(false);
+            setIsTyping(false); // Stop typing indicator
         }
     };
 
-
-
-    const quickReplies = useMemo(() => {
-        if (mode === "Quiz") return ["Start 5 MCQ Quiz", "Hard Mode", "Summary"];
-        if (mode === "HW") return ["Step-by-step", "Clarify this", "Alternative"];
-        return [`Summarize ${chapter || 'this'}`, "Real-world application", "Simplify"];
-    }, [mode, chapter]);
-
-    useEffect(() => {
-        if (!currentUser) return;
-        const q = query(collection(db, `users/${currentUser.uid}/sessions`), orderBy("lastUpdate", "desc"), limit(10));
-        return onSnapshot(q, (snap) => setSessions(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    }, [currentUser]);
-
-    useEffect(() => {
-        if (!currentUser || !currentSessionId) return;
-
-        // Listen to the SPECIFIC active session
-        const unsub = onSnapshot(doc(db, `users/${currentUser.uid}/sessions`, currentSessionId), (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-
-                // This restores your messages AND their attachments (images/docs)
-                if (data.messages) {
-                    setMessages(data.messages);
-                }
-
-                // This restores the AI's strict context (Subject/Chapter)
-                if (data.subject) setSubject(data.subject);
-                if (data.chapter) setChapter(data.chapter);
-            }
-        });
-
-        return () => unsub();
-    }, [currentSessionId, currentUser]);
-
     const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
     const calculateLevel = (xp) => Math.floor((xp || 0) / 1000) + 1;
+
+    const handleScroll = () => {
+        if (chatContainerRef.current) {
+            const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+            // If user is more than 300px away from the bottom, show the button
+            const isFarUp = scrollHeight - scrollTop - clientHeight > 300;
+            setShowScrollToBottom(isFarUp);
+        }
+    };
+
     const openVaultFile = (base64Data) => {
         try {
             // 1. Convert Base64 to a real PDF Blob
@@ -593,22 +845,25 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
             toast.error("Neural Link failed to decode file.");
         }
     };
-    // --- CONSOLIDATED VAULT LOGIC ---
-    // --- CONSOLIDATED VAULT LOGIC ---
-    const filteredSessions = useMemo(() => {
-        if (!sessions) return [];
-        const query = (searchVault || "").toLowerCase();
-        return sessions.filter(s =>
-            (s.title || "").toLowerCase().includes(query) ||
-            (s.subject || "").toLowerCase().includes(query)
+
+    const handleLogout = async () => {
+        try { await auth.signOut(); navigate("/login"); } catch (err) { toast.error("Logout Failed"); }
+    };
+
+    // Component Guard: Loading check
+    if (authLoading || !userData) {
+        return (
+            <div className="h-screen flex items-center justify-center bg-[#050505]">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-16 h-16 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-cyan-400 text-sm font-black uppercase tracking-widest">Initializing Neural Link...</span>
+                </div>
+            </div>
         );
-    }, [sessions, searchVault]); // This line should match the 'const filteredSessions' start
-
-
-    if (authLoading) return <div className="h-screen flex items-center justify-center text-xs font-black uppercase tracking-widest">Initialising...</div>;
+    }
 
     return (
-        <div className={`flex h-[100dvh] w-full ${activeTheme.bg} ${activeTheme.text} overflow-hidden font-sans relative`}>
+        <div>
             <ToastContainer theme={activeTheme.isDark ? "dark" : "light"} />
 
             {/* SIDEBAR (PRESERVED) */}
@@ -631,13 +886,13 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                             animate={{ x: 0 }}
                             exit={{ x: -600 }}
                             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-                            className={`fixed inset-y-0 left-0 w-[92%] md:w-[520px] ${activeTheme.isDark ? 'bg-[#080808]' : 'bg-white'} border-r ${activeTheme.border} z-[801] p-8 md:p-14 flex flex-col shadow-[50px_0_100px_rgba(0,0,0,0.5)]`}
+                            className={`fixed inset-y-0 left-0 w-[92%] md:w-[520px] ${activeTheme.bg} border-r ${activeTheme.border} z-[801] p-8 md:p-14 flex flex-col shadow-[50px_0_100px_rgba(0,0,0,0.5)]`}
                         >
                             {/* Header Section */}
                             <div className="flex justify-between items-start mb-12">
                                 <div className="flex flex-col">
                                     <h3 className="text-4xl md:text-5xl font-black italic uppercase tracking-tighter leading-none">Statistics</h3>
-                                    <p className="text-[10px] md:text-xs font-black uppercase tracking-[0.5em] opacity-30 mt-2 text-indigo-500">Scholar Neural Link</p>
+                                    <p className={`text-[10px] md:text-xs font-black uppercase tracking-[0.5em] opacity-30 mt-2 text-${activeTheme.accent}`}>Scholar Neural Link</p>
                                 </div>
                                 <button
                                     onClick={() => setShowSidebar(false)}
@@ -657,14 +912,16 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                     </div>
 
                                     <motion.div whileHover={{ scale: 1.05 }} className="relative mb-8">
-                                        <div className="w-36 h-36 rounded-[3.5rem] bg-indigo-600 flex items-center justify-center font-black text-6xl shadow-[0_0_70px_rgba(79,70,229,0.5)] border-4 border-white/10">
+                                        <div className={`w-36 h-36 rounded-[3.5rem] bg-${activeTheme.primary} flex items-center justify-center font-black text-6xl border-4 border-white/10`}
+                                            style={{ boxShadow: `0 0 70px ${activeTheme.primaryHex}50` }}>
                                             {currentLvl}
                                         </div>
                                         {userData.streak >= 3 && (
                                             <motion.div
                                                 animate={{ y: [0, -12, 0], scale: [1, 1.2, 1] }}
                                                 transition={{ repeat: Infinity, duration: 2 }}
-                                                className="absolute -top-6 -right-6 bg-orange-600 p-5 rounded-[2rem] shadow-[0_0_30px_#ea580c] border-4 border-[#080808]"
+                                                className={`absolute -top-6 -right-6 bg-${activeTheme.primary} p-5 rounded-[2rem] border-4 border-[#080808]`}
+                                                style={{ boxShadow: `0 0 30px ${activeTheme.primaryHex}` }}
                                             >
                                                 <FaFire size={28} className="text-white" />
                                             </motion.div>
@@ -674,11 +931,11 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                     <div className="text-center">
                                         <h4 className="text-2xl font-black uppercase tracking-[0.2em]">Academic Phase {currentLvl}</h4>
                                         <div className="flex items-center justify-center gap-3 mt-4">
-                                            <span className="px-4 py-1.5 bg-indigo-600/20 text-indigo-400 rounded-full text-[10px] font-black border border-indigo-500/30 uppercase tracking-widest">
-                                                {userData.xp} Total XP
+                                            <span className={`px-4 py-1.5 bg-${activeTheme.primary}/20 text-${activeTheme.accent} rounded-full text-[10px] font-black border border-${activeTheme.primary}/30 uppercase tracking-widest`}>
+                                                {userData?.xp || 0} Total XP
                                             </span>
                                             <span className="px-4 py-1.5 bg-emerald-600/20 text-emerald-400 rounded-full text-[10px] font-black border border-emerald-500/30 uppercase tracking-widest">
-                                                {userData.streak} Day Streak
+                                                {userData?.streak || 0} Day Streak
                                             </span>
                                         </div>
                                     </div>
@@ -690,13 +947,14 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                     <div className="space-y-4">
                                         <div className="flex justify-between items-end">
                                             <span className="text-[11px] font-black uppercase tracking-[0.3em] opacity-40">Neural Evolution</span>
-                                            <span className="text-lg font-black text-indigo-500">{levelProgress.toFixed(0)}%</span>
+                                            <span className={`text-lg font-black text-${activeTheme.accent}`}>{levelProgress.toFixed(0)}%</span>
                                         </div>
                                         <div className="h-4 bg-white/5 rounded-full p-1 border border-white/5 relative">
                                             <motion.div
                                                 initial={{ width: 0 }}
                                                 animate={{ width: `${levelProgress}%` }}
-                                                className="h-full bg-gradient-to-r from-indigo-600 to-blue-400 rounded-full shadow-[0_0_20px_rgba(79,70,229,0.6)]"
+                                                className={`h-full bg-gradient-to-r from-${activeTheme.primary} to-blue-400 rounded-full`}
+                                                style={{ boxShadow: `0 0 20px ${activeTheme.primaryHex}60` }}
                                             />
                                         </div>
                                     </div>
@@ -727,20 +985,31 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                             <motion.div
                                                 key={user.id}
                                                 whileHover={{ x: 10 }}
-                                                className={`flex items-center justify-between p-6 rounded-[2rem] border transition-all ${user.id === currentUser?.uid ? 'bg-indigo-600/10 border-indigo-500/40 shadow-lg shadow-indigo-500/10' : 'bg-white/[0.02] border-white/5'}`}
+                                                onClick={() => { setSelectedUser(user); setShowProfileModal(true); }}
+                                                className={`flex items-center justify-between p-6 rounded-[2rem] border transition-all cursor-pointer ${user.id === currentUser?.uid ? `bg-${activeTheme.primary}/10 border-${activeTheme.primary}/40 shadow-lg` : 'bg-white/[0.02] border-white/5 hover:bg-white/[0.04]'}`}
+                                                style={user.id === currentUser?.uid ? { boxShadow: `0 0 20px ${activeTheme.primaryHex}10` } : {}}
                                             >
                                                 <div className="flex items-center gap-5">
-                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs ${idx === 0 ? 'bg-yellow-500 text-black' : 'bg-white/5 text-white/40'}`}>
-                                                        0{idx + 1}
+                                                    <div className="relative">
+                                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm ${idx === 0 ? 'bg-yellow-500 text-black' : 'bg-white/5 text-white/40'}`}>
+                                                            {user.pfp ? (
+                                                                <img src={user.pfp} alt="Avatar" className="w-full h-full rounded-xl object-cover" />
+                                                            ) : (
+                                                                (user.name || "Anonymous")[0].toUpperCase()
+                                                            )}
+                                                        </div>
+                                                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 bg-${activeTheme.primary} rounded-full flex items-center justify-center text-[8px] font-black text-white`}>
+                                                            {idx + 1}
+                                                        </div>
                                                     </div>
                                                     <div className="flex flex-col">
-                                                        <span className="text-sm font-black uppercase tracking-tight">{user.displayName || "Anonymous"}</span>
+                                                        <span className="text-sm font-black uppercase tracking-tight">{user.name || "Anonymous"}</span>
                                                         <span className="text-[10px] opacity-30 font-bold uppercase tracking-widest">Level {Math.floor(user.xp / 1000) + 1}</span>
                                                     </div>
                                                 </div>
                                                 <div className="text-right">
-                                                    <span className="text-sm font-black text-indigo-400">{user.xp}</span>
-                                                    <p className="text-[8px] opacity-20 font-black uppercase">Credits</p>
+                                                    <span className={`text-sm font-black text-${activeTheme.accent}`}>{user.xp}</span>
+                                                    <p className="text-[8px] opacity-20 font-black uppercase">XP</p>
                                                 </div>
                                             </motion.div>
                                         ))}
@@ -766,36 +1035,37 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                         initial={{ opacity: 0, scale: 1.1 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 1.1 }}
-                        className="fixed inset-0 z-[999] bg-black/95 backdrop-blur-3xl p-6 flex flex-col justify-center gap-6"
+                        className={`fixed inset-0 z-[999] ${activeTheme.isDark ? 'bg-black/95' : 'bg-white/95'} backdrop-blur-3xl p-6 flex flex-col justify-center gap-6`}
                     >
                         <div className="flex justify-between items-center mb-4">
                             <div className="flex flex-col">
-                                <h2 className="text-2xl font-black uppercase italic tracking-tighter text-white">Neural Vault</h2>
-                                <span className="text-[10px] font-bold text-indigo-400 tracking-[0.3em] uppercase">
+                                <h2 className={`text-2xl font-black uppercase italic tracking-tighter ${activeTheme.text}`}>Neural Vault</h2>
+                                <span className={`text-[10px] font-bold ${activeTheme.accent} tracking-[0.3em] uppercase`}>
                                     Config: {userData?.board} — Class {userData?.classLevel || userData?.class}
                                 </span>
                             </div>
-                            <button onClick={() => setShowContextOverlay(false)} className="p-4 bg-white/5 rounded-full text-white active:scale-90 transition-transform">
-                                <FaTimes size={18} />
+                            <button onClick={() => setShowContextOverlay(false)} className={`p-4 bg-white/5 rounded-full ${activeTheme.text} active:scale-90 transition-transform`}>
+                                <FaTimes size={18} className={activeTheme.text} />
                             </button>
                         </div>
 
                         <div className="space-y-6">
                             {/* Mobile Subject Selector */}
+                            {/* Mobile Subject Selector */}
                             <div className="relative">
-                                <label className="text-[10px] font-black uppercase opacity-40 text-white ml-4 mb-2 block">Primary Subject</label>
+                                <label className={`text-[10px] font-black uppercase opacity-40 ${activeTheme.text} ml-4 mb-2 block`}>Primary Subject</label>
                                 <div onClick={() => { setShowSubjDrop(!showSubjDrop); setShowChapDrop(false); }} className={`flex items-center justify-between p-5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer shadow-2xl`}>
-                                    <span className="text-sm font-black uppercase text-white">{subject || "Select Subject"}</span>
-                                    <FaChevronDown size={12} className={`transition-transform duration-300 ${showSubjDrop ? 'rotate-180' : ''} opacity-30 text-white`} />
+                                    <span className={`text-sm font-black uppercase ${activeTheme.text}`}>{subject || "Select Subject"}</span>
+                                    <FaChevronDown size={12} className={`transition-transform duration-300 ${showSubjDrop ? 'rotate-180' : ''} opacity-30 ${activeTheme.text}`} />
                                 </div>
                                 {showSubjDrop && (
-                                    <div className="absolute top-full left-0 w-full mt-2 rounded-2xl bg-gray-900 border border-white/10 p-2 max-h-48 overflow-y-auto z-[1000] backdrop-blur-xl shadow-2xl no-scrollbar">
+                                    <div className={`absolute top-full left-0 w-full mt-2 rounded-2xl ${activeTheme.isDark ? 'bg-gray-900' : 'bg-white'} border ${activeTheme.border} p-2 max-h-48 overflow-y-auto z-[1000] backdrop-blur-xl shadow-2xl no-scrollbar`}>
                                         {Object.keys(syllabusData?.[userData?.board]?.[String(userData?.classLevel || userData?.class)] || {}).map(s => (
                                             <div key={s} onClick={() => {
                                                 setSubject(s);
                                                 setChapter(""); // Reset chapter on subject change
                                                 setShowSubjDrop(false);
-                                            }} className="p-4 rounded-xl text-xs font-bold uppercase text-white hover:bg-white/10 transition-colors">{s}</div>
+                                            }} className={`p-4 rounded-xl text-xs font-bold uppercase ${activeTheme.text} hover:bg-white/10 transition-colors`}>{s}</div>
                                         ))}
                                     </div>
                                 )}
@@ -803,18 +1073,18 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
 
                             {/* Mobile Chapter Selector */}
                             <div className="relative">
-                                <label className="text-[10px] font-black uppercase opacity-40 text-white ml-4 mb-2 block">Target Chapter</label>
+                                <label className={`text-[10px] font-black uppercase opacity-40 ${activeTheme.text} ml-4 mb-2 block`}>Target Chapter</label>
                                 <div onClick={() => { setShowChapDrop(!showChapDrop); setShowSubjDrop(false); }} className={`flex items-center justify-between p-5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer shadow-2xl`}>
-                                    <span className="text-sm font-black uppercase text-white">{chapter || "Select Chapter"}</span>
-                                    <FaChevronDown size={12} className={`transition-transform duration-300 ${showChapDrop ? 'rotate-180' : ''} opacity-30 text-white`} />
+                                    <span className={`text-sm font-black uppercase ${activeTheme.text}`}>{chapter || "Select Chapter"}</span>
+                                    <FaChevronDown size={12} className={`transition-transform duration-300 ${showChapDrop ? 'rotate-180' : ''} opacity-30 ${activeTheme.text}`} />
                                 </div>
                                 {showChapDrop && (
-                                    <div className="absolute top-full left-0 w-full mt-2 rounded-2xl bg-gray-900 border border-white/10 p-2 max-h-48 overflow-y-auto z-[1000] backdrop-blur-xl shadow-2xl no-scrollbar">
+                                    <div className={`absolute top-full left-0 w-full mt-2 rounded-2xl ${activeTheme.isDark ? 'bg-gray-900' : 'bg-white'} border ${activeTheme.border} p-2 max-h-48 overflow-y-auto z-[1000] backdrop-blur-xl shadow-2xl no-scrollbar`}>
                                         {(syllabusData?.[userData?.board]?.[String(userData?.classLevel || userData?.class)]?.[subject] || []).map(ch => (
                                             <div key={ch} onClick={() => {
                                                 setChapter(ch);
                                                 setShowChapDrop(false);
-                                            }} className="p-4 rounded-xl text-xs font-bold uppercase text-white hover:bg-white/10 transition-colors">{ch}</div>
+                                            }} className={`p-4 rounded-xl text-xs font-bold uppercase ${activeTheme.text} hover:bg-white/10 transition-colors`}>{ch}</div>
                                         ))}
                                     </div>
                                 )}
@@ -834,8 +1104,8 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                 <div className="w-full max-w-3xl mx-auto px-4 mt-2 md:mt-4 space-y-2 md:space-y-4 z-[400] sticky top-[72px]">
 
                     {/* Main Header Bar */}
-                    <div className={`flex items-center justify-between p-3 md:p-4 rounded-2xl md:rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-xl shadow-2xl`}>
-                        <div className="flex items-center gap-3 overflow-hidden">
+                    <div className={`flex items-center gap-4 p-3 md:p-4 rounded-2xl md:rounded-3xl ${activeTheme.card} border ${activeTheme.border} backdrop-blur-xl shadow-2xl`}>
+                        <div className="flex items-center gap-3 overflow-hidden flex-1">
                             <FaHistory size={12} className={activeTheme.accent} />
                             {isEditingTitle ? (
                                 <input
@@ -844,14 +1114,57 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                     onChange={(e) => setSessionTitle(e.target.value)}
                                     onBlur={handleTitleBlur}
                                     onKeyDown={(e) => e.key === 'Enter' && handleTitleBlur()}
-                                    className="bg-transparent border-none focus:ring-0 text-[10px] md:text-xs font-black uppercase p-0 w-32 outline-none text-white placeholder-white/20"
+                                    className={`bg-transparent border-none focus:ring-0 text-[10px] md:text-xs font-black uppercase p-0 w-32 outline-none ${activeTheme.text} placeholder-white/20`}
                                     placeholder="RENAME SESSION..."
                                 />
                             ) : (
-                                <span onClick={() => setIsEditingTitle(true)} className="text-[10px] md:text-xs font-black uppercase tracking-tighter cursor-pointer truncate max-w-[120px] md:max-w-none text-white hover:opacity-70 transition-opacity">
+                                <span onClick={() => setIsEditingTitle(true)} className={`text-[10px] md:text-xs font-black uppercase tracking-tighter cursor-pointer truncate max-w-[120px] md:max-w-none ${activeTheme.text} hover:opacity-70 transition-opacity`}>
                                     {sessionTitle || "New Lesson"}
                                 </span>
                             )}
+                        </div>
+
+                        <div className="relative hidden md:block">
+                            <div onClick={() => { setShowSubjDrop(!showSubjDrop); setShowChapDrop(false); }} className={`flex items-center gap-3 p-1.5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer hover:border-white/20 transition-all shadow-lg`}>
+                                <div className="p-3 rounded-full bg-white/5"><FaLayerGroup className={activeTheme.accent} size={14} /></div>
+                                <span className={`flex-1 text-[10px] font-black uppercase truncate ${activeTheme.text}`}>{subject || "Subject"}</span>
+                                <FaChevronDown size={10} className={`mr-4 transition-transform duration-300 ${showSubjDrop ? 'rotate-180' : ''} opacity-30 ${activeTheme.text}`} />
+                            </div>
+                            <AnimatePresence>
+                                {showSubjDrop && (
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className={`absolute top-full left-0 w-full mt-2 rounded-2xl ${activeTheme.isDark ? 'border-white/10 bg-black/90' : 'border-slate-200 bg-white'} backdrop-blur-2xl z-[500] p-2 max-h-48 overflow-y-auto shadow-2xl no-scrollbar`}>
+                                        {Object.keys(syllabusData?.[userData?.board]?.[String(userData?.classLevel || userData?.class)] || {}).map(s => (
+                                            <div key={s} onClick={() => {
+                                                setSubject(s);
+                                                setChapter("");
+                                                setShowSubjDrop(false);
+                                                syncContext(s, ""); // Immediate subject update
+                                            }} className={`p-4 rounded-xl text-[10px] font-black uppercase ${activeTheme.text} hover:bg-white/10 cursor-pointer transition-colors`}>{s}</div>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        <div className="relative hidden md:block">
+                            <div onClick={() => { setShowChapDrop(!showChapDrop); setShowSubjDrop(false); }} className={`flex items-center gap-3 p-1.5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer hover:border-white/20 transition-all shadow-lg`}>
+                                <div className="p-3 rounded-full bg-white/5"><FaBrain className="text-cyan-400" size={14} /></div>
+                                <span className={`flex-1 text-[10px] font-black uppercase truncate ${activeTheme.text}`}>{chapter || "Chapter"}</span>
+                                <FaChevronDown size={10} className={`mr-4 transition-transform duration-300 ${showChapDrop ? 'rotate-180' : ''} opacity-30 ${activeTheme.text}`} />
+                            </div>
+                            <AnimatePresence>
+                                {showChapDrop && (
+                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className={`absolute top-full left-0 w-full mt-2 rounded-2xl ${activeTheme.isDark ? 'border-white/10 bg-black/90' : 'border-slate-200 bg-white'} backdrop-blur-2xl z-[500] p-2 max-h-48 overflow-y-auto shadow-2xl no-scrollbar`}>
+                                        {(syllabusData?.[userData?.board]?.[String(userData?.classLevel || userData?.class)]?.[subject] || []).map(ch => (
+                                            <div key={ch} onClick={() => {
+                                                setChapter(ch);
+                                                setShowChapDrop(false);
+                                                syncContext(subject, ch); // Immediate chapter update
+                                            }} className={`p-4 rounded-xl text-[10px] font-black uppercase ${activeTheme.text} hover:bg-white/10 cursor-pointer transition-colors`}>{ch}</div>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -862,76 +1175,22 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                 <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 truncate max-w-[80px]">
                                     {subject || 'CONTEXT'}
                                 </span>
-                                <FaSlidersH size={10} className="opacity-40 text-white" />
+                                <FaSlidersH size={10} className={`opacity-40 ${activeTheme.text}`} />
                             </div>
-                            <span className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-full border border-white/5 text-[9px] font-black uppercase text-white shadow-inner">
+                            <span className={`flex items-center gap-1.5 px-3 py-1.5 bg-white/5 rounded-full border border-white/5 text-[9px] font-black uppercase ${activeTheme.text} shadow-inner`}>
                                 <FaClock className={activeTheme.accent} size={10} /> {formatTime(timer)}
                             </span>
                         </div>
                     </div>
-
-                    {/* Desktop Context Selectors */}
-                    <div className="hidden md:grid grid-cols-2 gap-4">
-                        <div className="relative">
-                            <div onClick={() => { setShowSubjDrop(!showSubjDrop); setShowChapDrop(false); }} className={`flex items-center gap-3 p-1.5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer hover:border-white/20 transition-all shadow-lg`}>
-                                <div className="p-3 rounded-full bg-white/5"><FaLayerGroup className={activeTheme.accent} size={14} /></div>
-                                <span className="flex-1 text-[10px] font-black uppercase truncate text-white">{subject || "Subject"}</span>
-                                <FaChevronDown size={10} className={`mr-4 transition-transform duration-300 ${showSubjDrop ? 'rotate-180' : ''} opacity-30 text-white`} />
-                            </div>
-                            <AnimatePresence>
-                                {showSubjDrop && (
-                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 w-full mt-2 rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl z-[500] p-2 max-h-48 overflow-y-auto shadow-2xl no-scrollbar">
-                                        {Object.keys(syllabusData?.[userData?.board]?.[String(userData?.classLevel || userData?.class)] || {}).map(s => (
-                                            <div key={s} onClick={() => {
-                                                setSubject(s);
-                                                setChapter("");
-                                                setShowSubjDrop(false);
-                                                syncContext(s, ""); // Immediate subject update
-                                            }} className="p-4 rounded-xl text-[10px] font-black uppercase text-white hover:bg-white/10 cursor-pointer transition-colors">{s}</div>
-                                        ))}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-
-                        <div className="relative">
-                            <div onClick={() => { setShowChapDrop(!showChapDrop); setShowSubjDrop(false); }} className={`flex items-center gap-3 p-1.5 rounded-[2rem] ${activeTheme.card} border ${activeTheme.border} cursor-pointer hover:border-white/20 transition-all shadow-lg`}>
-                                <div className="p-3 rounded-full bg-white/5"><FaBrain className="text-cyan-400" size={14} /></div>
-                                <span className="flex-1 text-[10px] font-black uppercase truncate text-white">{chapter || "Chapter"}</span>
-                                <FaChevronDown size={10} className={`mr-4 transition-transform duration-300 ${showChapDrop ? 'rotate-180' : ''} opacity-30 text-white`} />
-                            </div>
-                            <AnimatePresence>
-                                {showChapDrop && (
-                                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 w-full mt-2 rounded-2xl border border-white/10 bg-black/90 backdrop-blur-2xl z-[500] p-2 max-h-48 overflow-y-auto shadow-2xl no-scrollbar">
-                                        {(syllabusData?.[userData?.board]?.[String(userData?.classLevel || userData?.class)]?.[subject] || []).map(ch => (
-                                            <div key={ch} onClick={() => {
-                                                setChapter(ch);
-                                                setShowChapDrop(false);
-                                                syncContext(subject, ch); // Immediate chapter update
-                                            }} className="p-4 rounded-xl text-[10px] font-black uppercase text-white hover:bg-white/10 cursor-pointer transition-colors">{ch}</div>
-                                        ))}
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </div>
-                    </div>
                 </div>
 
-
-
                 {/* MESSAGES AREA */}
-                {/* --- MAIN PAGE WRAPPER --- */}
-                <div className="flex flex-col h-screen overflow-hidden bg-transparent">
-
-                    {/* 1. HEADER (Optional - adjust height as needed) */}
-                    {/* <div className="h-16 flex-shrink-0"> ... </div> */}
+                <div className="flex flex-col overflow-hidden bg-transparent">
 
                     {/* 2. FIXED CHAT AREA */}
-                    {/* 'flex-1' fills the middle, 'h-0' forces it to stay inside the flex box */}
-                    <div className="flex-1 relative flex flex-col h-0 w-full overflow-hidden">
+                    <div className="relative flex flex-col h-[500px] w-full overflow-hidden">
 
-                        <div className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar scroll-smooth">
-                            {/* The 'pb-32' here creates the gap ABOVE the input bar */}
+                        <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 md:p-8 no-scrollbar scroll-smooth">
                             <div className="max-w-3xl mx-auto space-y-10 pb-32">
 
                                 {messages.length === 0 && (
@@ -987,13 +1246,38 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
 
                                             {/* --- MESSAGE CONTENT --- */}
                                             <div className="prose prose-invert prose-sm max-w-none">
-                                                <ReactMarkdown
-                                                    remarkPlugins={[remarkGfm, remarkMath]}
-                                                    rehypePlugins={[rehypeKatex]}
-                                                >
-                                                    {msg.content}
-                                                </ReactMarkdown>
+                                                {msg.role === 'ai' ? (
+                                                    <Typewriter text={msg.content} />
+                                                ) : (
+                                                    <ReactMarkdown
+                                                        remarkPlugins={[remarkGfm, remarkMath]}
+                                                        rehypePlugins={[rehypeKatex]}
+                                                    >
+                                                        {msg.content}
+                                                    </ReactMarkdown>
+                                                )}
                                             </div>
+
+                                            {/* --- VOICE TOGGLE BUTTON FOR AI MESSAGES --- */}
+                                            {msg.role === 'ai' && (
+                                                <div className="mt-3 flex justify-end">
+                                                    <button
+                                                        onClick={() => {
+                                                            if (speakingMessageId === msg.timestamp) {
+                                                                stopSpeech();
+                                                                setSpeakingMessageId(null);
+                                                            } else {
+                                                                speak(msg.content);
+                                                                setSpeakingMessageId(msg.timestamp);
+                                                            }
+                                                        }}
+                                                        className={`p-2 rounded-full transition-all ${speakingMessageId === msg.timestamp ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-indigo-500/20 hover:bg-indigo-500/40 text-indigo-400 hover:text-indigo-300'}`}
+                                                        title={speakingMessageId === msg.timestamp ? 'Stop Voice' : 'Enable Voice'}
+                                                    >
+                                                        <FaVolumeUp size={14} />
+                                                    </button>
+                                                </div>
+                                            )}
 
                                             {/* --- AI METADATA --- */}
                                             {/* --- YOUTUBE LINK (AI ONLY & CONDITIONAL) --- */}
@@ -1006,7 +1290,7 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                                     <div className="flex flex-col gap-2">
                                                         {/* Subtle Label with Subject/Chapter context */}
                                                         <div className="flex justify-between items-center ml-1">
-                                                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-white/30">
+                                                            <span className={`text-[8px] font-black uppercase tracking-[0.2em] ${activeTheme.text}/30`}>
                                                                 Neural Recommended Media
                                                             </span>
                                                             {/* Secondary badge for Chapter info */}
@@ -1016,9 +1300,8 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                                         </div>
 
                                                         <a
-                                                            /* This line ignores the AI's bad link and builds a perfect search for the user's actual class */
                                                             href={`https://www.youtube.com/results?search_query=${encodeURIComponent(
-                                                                (userData?.board || "CBSE") + " class " + (userData?.classLevel || userData?.class || "9") + " " + (subject || "") + " " + (chapter || "") + " explanation"
+                                                                (userData?.board || "CBSE") + " class " + userClass + " " + (subject || "") + " " + (chapter || "") + " explanation"
                                                             )}`}
                                                             target="_blank"
                                                             rel="noreferrer"
@@ -1033,9 +1316,8 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                                                     <span className="text-[10px] font-black uppercase tracking-widest text-red-500 group-hover:text-red-400">
                                                                         Watch {subject || "Related"} Lesson
                                                                     </span>
-                                                                    <span className="text-[9px] text-white/40 font-medium italic leading-tight">
-                                                                        {/* This line dynamically picks your board and class */}
-                                                                        {userData?.board || "CBSE"} • Class {userData?.classLevel || userData?.class || userData?.grade || "9"} • {subject || "Science"}
+                                                                    <span className={`text-[9px] ${activeTheme.text}/40 font-medium italic leading-tight`}>
+                                                                        {userData?.board || "CBSE"} • Class {userClass} • {subject || "Science"}
                                                                     </span>
 
                                                                 </div>
@@ -1055,6 +1337,41 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                     </motion.div>
                                 ))}
 
+                                {/* --- TYPING INDICATOR --- */}
+                                {isTyping && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 15 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -15 }}
+                                        className="flex justify-start w-full mb-6"
+                                    >
+                                        <div className={`p-5 md:p-6 rounded-[2rem] max-w-[90%] md:max-w-[80%] shadow-2xl ${activeTheme.card} border ${activeTheme.border} rounded-tl-none`}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex gap-1">
+                                                    <motion.div
+                                                        animate={{ scale: [1, 1.2, 1] }}
+                                                        transition={{ repeat: Infinity, duration: 1, delay: 0 }}
+                                                        className="w-2 h-2 bg-indigo-400 rounded-full"
+                                                    />
+                                                    <motion.div
+                                                        animate={{ scale: [1, 1.2, 1] }}
+                                                        transition={{ repeat: Infinity, duration: 1, delay: 0.2 }}
+                                                        className="w-2 h-2 bg-indigo-400 rounded-full"
+                                                    />
+                                                    <motion.div
+                                                        animate={{ scale: [1, 1.2, 1] }}
+                                                        transition={{ repeat: Infinity, duration: 1, delay: 0.4 }}
+                                                        className="w-2 h-2 bg-indigo-400 rounded-full"
+                                                    />
+                                                </div>
+                                                <span className="text-sm font-medium text-indigo-400 animate-pulse">
+                                                    AI is thinking...
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+
                                 {/* --- AUTO-SCROLL ANCHOR --- */}
                                 <div ref={messagesEndRef} className="h-2 w-full" />
                             </div>
@@ -1062,7 +1379,6 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                     </div>
 
                     {/* 3. INPUT AREA (Fixed Sibling) */}
-                    {/* Ensure this is NOT absolute. It should naturally sit at the bottom. */}
                     <div className="flex-shrink-0 w-full bg-transparent p-4 z-50">
                         <div className="max-w-3xl mx-auto">
                             {/* Your Input bar and Quick Replies code goes here */}
@@ -1070,10 +1386,62 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                     </div>
                 </div>
 
-
                 {/* --- REFINED BOTTOM INTERFACE --- */}
                 <div className="fixed bottom-0 left-0 w-full z-[600] pointer-events-none">
                     <div className="max-w-4xl mx-auto p-2 md:p-4 pointer-events-auto">
+
+                        {/* --- COOL SCROLL TO BOTTOM BUTTON --- */}
+                        <AnimatePresence>
+                            {showScrollToBottom && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.5, y: 50 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.5, y: 20 }}
+                                    whileHover={{ y: -5 }}
+                                    whileTap={{ scale: 0.9 }}
+                                    className="absolute -top-20 right-6 md:right-10 z-[610]"
+                                >
+                                    <button
+                                        onClick={scrollToBottom}
+                                        className="relative flex items-center justify-center p-4 rounded-full group transition-all"
+                                        style={{
+                                            backgroundColor: activeTheme.card,
+                                            border: `1px solid ${activeTheme.primaryHex}55`,
+                                            boxShadow: `0 0 20px ${activeTheme.primaryHex}33`
+                                        }}
+                                    >
+                                        {/* Outer Pulsing Ring */}
+                                        <motion.div
+                                            animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] }}
+                                            transition={{ repeat: Infinity, duration: 2 }}
+                                            className="absolute inset-0 rounded-full"
+                                            style={{ border: `2px solid ${activeTheme.primaryHex}` }}
+                                        />
+
+                                        {/* The Icon */}
+                                        <div className="relative flex flex-col items-center">
+                                            <FaChevronDown
+                                                size={18}
+                                                className={`${activeTheme.accent} group-hover:translate-y-1 transition-transform duration-300`}
+                                            />
+
+                                            {/* Tiny "New" Indicator */}
+                                            <motion.span
+                                                animate={{ opacity: [0, 1, 0] }}
+                                                transition={{ repeat: Infinity, duration: 1.5 }}
+                                                className="absolute -top-8 bg-white text-black text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter shadow-xl"
+                                                style={{ backgroundColor: activeTheme.primaryHex }}
+                                            >
+                                                New
+                                            </motion.span>
+                                        </div>
+
+                                        {/* Glassmorphism Background Layer */}
+                                        <div className="absolute inset-0 rounded-full bg-white/5 backdrop-blur-md -z-10" />
+                                    </button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
 
                         {/* 1. Quick Replies */}
                         <AnimatePresence>
@@ -1195,7 +1563,7 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                                 </span>
                                             </div>
                                             {!isAnalyzing && (
-                                                <span className="text-[8px] text-white/40 ml-1 font-medium italic">
+                                                <span className={`text-[8px] ${activeTheme.text}/40 ml-1 font-medium italic`}>
                                                     Ready for Core Analysis
                                                 </span>
                                             )}
@@ -1206,24 +1574,17 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                                 <textarea
                                     ref={inputRef} // <--- Add this line
                                     value={input}
-                                    value={input}
-                                    onChange={(e) => {
-                                        setInput(e.target.value);
-                                        // This makes the box grow up to its max-height
-                                        e.target.style.height = 'auto';
-                                        e.target.style.height = `${e.target.scrollHeight}px`;
-                                    }}
+                                    onChange={(e) => setInput(e.target.value)}
                                     placeholder="Neural pulse command..."
                                     rows="1"
-                                    className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3 px-4 resize-none no-scrollbar max-h-24 outline-none placeholder:opacity-30 shadow-none"
+                                    className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3 px-4 resize-none overflow-y-auto outline-none placeholder:opacity-30 shadow-none"
+                                    style={{ height: '48px', minHeight: '48px', maxHeight: '48px' }}
                                     onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())}
                                 />
                                 <motion.button
                                     disabled={isSending || isAnalyzing}
                                     whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                                     onClick={() => sendMessage()}
-
-                                    disabled={isSending}
                                     className="p-4 md:p-5 rounded-full shadow-lg disabled:opacity-50 overflow-hidden group flex items-center justify-center"
                                     style={{ backgroundColor: activeTheme.primaryHex }}
                                 >
@@ -1399,6 +1760,106 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                     </>
                 )}
             </AnimatePresence>
+
+            {/* Profile Modal */}
+            <AnimatePresence>
+                {showProfileModal && selectedUser && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setShowProfileModal(false)}
+                        className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[1000] flex items-center justify-center"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`p-8 rounded-[3rem] ${activeTheme.card} border ${activeTheme.border} shadow-2xl max-w-md w-full mx-4`}
+                        >
+                            <div className="flex justify-between items-start mb-6">
+                                <h3 className={`text-2xl font-black uppercase ${activeTheme.text}`}>{selectedUser.name || "Anonymous"}</h3>
+                                <button onClick={() => setShowProfileModal(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10">
+                                    <FaTimes className={activeTheme.text} />
+                                </button>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-16 h-16 rounded-full bg-indigo-600 flex items-center justify-center font-black text-xl overflow-hidden">
+                                        {selectedUser.pfp ? (
+                                            <img src={selectedUser.pfp} alt="Avatar" className="w-full h-full object-cover" />
+                                        ) : (
+                                            (selectedUser.name || selectedUser.email || "A")[0].toUpperCase()
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className={`text-sm font-bold ${activeTheme.text}`}>Level {Math.floor(selectedUser.xp / 1000) + 1}</p>
+                                        <p className={`text-xs opacity-60 ${activeTheme.text}`}>Rank {selectedUser.rank}</p>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="text-center">
+                                        <span className="text-2xl font-black text-indigo-400">{selectedUser.xp}</span>
+                                        <p className={`text-xs opacity-60 ${activeTheme.text}`}>XP</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <span className="text-2xl font-black text-emerald-400">{selectedUser.streak || 0}</span>
+                                        <p className={`text-xs opacity-60 ${activeTheme.text}`}>Streak</p>
+                                    </div>
+                                </div>
+                                {selectedUser.board && <p className={`text-sm ${activeTheme.text}`}>Board: {selectedUser.board}</p>}
+                                {selectedUser.class && <p className={`text-sm ${activeTheme.text}`}>Class: {selectedUser.class}</p>}
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Onboarding Modal */}
+            <AnimatePresence>
+                {showOnboardingModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setShowOnboardingModal(false)}
+                        className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[999] flex items-center justify-center"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.8, opacity: 0 }}
+                            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-white/[0.03] border border-white/10 shadow-2xl rounded-[3rem] p-8 max-w-md w-full mx-4"
+                            style={{ boxShadow: '0 0 50px rgba(79, 70, 229, 0.3)' }}
+                        >
+                            <div className="flex justify-between items-start mb-6">
+                                <h3 className={`text-3xl font-black uppercase tracking-tighter ${activeTheme.text}`}>Profile Completion</h3>
+                                <button onClick={() => setShowOnboardingModal(false)} className="p-2 rounded-full bg-white/5 hover:bg-white/10">
+                                    <FaTimes className={`${activeTheme.text}`} />
+                                </button>
+                            </div>
+                            <div className="space-y-6">
+                                <p className="text-sm font-medium text-indigo-400 leading-relaxed">
+                                    Setting up your profile ensures better tutoring tailored to your specific Class and Board. Let's get you personalized learning experiences!
+                                </p>
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={() => { navigate('/profile'); setShowOnboardingModal(false); }}
+                                    className="w-full py-4 bg-indigo-600 text-white text-sm font-black uppercase tracking-widest rounded-2xl shadow-lg hover:bg-indigo-500 transition-all"
+                                    style={{ boxShadow: '0 0 30px rgba(79, 70, 229, 0.5)' }}
+                                >
+                                    Go to Profile
+                                </motion.button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <input
                 type="file"
                 ref={docInputRef}
@@ -1414,7 +1875,6 @@ You are 'Dhruva AI', an elite academic tutor for ${userData.board} Board, Class 
                 accept="image/*"
                 onChange={handleFileUpload}
             />
-        </div>
+        </div >
     );
 }
-
