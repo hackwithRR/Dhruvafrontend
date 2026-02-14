@@ -10,6 +10,7 @@ import Chat from "./pages/Chat";
 import Profile from "./pages/Profile";
 import LoginPage from "./pages/LoginPage";
 import Register from "./pages/Register";
+import LiveMode from "./pages/LiveMode";
 
 const GlobalLoader = () => (
   <div className="h-screen w-full flex flex-col items-center justify-center bg-[#05000a]">
@@ -74,6 +75,26 @@ function AppContent() {
               element={
                 currentUser ? (
                   userData ? <Profile /> : <GlobalLoader />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              } 
+            />
+            <Route 
+              path="/live" 
+              element={
+                currentUser ? (
+                  userData ? <LiveMode /> : <GlobalLoader />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              } 
+            />
+            <Route 
+              path="/livemode" 
+              element={
+                currentUser ? (
+                  userData ? <LiveMode /> : <GlobalLoader />
                 ) : (
                   <Navigate to="/login" replace />
                 )

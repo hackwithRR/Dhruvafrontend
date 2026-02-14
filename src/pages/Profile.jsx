@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase";
@@ -12,7 +12,7 @@ import {
     FaArrowLeft, FaSave, FaSyncAlt, FaShieldAlt,
     FaChevronDown, FaLanguage, FaEye, FaEyeSlash, FaUserCircle,
     FaGraduationCap, FaBook, FaBolt, FaDice, FaKey, FaMars, FaVenus, FaGenderless, FaUpload, FaInfoCircle, FaExclamationTriangle,
-    FaGlobe
+    FaGlobe, FaCheck
 } from "react-icons/fa";
 
 const themes = {
@@ -22,6 +22,9 @@ const themes = {
         input: "bg-[#141417] border-[#2a2a2f] text-white focus:border-cyan-500 focus:bg-[#1a1a1e]",
         label: "text-cyan-400 bg-[#0a0a0c]",
         accent: "text-cyan-400",
+        accentBg: "bg-cyan-500/10",
+        accentBorder: "border-cyan-500",
+        accentGlow: "rgba(6, 182, 212, 0.2)",
         btnGradient: "from-[#6366f1] via-[#a855f7] to-[#6366f1]",
         warnGradient: "from-[#ef4444] via-[#f97316] to-[#ef4444]",
         safeGradient: "from-[#10b981] via-[#34d399] to-[#10b981]"
@@ -32,6 +35,9 @@ const themes = {
         input: "bg-[#ffffff] border-[#cbd5e1] text-[#0f172a] focus:border-blue-600 shadow-sm",
         label: "text-blue-600 bg-white",
         accent: "text-blue-600",
+        accentBg: "bg-blue-50",
+        accentBorder: "border-blue-600",
+        accentGlow: "rgba(37, 99, 235, 0.2)",
         btnGradient: "from-[#2563eb] via-[#7c3aed] to-[#2563eb]",
         warnGradient: "from-[#dc2626] via-[#ea580c] to-[#dc2626]",
         safeGradient: "from-[#059669] via-[#10b981] to-[#059669]"
@@ -62,8 +68,35 @@ export default function Profile() {
     const [passwords, setPasswords] = useState({ oldPass: "", newPass: "" });
     const [showErrorModal, setShowErrorModal] = useState(false);
 
+    // Glassmorphism dropdown states
+    const [boardDropdownOpen, setBoardDropdownOpen] = useState(false);
+    const [classDropdownOpen, setClassDropdownOpen] = useState(false);
+    const [languageDropdownOpen, setLanguageDropdownOpen] = useState(false);
+
+    // Refs for click outside
+    const boardRef = useRef(null);
+    const classRef = useRef(null);
+    const languageRef = useRef(null);
+
+    // Click outside handler
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (boardRef.current && !boardRef.current.contains(event.target)) {
+                setBoardDropdownOpen(false);
+            }
+            if (classRef.current && !classRef.current.contains(event.target)) {
+                setClassDropdownOpen(false);
+            }
+            if (languageRef.current && !languageRef.current.contains(event.target)) {
+                setLanguageDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
     const [profileData, setProfileData] = useState({
-        displayName: userData?.name || currentUser?.displayName || "",
+        displayName: userData?.name || userData?.displayName || currentUser?.displayName || "",
         board: userData?.board || "CBSE",
         classLevel: userData?.classLevel || "10",
         language: userData?.language || "English",
@@ -74,12 +107,13 @@ export default function Profile() {
     const s = themes[theme] || themes.dark;
     const hasPassword = currentUser?.providerData.some(p => p.providerId === 'password');
 
+    // Sync local state when global userData changes
     useEffect(() => {
         if (userData) {
             setProfileData({
-                displayName: userData.name || currentUser?.displayName || "",
+                displayName: userData.name || userData.displayName || currentUser?.displayName || "",
                 board: userData.board || "CBSE",
-                classLevel: userData.classLevel,
+                classLevel: userData.classLevel || "10",
                 language: userData.language || "English",
                 pfp: userData.pfp || currentUser?.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${currentUser?.uid}`,
                 gender: userData.gender || "other"
@@ -126,18 +160,13 @@ export default function Profile() {
     const handleSave = async () => {
         if (!profileData.displayName.trim()) return toast.error("ALIAS REQUIRED");
 
-        // Defining variables used in potential system instructions or logs
-        const userClass = profileData.classLevel;
-        const userBoard = profileData.board;
-        const userName = profileData.displayName;
-        const userLang = profileData.language;
-
         setLoading(true);
         try {
             const userRef = doc(db, "users", currentUser.uid);
 
             await setDoc(userRef, {
                 name: profileData.displayName,
+                displayName: profileData.displayName,
                 board: profileData.board,
                 classLevel: profileData.classLevel,
                 language: profileData.language,
@@ -154,7 +183,6 @@ export default function Profile() {
             if (reloadUser) await reloadUser();
 
             toast.success("CORE SYNCED", { icon: <FaBolt className="text-yellow-400" /> });
-            toast.info(`Dhruva AI Protocol: ${userClass} | ${userLang}`);
 
         } catch (e) {
             console.error(e);
@@ -189,6 +217,7 @@ export default function Profile() {
             <Navbar currentUser={currentUser} theme={theme} setTheme={setTheme} logout={logout} />
             <ToastContainer position="top-right" theme={theme === 'dark' ? 'dark' : 'light'} />
 
+            {/* Error Modal */}
             <AnimatePresence>
                 {showErrorModal && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
@@ -235,7 +264,7 @@ export default function Profile() {
                             </div>
                         </div>
                         <div className="mt-12 flex items-center gap-2 text-[9px] font-black tracking-[0.3em] opacity-30 uppercase">
-                            <FaInfoCircle className="text-cyan-500" /> Neural ID established | Class {profileData.classLevel}
+                            <FaInfoCircle className={s.accent} /> Neural ID established | Class {profileData.classLevel}
                         </div>
                         <h1 className="text-5xl sm:text-7xl font-black italic tracking-tighter mt-4 uppercase">User<span className={s.accent}>.</span>Meta</h1>
                     </div>
@@ -244,12 +273,12 @@ export default function Profile() {
                         {/* Name Input */}
                         <div className="relative group">
                             <span className={`absolute -top-2.5 left-6 px-2 py-0.5 text-[10px] font-black uppercase rounded-md z-20 border tracking-widest ${s.label}`}>Neural Alias</span>
-                            <div className="absolute left-6 top-1/2 -translate-y-1/2 text-xl opacity-40"><FaUserCircle /></div>
+                            <div className={`absolute left-6 top-1/2 -translate-y-1/2 text-xl opacity-40 ${s.accent}`}><FaUserCircle /></div>
                             <input type="text" value={profileData.displayName} onChange={(e) => setProfileData({ ...profileData, displayName: e.target.value })}
                                 className={`w-full p-6 pl-14 rounded-2xl border-2 outline-none font-bold text-lg transition-all ${s.input}`} />
                         </div>
 
-                        {/* Gender Selection Grid (REPLACED MODE) */}
+                        {/* Gender Selection Grid */}
                         <div className="relative">
                             <span className={`absolute -top-3 left-6 px-3 py-1 text-[9px] font-black uppercase rounded-full z-20 border tracking-widest ${s.label}`}>Orientation_Key</span>
                             <div className="grid grid-cols-3 gap-4">
@@ -258,9 +287,9 @@ export default function Profile() {
                                     { id: 'female', label: 'FEMALE', icon: <FaVenus /> },
                                     { id: 'other', label: 'NEUTRAL', icon: <FaGenderless /> }
                                 ].map((g) => (
-                                    <button key={g.id} onClick={() => setProfileData({ ...profileData, gender: g.id })}
+                                    <button key={g.id} type="button" onClick={() => setProfileData({ ...profileData, gender: g.id })}
                                         className={`flex flex-col items-center justify-center py-6 rounded-3xl border-2 transition-all 
-                                        ${profileData.gender === g.id ? 'bg-cyan-500/10 border-cyan-500 text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]' : 'bg-transparent opacity-30 border-slate-800'}`}
+                                        ${profileData.gender === g.id ? `${s.accentBg} ${s.accentBorder} text-white shadow-[0_0_20px_rgba(6,182,212,0.3)]` : 'bg-transparent opacity-30 border-slate-800'}`}
                                     >
                                         <span className="text-2xl mb-2">{g.icon}</span>
                                         <span className="font-black text-[9px] tracking-widest">{g.label}</span>
@@ -269,53 +298,185 @@ export default function Profile() {
                             </div>
                         </div>
 
-                        {/* Board & Class Row */}
+                        {/* Board & Class Row - Glassmorphism Dropdowns */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="relative group">
+                            {/* Board Dropdown */}
+                            <div className="relative group" ref={boardRef}>
                                 <span className={`absolute -top-2.5 left-6 px-2 py-0.5 text-[9px] font-black uppercase rounded-md z-20 border tracking-widest ${s.label}`}>Curriculum</span>
-                                <FaBook className="absolute left-6 top-1/2 -translate-y-1/2 text-lg opacity-40 pointer-events-none" />
-                                <select value={profileData.board} onChange={(e) => setProfileData({ ...profileData, board: e.target.value })}
-                                    className={`w-full p-6 pl-14 rounded-2xl border-2 outline-none font-black appearance-none cursor-pointer transition-all ${s.input}`}>
-                                    <option value="CBSE">CBSE</option>
-                                    <option value="ICSE">ICSE</option>
-                                </select>
-                                <FaChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none" />
+                                <FaBook className={`absolute left-6 top-1/2 -translate-y-1/2 text-lg opacity-40 pointer-events-none z-10 ${s.accent}`} />
+                                <button
+                                    type="button"
+                                    onClick={() => { setBoardDropdownOpen(!boardDropdownOpen); setClassDropdownOpen(false); setLanguageDropdownOpen(false); }}
+                                    className={`w-full p-6 pl-14 rounded-2xl border-2 outline-none font-black cursor-pointer transition-all flex items-center justify-between ${s.input}
+                                    ${boardDropdownOpen ? s.accentBorder : ''}`}
+                                    style={boardDropdownOpen ? { boxShadow: `0 0 20px ${s.accentGlow}` } : {}}
+                                >
+                                    <span>{profileData.board}</span>
+                                    <motion.div animate={{ rotate: boardDropdownOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="opacity-40">
+                                        <FaChevronDown size={14} />
+                                    </motion.div>
+                                </button>
+
+                                <AnimatePresence>
+                                    {boardDropdownOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                            transition={{ duration: 0.15 }}
+                                            className={`absolute top-full left-0 right-0 mt-2 py-2 rounded-2xl border-2 z-50 overflow-hidden backdrop-blur-xl ${s.card}`}
+                                            style={{ boxShadow: `0 0 30px ${s.accentGlow}` }}
+                                        >
+                                            {['CBSE', 'ICSE'].map((board) => (
+                                                <button
+                                                    key={board}
+                                                    type="button"
+                                                    onClick={() => { setProfileData({ ...profileData, board }); setBoardDropdownOpen(false); }}
+                                                    className={`w-full px-6 py-3 text-left font-black text-sm flex items-center justify-between transition-all
+                                                    ${profileData.board === board
+                                                            ? `${s.accent} ${s.accentBg}`
+                                                            : theme === 'dark' ? 'text-white hover:bg-white/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                >
+                                                    <span>{board}</span>
+                                                    {profileData.board === board && (
+                                                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className={s.accent}>
+                                                            <FaCheck size={12} />
+                                                        </motion.div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
 
-                            <div className="relative group">
+                            {/* Class Level Dropdown */}
+                            <div className="relative group" ref={classRef}>
                                 <span className={`absolute -top-2.5 left-6 px-2 py-0.5 text-[9px] font-black uppercase rounded-md z-20 border tracking-widest ${s.label}`}>Neural_Level</span>
-                                <FaGraduationCap className="absolute left-6 top-1/2 -translate-y-1/2 text-lg opacity-40 pointer-events-none" />
-                                <select value={profileData.classLevel} onChange={(e) => setProfileData({ ...profileData, classLevel: e.target.value })}
-                                    className={`w-full p-6 pl-14 rounded-2xl border-2 outline-none font-black appearance-none cursor-pointer transition-all ${s.input}`}>
-                                    {['8', '9', '10', '11', '12'].map(n => <option key={n} value={n}>Class {n}</option>)}
-                                </select>
-                                <FaChevronDown className="absolute right-6 top-1/2 -translate-y-1/2 opacity-20 pointer-events-none" />
+                                <FaGraduationCap className={`absolute left-6 top-1/2 -translate-y-1/2 text-lg opacity-40 pointer-events-none z-10 ${s.accent}`} />
+                                <button
+                                    type="button"
+                                    onClick={() => { setClassDropdownOpen(!classDropdownOpen); setBoardDropdownOpen(false); setLanguageDropdownOpen(false); }}
+                                    className={`w-full p-6 pl-14 rounded-2xl border-2 outline-none font-black cursor-pointer transition-all flex items-center justify-between ${s.input}
+                                    ${classDropdownOpen ? s.accentBorder : ''}`}
+                                    style={classDropdownOpen ? { boxShadow: `0 0 20px ${s.accentGlow}` } : {}}
+                                >
+                                    <span>Class {profileData.classLevel}</span>
+                                    <motion.div animate={{ rotate: classDropdownOpen ? 180 : 0 }} transition={{ duration: 0.2 }} className="opacity-40">
+                                        <FaChevronDown size={14} />
+                                    </motion.div>
+                                </button>
+
+                                <AnimatePresence>
+                                    {classDropdownOpen && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                            transition={{ duration: 0.15 }}
+                                            className={`absolute top-full left-0 right-0 mt-2 py-2 rounded-2xl border-2 z-50 overflow-hidden max-h-[300px] overflow-y-auto backdrop-blur-xl ${s.card}`}
+                                            style={{ boxShadow: `0 0 30px ${s.accentGlow}` }}
+                                        >
+                                            {['8', '9', '10', '11', '12'].map((n) => (
+                                                <button
+                                                    key={n}
+                                                    type="button"
+                                                    onClick={() => { setProfileData({ ...profileData, classLevel: n }); setClassDropdownOpen(false); }}
+                                                    className={`w-full px-6 py-3 text-left font-black text-sm flex items-center justify-between transition-all
+                                                    ${profileData.classLevel === n
+                                                            ? `${s.accent} ${s.accentBg}`
+                                                            : theme === 'dark' ? 'text-white hover:bg-white/10' : 'text-gray-700 hover:bg-gray-100'}`}
+                                                >
+                                                    <span>Class {n}</span>
+                                                    {profileData.classLevel === n && (
+                                                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className={s.accent}>
+                                                            <FaCheck size={12} />
+                                                        </motion.div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         </div>
 
-                        {/* Language Selection Scroll Grid */}
-                        <div className="relative mt-4">
+                        {/* Language Selection - Enhanced Glassmorphism */}
+                        <div className="relative mt-4" ref={languageRef}>
                             <span className={`absolute -top-3 left-6 px-3 py-1 text-[9px] font-black uppercase rounded-full z-20 border tracking-widest ${s.label}`}>Language_Linguistics</span>
-                            <div className={`p-6 rounded-[35px] border-2 border-dashed border-white/10 ${s.bg} max-h-[300px] overflow-y-auto custom-scrollbar`}>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                    {languages.map((lang) => (
-                                        <button key={lang.name} onClick={() => setProfileData({ ...profileData, language: lang.name })}
-                                            className={`p-4 rounded-2xl border-2 transition-all text-left relative overflow-hidden
-                                            ${profileData.language === lang.name ? 'border-purple-500 bg-purple-500/10' : 'border-white/5 bg-white/5 hover:border-white/20'}`}
-                                        >
-                                            <div className="flex flex-col">
-                                                <span className={`text-[10px] font-black tracking-tight ${profileData.language === lang.name ? 'text-purple-400' : 'text-white/80'}`}>{lang.name}</span>
-                                                <span className="text-[7px] font-bold opacity-30 uppercase tracking-widest">{lang.type}</span>
-                                            </div>
-                                            {profileData.language === lang.name && (
-                                                <motion.div layoutId="activeLang" className="absolute top-2 right-2 text-purple-500 text-[10px]">
-                                                    <FaGlobe className="animate-pulse" />
-                                                </motion.div>
-                                            )}
-                                        </button>
-                                    ))}
+
+                            <button
+                                type="button"
+                                onClick={() => { setLanguageDropdownOpen(!languageDropdownOpen); setBoardDropdownOpen(false); setClassDropdownOpen(false); }}
+                                className={`w-full p-4 rounded-[35px] border-2 transition-all flex items-center justify-between
+                                ${languageDropdownOpen
+                                        ? `${s.accentBorder} ${s.accentBg}`
+                                        : theme === 'dark'
+                                            ? 'border-white/10 bg-[#0a0a0c]/50'
+                                            : 'border-gray-200 bg-white/50'
+                                    }`}
+                            >
+                                <div className="flex items-center gap-3 px-2">
+                                    <FaGlobe className={profileData.language ? s.accent : 'opacity-30'} />
+                                    <span className={`font-black text-sm ${profileData.language ? (theme === 'dark' ? 'text-white' : 'text-[#0f172a]') : 'opacity-30'}`}>
+                                        {profileData.language || 'Select Language'}
+                                    </span>
                                 </div>
-                            </div>
+                                <motion.div animate={{ rotate: languageDropdownOpen ? 180 : 0 }} transition={{ duration: 0.2 }}
+                                    className={theme === 'dark' ? 'text-white/40' : 'text-gray-400'}>
+                                    <FaChevronDown size={14} />
+                                </motion.div>
+                            </button>
+
+                            <AnimatePresence>
+                                {languageDropdownOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                                        transition={{ duration: 0.15 }}
+                                        className={`absolute top-full left-0 right-0 mt-2 p-4 rounded-[25px] border-2 z-50 max-h-[350px] overflow-y-auto custom-scrollbar backdrop-blur-xl ${s.card}`}
+                                        style={{ boxShadow: `0 0 40px ${s.accentGlow}` }}
+                                    >
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                            {languages.map((lang) => (
+                                                <button key={lang.name} type="button" onClick={() => { setProfileData({ ...profileData, language: lang.name }); setLanguageDropdownOpen(false); }}
+                                                    className={`p-3 rounded-xl border-2 transition-all text-left relative overflow-hidden
+                                                    ${profileData.language === lang.name
+                                                            ? `${s.accentBorder} ${s.accentBg}`
+                                                            : theme === 'dark'
+                                                                ? 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
+                                                                : 'border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100'
+                                                        }`}
+                                                >
+                                                    <div className="flex flex-col">
+                                                        <span className={`text-[10px] font-black tracking-tight 
+                                                            ${profileData.language === lang.name
+                                                                ? s.accent
+                                                                : theme === 'dark' ? 'text-white' : 'text-gray-700'
+                                                            }`}>
+                                                            {lang.name}
+                                                        </span>
+                                                        <span className={`text-[7px] font-bold uppercase tracking-widest 
+                                                            ${profileData.language === lang.name
+                                                                ? theme === 'dark' ? 'text-cyan-400/70' : 'text-blue-600/70'
+                                                                : theme === 'dark' ? 'text-white/50' : 'text-gray-400'
+                                                            }`}>
+                                                            {lang.type}
+                                                        </span>
+                                                    </div>
+                                                    {profileData.language === lang.name && (
+                                                        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
+                                                            className={`absolute top-1 right-1 ${s.accent}`}>
+                                                            <FaCheck size={10} />
+                                                        </motion.div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </div>
 
                         <motion.button

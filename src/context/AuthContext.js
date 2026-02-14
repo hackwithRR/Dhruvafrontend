@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { auth, db, googleProvider } from "../firebase"; // Added googleProvider import
+import { auth, db, googleProvider } from "../firebase"; 
 import { 
     onAuthStateChanged, 
     createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
     signInWithPopup, 
     signOut 
-} from "firebase/auth"; // Added missing Firebase methods
+} from "firebase/auth"; 
 import { doc, onSnapshot, updateDoc, setDoc, serverTimestamp } from "firebase/firestore";
 
 const AuthContext = createContext();
@@ -15,19 +16,52 @@ export function AuthProvider({ children }) {
     const [userData, setUserData] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // --- NEW: Added these without changing your existing state logic ---
-    const register = (email, password) => createUserWithEmailAndPassword(auth, email, password);
-    const logout = () => signOut(auth);
+    // --- LOGIN (Email/Password) ---
+    const login = (email, password) => {
+        return signInWithEmailAndPassword(auth, email, password);
+    };
+
+    // --- REGISTER (Email/Password) ---
+    // UPDATED: Now accepts gender and avatarUrl to prevent blank profile fields
+    const register = async (email, password, name, gender, avatarUrl) => {
+        try {
+            const res = await createUserWithEmailAndPassword(auth, email, password);
+            const userDocRef = doc(db, "users", res.user.uid);
+            
+            // CRITICAL: We await this write so the profile exists before navigation
+            await setDoc(userDocRef, {
+                uid: res.user.uid,
+                name: name,                // For Dhruva AI Backend
+                displayName: name,         // For Firebase Auth UI
+                email: res.user.email,
+                pfp: avatarUrl,            // Selected Avatar from Register.jsx
+                gender: gender,            // Selected Gender
+                theme: "dark",             // Default Theme
+                classLevel: "8",           // Default
+                board: "ICSE",             // Default
+                language: "English",       // Default
+                createdAt: serverTimestamp()
+            });
+            
+            return res;
+        } catch (error) {
+            throw error; 
+        }
+    };
+
+    // --- GOOGLE LOGIN ---
     const googleLogin = async () => {
         try {
             const res = await signInWithPopup(auth, googleProvider);
             const userDocRef = doc(db, "users", res.user.uid);
+            
+            // merge: true ensures we don't overwrite existing data on returning users
             await setDoc(userDocRef, {
                 uid: res.user.uid,
+                displayName: res.user.displayName,
                 name: res.user.displayName,
                 email: res.user.email,
                 pfp: res.user.photoURL,
-                theme: "DeepSpace",
                 createdAt: serverTimestamp()
             }, { merge: true });
         } catch (error) {
@@ -35,6 +69,10 @@ export function AuthProvider({ children }) {
         }
     };
 
+    // --- LOGOUT ---
+    const logout = () => signOut(auth);
+
+    // --- THEME UPDATE ---
     const updateTheme = async (newTheme) => {
         if (!currentUser) return;
         try {
@@ -51,28 +89,17 @@ export function AuthProvider({ children }) {
         const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
             setCurrentUser(user);
             
-            if (unsubscribeData) {
-                unsubscribeData();
-                unsubscribeData = null;
-            }
-
             if (user) {
                 const userDocRef = doc(db, "users", user.uid);
                 
-                // --- YOUR ORIGINAL SNAPSHOT LOGIC ---
+                // Real-time listener: This automatically updates userData across the app
                 unsubscribeData = onSnapshot(userDocRef, (docSnap) => {
                     if (docSnap.exists()) {
                         setUserData(docSnap.data());
-                    } else {
-                        setUserData({ 
-                            theme: "DeepSpace", 
-                            displayName: user.displayName || "Scholar",
-                            streak: 0 
-                        });
                     }
                     setLoading(false);
                 }, (err) => {
-                    console.error("Firestore error:", err);
+                    console.error("Firestore snapshot error:", err);
                     setLoading(false);
                 });
             } else {
@@ -91,9 +118,10 @@ export function AuthProvider({ children }) {
         currentUser,
         userData,
         loading,
-        register,    // Added
-        logout,      // Added
-        googleLogin, // Added
+        register,
+        login,
+        logout,
+        googleLogin,
         setTheme: updateTheme
     };
 
@@ -105,9 +133,5 @@ export function AuthProvider({ children }) {
 }
 
 export function useAuth() {
-    const context = useContext(AuthContext);
-    if (context === undefined) {
-        throw new Error("useAuth must be used within an AuthProvider");
-    }
-    return context;
+    return useContext(AuthContext);
 }

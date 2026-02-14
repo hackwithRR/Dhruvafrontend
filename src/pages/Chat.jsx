@@ -13,7 +13,7 @@ import {
     FaPaperPlane, FaSyncAlt, FaTimes, FaImage, FaHistory, FaTrash,
     FaTrophy, FaChartLine, FaLayerGroup, FaWaveSquare,
     FaClock, FaSignOutAlt, FaMedal, FaBrain, FaSearch, FaChevronDown, FaPlus,
-    FaSlidersH, FaFire, FaGem, FaStar, FaLock, FaBolt, FaFilePdf, FaFileWord, FaFileAlt, FaYoutube, FaChevronRight, FaChevronLeft, FaVolumeUp,
+    FaSlidersH, FaFire, FaGem, FaStar, FaLock, FaBolt, FaFilePdf, FaFileWord, FaFileAlt, FaYoutube, FaChevronRight, FaChevronLeft, FaVolumeUp, FaMicrophone,
 } from "react-icons/fa";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -28,8 +28,22 @@ import { db, auth } from "../firebase";
 import { motion, AnimatePresence } from "framer-motion";
 
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import QuizBubble from "../components/QuizBubble";
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-production.up.railway.app").replace(/\/$/, "");
+
+// MCQ Detection patterns (same as QuizBubble)
+const MCQ_PATTERNS = [
+    /\b[A-D]\)[\s]/,            // A) B) C) D)
+    /\b[A-D]\.\s/,              // A. B. C. D.
+    /\b\([A-D]\)[\s]/,          // (A) (B) (C) (D)
+    /\b[A-D]\s+[\.\)]\s/,      // A ) or A . 
+];
+
+// Function to check if content contains MCQ
+const isMCQ = (content) => {
+    return MCQ_PATTERNS.some((pattern) => pattern.test(content));
+};
 
 // SYLLABUS DATA (PRESERVED)
 const syllabusData = {
@@ -229,9 +243,9 @@ export default function Chat() {
     }, [sessions, searchVault]);
 
     const quickReplies = useMemo(() => {
-        if (mode === "Quiz") return ["Start 5 MCQ Quiz", "Hard Mode", "Summary"];
+        if (mode === "Quiz") return ["Quiz me", "Hard Mode", "easy mode"];
         if (mode === "HW") return ["Step-by-step", "Clarify this", "Alternative"];
-        return [`Summarize ${chapter || 'this'}`, "Real-world application", "Simplify"];
+        return [`Summarize ${chapter || 'this'}`, "Real-world application", "Simplify", "Didnt understand this part", "examples"];
     }, [mode, chapter]);
 
     // --- EFFECTS ---
@@ -561,16 +575,16 @@ export default function Chat() {
                 preferredVoice.name.toLowerCase().includes('girl') ||
                 preferredVoice.name.toLowerCase().includes('zira') ||
                 preferredVoice.name.toLowerCase().includes('hazel')) {
-                utterance.pitch = 0.7; // Very low pitch for female voices
+                utterance.pitch = 0.4; // Very low pitch for female voices
             } else {
-                utterance.pitch = 0.7; // Lower pitch for male voices
+                utterance.pitch = 0.5; // Lower pitch for male voices
             }
         } else {
-            utterance.pitch = 0.7; // Default low pitch
+            utterance.pitch = 0.6; // Default low pitch
         }
 
         // Adjust parameters for more natural male speech
-        utterance.rate = 0.8; // Slightly faster for natural flow
+        utterance.rate = 1.0; // Slightly faster for natural flow
         utterance.volume = 1.0;
 
         synth.speak(utterance);
@@ -655,12 +669,54 @@ export default function Chat() {
         }
     };
 
-    const incrementXP = async (amount) => {
+    const incrementXP = async (amount, reason = "") => {
         if (!currentUser) return;
         try {
             const userRef = doc(db, "users", currentUser.uid);
             await updateDoc(userRef, { xp: increment(amount), dailyXp: increment(amount) });
+            if (reason) {
+                console.log(`XP Awarded: +${amount} XP (${reason})`);
+            }
         } catch (e) { console.error("XP Error", e); }
+    };
+
+    // Function to check if AI response indicates a correct answer in Quiz mode
+    const checkCorrectAnswer = (response) => {
+        const lowerResponse = response.toLowerCase();
+
+        // Patterns that indicate a correct answer
+        const correctPatterns = [
+            "correct!",
+            "that's correct!",
+            "that's right!",
+            "well done!",
+            "excellent!",
+            "perfect!",
+            "you got it!",
+            "absolutely correct",
+            "you are right",
+            "your answer is correct",
+            "correct answer",
+            "well done, that's correct",
+            "awesome! that's correct",
+            "great job! that's correct",
+            "brilliant!",
+            "splendid!",
+            "marvellous!",
+            "marvelous!",
+            "outstanding!",
+            "🎯 correct",
+            "✅ correct",
+            "right answer",
+            "exactly!",
+            "you nailed it!",
+            "nice work!",
+            "good job!",
+            "thats correct"
+        ];
+
+        // Check if any correct pattern is found in the response
+        return correctPatterns.some(pattern => lowerResponse.includes(pattern));
     };
 
     const handleFileSelect = async (e) => {
@@ -757,7 +813,7 @@ export default function Chat() {
     [CORE MISSION CONTEXT]
     - Subject: ${subject}
     - Chapter: ${chapter}
-    - ACTIVE MODE: ${currentMode}
+    - ACTIVE MODE: ${mode}
     
     STRICT CHAPTER LOCK: 
     You are currently focused ONLY on "${chapter}". 
@@ -775,11 +831,18 @@ export default function Chat() {
        - OBJECTIVE: Concept Mastery. Use "Hooks" and analogies from ${lingo.root} culture.
     
     2. HW HELP MODE (The Coach 🧠):
+       - Should provide full answers but ALSO break down the steps.
+       -Should give full answers but ALSO scaffold the problem-solving process, encouraging the student to think critically.
        - OBJECTIVE: Independent Solving. Use "Scaffolding".
        - If they struggle, say "${lingo.fail}" and break it down further.
 
     3. QUIZ MODE (The Game Master 🎯):
+
        - STRATEGY: Ask ONE crisp question from ${chapter} at a time. 
+       - IMPORTANT: When you ask a question, ONLY display the question and options. Do NOT include any explanatory text, hints, or the answer in your response - the QuizBubble component will handle displaying the question.
+       - If the answer is CORRECT: Simply say "Correct! 🎉" or "Excellent! 🎯" or "Well done! ✅" - just a SHORT encouraging message (maximum 3 words) and then ask the NEXT question.
+       - If the answer is WRONG: Simply say "Wrong! ❌" or "Not quite! ❌" or "Try again! ❌" - just a SHORT message (maximum 3 words) and ask the SAME question again. DO NOT give any hints or explanations.
+       - OBJECTIVE: Active Recall. Keep responses SHORT and direct.
 
     [DHURUVA'S PERSONALITY & STYLE]
     - BIG SIBLING VIBE: Be patient, slightly witty, and deeply encouraging.
@@ -822,6 +885,11 @@ export default function Chat() {
         formData.append("mode", mode);
         formData.append("board", userData.board || "CBSE");
         formData.append("class", userClass); // Correct Class sent to backend
+
+        // Append the file if it exists
+        if (currentFile) {
+            formData.append("file", currentFile);
+        }
 
         // 6. LOCAL MESSAGE UPDATE (User Side)
         const userMsg = {
@@ -889,7 +957,43 @@ export default function Chat() {
             });
 
             // 10. REWARD XP
-            await incrementXP(currentFile ? 30 : 15);
+            // Base XP for participating
+            const baseXP = currentFile ? 30 : 15;
+            await incrementXP(baseXP, "Participation");
+
+            // Show toast for participation XP
+            toast.success(`+${baseXP} XP Earned!`, {
+                icon: "⭐",
+                style: {
+                    borderRadius: '15px',
+                    background: activeTheme.isDark ? '#111' : '#fff',
+                    color: activeTheme.isDark ? '#fff' : '#000',
+                    border: '2px solid #6366f1'
+                },
+                autoClose: 1500
+            });
+
+            // Bonus XP for correct answers in Quiz mode
+            if (mode === "Quiz") {
+                const isCorrect = checkCorrectAnswer(aiResponse);
+                if (isCorrect) {
+                    // Award bonus XP for correct answer
+                    await incrementXP(20, "Correct Answer in Quiz");
+
+                    // Show a celebration toast for correct answer
+                    toast.success("🎉 Correct! +20 XP Bonus!", {
+                        icon: "🎯",
+                        style: {
+                            borderRadius: '15px',
+                            background: activeTheme.isDark ? '#111' : '#fff',
+                            color: activeTheme.isDark ? '#fff' : '#000',
+                            border: '2px solid #10b981'
+                        },
+                        autoClose: 2000
+                    });
+                    console.log("🎯 Quiz Bonus XP Awarded!");
+                }
+            }
 
         } catch (err) {
             console.error("Neural Error:", err);
@@ -947,6 +1051,13 @@ export default function Chat() {
 
     const handleLogout = async () => {
         try { await auth.signOut(); navigate("/login"); } catch (err) { toast.error("Logout Failed"); }
+    };
+
+    // Handler for quiz answer selection
+    const handleQuizAnswer = (answer) => {
+        if (answer && mode === "Quiz") {
+            sendMessage(answer);
+        }
     };
 
     // Component Guard: Loading check
@@ -1346,7 +1457,10 @@ export default function Chat() {
                                             {/* --- MESSAGE CONTENT --- */}
                                             <div className="prose prose-invert prose-sm max-w-none">
                                                 {msg.role === 'ai' ? (
-                                                    <Typewriter text={msg.content} />
+                                                    // Don't show Typewriter content if it's a quiz question (QuizBubble will handle it)
+                                                    mode === "Quiz" && isMCQ(msg.content) ? null : (
+                                                        <Typewriter text={msg.content} />
+                                                    )
                                                 ) : (
                                                     <ReactMarkdown
                                                         remarkPlugins={[remarkGfm, remarkMath]}
@@ -1356,6 +1470,15 @@ export default function Chat() {
                                                     </ReactMarkdown>
                                                 )}
                                             </div>
+
+                                            {/* --- QUIZ BUBBLE (Only in Quiz Mode) --- */}
+                                            {mode === "Quiz" && msg.role === "ai" && (
+                                                <QuizBubble
+                                                    message={msg}
+                                                    onAnswerSelect={handleQuizAnswer}
+                                                    theme={activeTheme}
+                                                />
+                                            )}
 
                                             {/* --- VOICE TOGGLE BUTTON FOR AI MESSAGES --- */}
                                             {msg.role === 'ai' && (
@@ -1578,6 +1701,13 @@ export default function Chat() {
                                         >
                                             <FaFileAlt size={12} />
                                         </button>
+                                        <button
+                                            onClick={() => navigate('/live', { state: { subject, chapter, userData } })}
+                                            className="p-2.5 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border border-indigo-400/30 shadow-lg"
+                                            title="Live Mode"
+                                        >
+                                            <FaMicrophone size={12} />
+                                        </button>
                                     </div>
                                     <div className="md:hidden relative">
                                         <button onClick={() => setShowPlusMenu(!showPlusMenu)} className={`p-2.5 rounded-full transition-all ${showPlusMenu ? 'bg-white text-black rotate-45' : 'bg-white/5'}`}><FaPlus size={12} /></button>
@@ -1592,6 +1722,13 @@ export default function Chat() {
                                                         className="p-3.5 rounded-full bg-black border border-blue-500/40 text-blue-400"
                                                     >
                                                         <FaFileAlt size={14} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => { navigate('/live', { state: { subject, chapter, userData } }); setShowPlusMenu(false) }}
+                                                        className="p-3.5 rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 border border-indigo-400/30 text-white"
+                                                        title="Live Mode"
+                                                    >
+                                                        <FaMicrophone size={14} />
                                                     </button>
                                                 </motion.div>
                                             )}

@@ -7,6 +7,8 @@ import { toast, ToastContainer } from "react-toastify";
 import 'react-toastify/dist/ReactToastify.css';
 import { motion, AnimatePresence } from "framer-motion";
 import { FaUser, FaEnvelope, FaLock, FaCheck, FaMars, FaVenus, FaGenderless, FaGoogle, FaRobot } from "react-icons/fa";
+// Import your background component
+import Background2 from "../components/Background2";
 
 import 'katex/dist/katex.min.css';
 
@@ -14,7 +16,7 @@ export default function Register() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [gender, setGender] = useState("other"); // Default state
+    const [gender, setGender] = useState("other");
     const [selectedAvatar, setSelectedAvatar] = useState(1);
     const [isVerified] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -57,34 +59,21 @@ export default function Register() {
         if (loading) return;
         setLoading(true);
 
-        const currentGender = gender;
-        const currentName = name;
-        const currentEmail = email;
-
         try {
             const avatarUrl = avatars.find(a => a.id === selectedAvatar).url;
 
-            // FIX: We only pass email and password to the register function
-            // Then we handle the name and avatar in the Firestore sync
-            const userCredential = await register(currentEmail, password);
+            /** * CRITICAL UPDATE: 
+             * We now pass all data directly to the register function. 
+             * This ensures Firestore is updated BEFORE the app redirects to the Profile page.
+             */
+            await register(email, password, name, gender, avatarUrl);
 
-            // Immediate Firestore Sync
-            await setDoc(doc(db, "users", userCredential.user.uid), {
-                uid: userCredential.user.uid,
-                name: currentName,
-                email: currentEmail,
-                pfp: avatarUrl,
-                gender: currentGender,
-                board: "CBSE",
-                classLevel: "10",
-                theme: "DeepSpace", // Ensuring a default theme exists
-                createdAt: serverTimestamp()
-            }, { merge: true });
+            toast.success("Welcome to the Neural Core!");
 
-            // Navigate directly to /chat after successful registration
-            navigate("/chat");
+            // Redirecting to Profile as requested
+            navigate("/profile");
+
         } catch (err) {
-            // Handle specific Firebase errors for better UX
             const errorMessage = err.code === 'auth/email-already-in-use'
                 ? "This email is already registered."
                 : (err.message || "Registration failed.");
@@ -95,8 +84,14 @@ export default function Register() {
 
     return (
         <div className="min-h-screen w-full flex items-center justify-center p-4 md:p-8 bg-[#05000a] overflow-x-hidden relative selection:bg-fuchsia-500/40">
-            {/* Background Glow */}
-            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+
+            {/* Background Component Integrated Here */}
+            <div className="absolute inset-0 z-0">
+                <Background2 />
+            </div>
+
+            {/* Mouse Glow Overlay */}
+            <div className="absolute inset-0 z-1 pointer-events-none overflow-hidden">
                 <div
                     className="absolute inset-0 transition-opacity duration-300 opacity-60"
                     style={{ background: `radial-gradient(800px at ${mousePos.x}px ${mousePos.y}px, rgba(147, 51, 234, 0.2), transparent 80%)` }}

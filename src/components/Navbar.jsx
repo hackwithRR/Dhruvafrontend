@@ -146,3 +146,4 @@ export default function Navbar({ userData }) {
         </nav>
     );
 }
+
