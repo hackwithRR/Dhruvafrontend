@@ -171,7 +171,31 @@ export default function LiveMode() {
     const lastSpokenTextRef = useRef("");
     const ignoreNextTranscriptRef = useRef(false);
     const speakingRef = useRef(false); // Track when AI is actually speaking
-    const conversationHistoryRef = useRef([]); // Store conversation history for context
+
+    // Use sessionStorage to persist across component remounts (when userData changes in App.js)
+    const getSessionHistory = () => {
+        try {
+            const stored = sessionStorage.getItem('liveMode_history');
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) {
+            return [];
+        }
+    };
+
+    const setSessionHistory = (history) => {
+        try {
+            sessionStorage.setItem('liveMode_history', JSON.stringify(history));
+        } catch (e) {
+            console.error('Failed to save history:', e);
+        }
+    };
+
+    const hasGreetedRef = useRef(false); // Track if initial greeting has been played
+
+
+    const conversationHistoryRef = useRef(getSessionHistory()); // Store conversation history for context
+
+
 
     const calculateSimilarity = (str1, str2) => {
         if (!str1 || !str2) return 0;
@@ -371,8 +395,14 @@ Use ${userLang} language. Be brief, conversational, end with a question.
                 formData.append("board", userBoard);
                 formData.append("class", userClass);
 
-                // Add conversation history for context
-                const historyString = conversationHistoryRef.current
+                // Add conversation history for context (including current user message)
+                // Add user message to history BEFORE sending to API so context is preserved even on error
+                const currentHistory = getSessionHistory();
+                currentHistory.push({ role: "user", content: transcript });
+                conversationHistoryRef.current = currentHistory;
+                setSessionHistory(currentHistory);
+
+                const historyString = currentHistory
                     .map(msg => `${msg.role}: ${msg.content}`)
                     .join('\n');
                 formData.append("history", historyString);
@@ -383,18 +413,23 @@ Use ${userLang} language. Be brief, conversational, end with a question.
                         timeout: 30000
                     });
 
-                    // Update conversation history with user message and AI response
-                    conversationHistoryRef.current.push({ role: "user", content: transcript });
-                    conversationHistoryRef.current.push({ role: "assistant", content: res.data.reply });
+                    // Add AI response to conversation history
+                    const updatedHistory = getSessionHistory();
+                    updatedHistory.push({ role: "assistant", content: res.data.reply });
 
                     // Keep history manageable - limit to last 10 exchanges (20 messages)
-                    if (conversationHistoryRef.current.length > 20) {
-                        conversationHistoryRef.current = conversationHistoryRef.current.slice(-20);
+                    if (updatedHistory.length > 20) {
+                        updatedHistory.splice(0, updatedHistory.length - 20);
                     }
 
+                    conversationHistoryRef.current = updatedHistory;
+                    setSessionHistory(updatedHistory);
+
                     speak(res.data.reply, true);
+
                 } catch (err) {
                     console.error("API Error:", err);
+                    // Note: User message is already in history, so next attempt will have context
                     setStatus("Connection Error");
                     setAppState(MODE.ERROR);
                     setConnectionStatus("error");
@@ -439,7 +474,7 @@ Use ${userLang} language. Be brief, conversational, end with a question.
             console.error("Failed to start recognition:", err);
             return false;
         }
-    }, [subject, chapter, speak, isContinuousMode, userClass, userBoard, userName, currentUser, userLang, appState]);
+    }, [subject, chapter, speak, isContinuousMode, userClass, userBoard, userName, currentUser, userLang]);
 
     const handleStartListening = useCallback(() => {
         synthesisRef.current.cancel();
@@ -470,8 +505,14 @@ Use ${userLang} language. Be brief, conversational, end with a question.
 
         const initTimeout = setTimeout(() => {
             setConnectionStatus("connected");
-            const intro = `Namaste ${userName}! Main Anthariksh hoon, aapka AI tutor. ${subject} ke baare mein kya jaanne chahte ho?`;
-            speakRef.current(intro);
+            // Only play greeting if not already greeted (check sessionStorage)
+            const hasGreeted = sessionStorage.getItem('liveMode_hasGreeted') === 'true';
+            if (!hasGreeted) {
+                sessionStorage.setItem('liveMode_hasGreeted', 'true');
+                hasGreetedRef.current = true;
+                const intro = `Namaste ${userName}! Main Anthariksh hoon, aapka AI tutor. ${subject} ke baare mein kya jaanne chahte ho?`;
+                speakRef.current(intro);
+            }
         }, 1500);
 
         return () => {
@@ -482,6 +523,7 @@ Use ${userLang} language. Be brief, conversational, end with a question.
             if (wakeLockRef.current) wakeLockRef.current.release();
         };
     }, []);
+
 
     // Visual helpers - unified for all states
     const getStatusColor = () => {
