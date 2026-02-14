@@ -90,7 +90,7 @@ const syllabusData = {
     },
     ICSE: {
         "8": {
-            "MATHEMATICS": ["Rational Numbers", "Exponents", "Squares and Square Roots", "Cubes and Cube Roots", "Algebraic Expressions", "Linear Equations"," "algebraic identities", "perimeter and area","volume and area"  ,"Direct and Inverse variation direct","constructions of quadrilaterals","linear inequation","Factorisation", "Ratio and Proportion", "Percentages", "Profit and Loss", "Simple Interest", "Polygons", "Quadrilaterals", "Mensuration", "Data Handling", "Graphs"],
+            "MATHEMATICS": ["Rational Numbers", "Exponents", "Squares and Square Roots", "Cubes and Cube Roots", "Algebraic Expressions", "Linear Equations","algebraic identities", "perimeter and area","volume and area"  ,"Direct and Inverse variation direct","constructions of quadrilaterals","linear inequation","Factorisation", "Ratio and Proportion", "Percentages", "Profit and Loss", "Simple Interest", "Polygons", "Quadrilaterals", "Mensuration", "Data Handling", "Graphs"],
             "PHYSICS": ["Matter", "Physical Quantities and Measurement", "Force and Pressure", "Energy", "Light", "Heat", "Sound", "Electricity"],
             "CHEMISTRY": ["Matter", "Physical and Chemical Changes", "Elements, Compounds and Mixtures", "Atomic Structure", "Chemical Reactions", "Hydrogen", "Water", "Carbon and its Compounds"],
             "BIOLOGY": ["Plant Tissues", "Animal Tissues", "Transport in Plants", "Reproduction in Plants", "Reproduction in Animals", "Ecosystem", "Human Body Systems", "Health and Hygiene"],
