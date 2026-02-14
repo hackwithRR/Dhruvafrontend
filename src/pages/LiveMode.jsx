@@ -474,7 +474,8 @@ Use ${userLang} language. Be brief, conversational, end with a question.
             console.error("Failed to start recognition:", err);
             return false;
         }
-    }, [subject, chapter, speak, isContinuousMode, userClass, userBoard, userName, currentUser, userLang]);
+    }, [subject, chapter, speak, isContinuousMode, userClass, userBoard, userName, currentUser, userLang, appState]);
+
 
     const handleStartListening = useCallback(() => {
         synthesisRef.current.cancel();
