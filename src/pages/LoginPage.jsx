@@ -80,7 +80,7 @@ export default function LoginPage() {
               <FaShieldAlt className="text-fuchsia-500" /> Secure Node
             </div>
             <h1 className="text-[clamp(3rem,15vw,6rem)] font-[1000] text-white italic tracking-tighter leading-none drop-shadow-sm">
-              DHRUVA
+              Anthariksh
             </h1>
           </div>
 

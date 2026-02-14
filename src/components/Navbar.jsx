@@ -23,7 +23,7 @@ export default function Navbar({ userData }) {
     // Fixes the "Scholar" bug by checking every possible name field
     const displayName = userData?.name || userData?.displayName || auth.currentUser?.displayName || "Scholar";
     const photoURL = userData?.pfp || auth.currentUser?.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${auth.currentUser?.uid}`;
-    const logoLetters = "DHRUVA".split("");
+    const logoLetters = "ANTHARIKSH".split("");
 
     useEffect(() => {
         const handleClickOutside = (event) => {

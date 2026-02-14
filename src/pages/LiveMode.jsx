@@ -243,7 +243,7 @@ export default function LiveMode() {
             speakingRef.current = true;
             setAppState(MODE.SPEAKING);
             setIsSpeaking(true);
-            setStatus("Dhruva is speaking...");
+            setStatus("Anthariksh is speaking...");
             // Stop any ongoing recognition when AI starts speaking
             if (recognitionRef.current) {
                 try {
@@ -355,7 +355,7 @@ export default function LiveMode() {
                 recognitionRef.current?.stop();
 
                 const systemInstruction = `
-ROLE: You are Dhruva, a super-friendly AI tutor for Class ${userClass} (${userBoard} Board). 
+ROLE: You are Anthariksh, a super-friendly AI tutor for Class ${userClass} (${userBoard} Board). 
 Your student's name is ${userName}. 
 Subject: ${subject}, Chapter: ${chapter}, Mode: Live Voice Conversation
 Use ${userLang} language. Be brief, conversational, end with a question.
@@ -470,7 +470,7 @@ Use ${userLang} language. Be brief, conversational, end with a question.
 
         const initTimeout = setTimeout(() => {
             setConnectionStatus("connected");
-            const intro = `Namaste ${userName}! Main Dhruva hoon, aapka AI tutor. ${subject} ke baare mein kya jaanne chahte ho?`;
+            const intro = `Namaste ${userName}! Main Anthariksh hoon, aapka AI tutor. ${subject} ke baare mein kya jaanne chahte ho?`;
             speakRef.current(intro);
         }, 1500);
 

@@ -98,7 +98,7 @@ export default function LoginForm({ setPage }) {
                 <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-scan" />
 
                 <div className="text-center space-y-2">
-                    <h2 className="text-4xl font-[1000] text-white italic tracking-tighter">DHRUVA_AI</h2>
+                    <h2 className="text-4xl font-[1000] text-white italic tracking-tighter">Anthariksh_AI</h2>
                     <p className="text-[10px] text-white/30 uppercase tracking-[0.4em] font-bold">Secure Terminal Login</p>
                 </div>
 

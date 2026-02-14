@@ -393,7 +393,7 @@ export default function Chat() {
                     lastUpdate: Date.now() // Keep the session 'fresh' in the list
                 }, { merge: true });
 
-                console.log(`📡 Dhruva Sync: Session ${currentSessionId} updated to ${updatedBoard} Class ${updatedClass}`);
+                console.log(`📡 Anthariksh Sync: Session ${currentSessionId} updated to ${updatedBoard} Class ${updatedClass}`);
             } catch (err) {
                 console.error("❌ Auto-Sync failed:", err);
             }
@@ -815,13 +815,13 @@ export default function Chat() {
         const संबोधन = userData.userGender === 'male' ? lingo.bro : userData.userGender === 'female' ? lingo.sis : "Dost";
 
         const userBoard = userData?.board || "CBSE";
-        const currentMode = userData?.currentMode || mode;
+
         // Friendly personalization based on gender
 
 
-        // 3. THE PERSONALIZED SYSTEM PROMPT (The "Dhruva" Persona)
+        // 3. THE PERSONALIZED SYSTEM PROMPT (The "Anthariksh" Persona)
         const systemInstruction = `
-    ROLE: You are Dhruva, a super-friendly, brilliant, and high-energy AI "Big Sibling" & Tutor for Class ${userClass} (${userBoard} Board). 
+    ROLE: You are Anthariksh, a super-friendly, brilliant, and high-energy AI "Big Sibling" & Tutor for Class ${userClass} (${userBoard} Board). 
     Your student's name is ${userName}. 
 
     [CORE MISSION CONTEXT]
@@ -841,22 +841,43 @@ export default function Chat() {
     - NATIVE RULE: If Natural, use the specific script of ${lingo.root} ONLY.
 
     [MODE-SPECIFIC BEHAVIOR]
-    1. EXPLAIN MODE (The Storyteller 📚):
+    1. EXPLAIN MODE (The Storyteller 📚)only if ${mode} === "Explain":
        - OBJECTIVE: Concept Mastery. Use "Hooks" and analogies from ${lingo.root} culture.
-    
-    2. HW HELP MODE (The Coach 🧠):
-       - Should provide full answers but ALSO break down the steps.
-       -Should give full answers but ALSO scaffold the problem-solving process, encouraging the student to think critically.
-       - OBJECTIVE: Independent Solving. Use "Scaffolding".
-       - If they struggle, say "${lingo.fail}" and break it down further.
+       -ask if the student has any doubts
+       -if goo in more details required by the board and class level
+       - Always end with a check-in question in ${userLang}: "${lingo.check} 🚀
+       - Use emojis and analogies relevant to ${lingo.root} culture to make explanations engaging and relatable.
+       - If the student asks for real-world applications, provide examples that are relevant to their daily life and culture.
+       - If the student says they don't understand a part, break it down using a simple analogy from ${lingo.root} culture and then explain the concept again in a different way.
+       -if the student asks for examples, provide 2-3 examples that are relevant to the chapter and explain how they relate to the concept being taught.
+       -if the student asks any homework related question ask him to change to hw mode for better understanding"
+        -if the student asks anything realted to quiz  or the word "quiz"  question ask him to change to quiz mode for better understanding and dont reply aanything else for that.
+        - scaffoldings should be used with better spcaing in between the lines and headings and mathematical formulas
+        -bold heading and step heading and titles.
 
-    3. QUIZ MODE (The Game Master 🎯):
+    
+    2. HW MODE (The Coach 🧠) only if ${mode} === "HW" :
+       - Should provide full answers but ALSO break down the steps.
+    - Should give full answers but ALSO scaffold the problem-solving process, encouraging the student to think critically.
+       - OBJECTIVE: Independent Solving. Use "Scaffolding" techniques.
+       - If they struggle, say "${lingo.fail}" and break it down further.
+       - Add two-three lines gap above mathematical euqations and steps to make it more clear and easy to understand.
+       - heading and title must be bold.
+       -Steps should be in bullet points to make it more clear and easy to understand.
+       -steps heading should be in extbold to make it more clear and easy to understand.
+       -Steps heading and body should be displayed in diffrent lines, and there should be a gap of two-three lines between them to make it more clear and easy to understand.
+       - The mathemactical part should be in latex form and shown seperately from the text to make it more clear and easy to understand.
+
+    3. QUIZ MODE (The Game Master 🎯)only if ${mode} === Quiz:
 
        - STRATEGY: Ask ONE crisp question from ${chapter} at a time. 
        - IMPORTANT: When you ask a question, ONLY display the question and options. Do NOT include any explanatory text, hints, or the answer in your response - the QuizBubble component will handle displaying the question.
-       - If the answer is CORRECT: Simply say "Correct! 🎉" or "Excellent! 🎯" or "Well done! ✅" - just a SHORT encouraging message (maximum 3 words) and then ask the NEXT question.
-       - If the answer is WRONG: Simply say "Wrong! ❌" or "Not quite! ❌" or "Try again! ❌" - just a SHORT message (maximum 3 words) and ask the SAME question again. DO NOT give any hints or explanations.
-       - OBJECTIVE: Active Recall. Keep responses SHORT and direct.
+       - If the answer is CORRECT: Simply say "Correct! 🎉" or "Excellent! 🎯" or "Well done! ✅" - then move onto the next question. Keep it SHORT! Do NOT explain anything.
+       - If the answer is WRONG: Simply say "Wrong! ❌" or "Not quite! ❌" or "Try again! ❌" - do NOT provide the correct answer. Then ask them to switch to Explain mode to get their doubt clarified. Say something like "Switch to Explain mode to understand this concept better!" - do NOT explain the answer yourself. Do NOT explain the concept.
+       - CRITICAL: In Quiz mode, you must ONLY say "Correct!" or "Wrong!" and move on. NEVER explain concepts, chapters, or answers in Quiz mode. If they want explanation, tell them to switch to Explain mode.
+       - OBJECTIVE: Active Recall. Keep responses VERY SHORT - just "Correct!" or "Wrong!" plus a brief note about Explain mode if wrong. NO explanations ever in Quiz mode.
+
+
 
     [DHURUVA'S PERSONALITY & STYLE]
     - BIG SIBLING VIBE: Be patient, slightly witty, and deeply encouraging.
@@ -918,7 +939,7 @@ export default function Chat() {
         setMessages(prev => [...prev, userMsg]);
 
         try {
-            console.log(`🚀 Sending to Dhruva -> Class: ${userClass}, Lang: ${userLang}`);
+            console.log(`🚀 Sending to Anthariksh -> Class: ${userClass}, Lang: ${userLang}`);
 
             // 7. API CALL
             const res = await axios.post(`${API_BASE}/chat`, formData, {
@@ -971,31 +992,16 @@ export default function Chat() {
             });
 
             // 10. REWARD XP
-            // Base XP for participating
-            const baseXP = currentFile ? 30 : 15;
-            await incrementXP(baseXP, "Participation");
-
-            // Show toast for participation XP
-            toast.success(`+${baseXP} XP Earned!`, {
-                icon: "⭐",
-                style: {
-                    borderRadius: '15px',
-                    background: activeTheme.isDark ? '#111' : '#fff',
-                    color: activeTheme.isDark ? '#fff' : '#000',
-                    border: '2px solid #6366f1'
-                },
-                autoClose: 1500
-            });
-
-            // Bonus XP for correct answers in Quiz mode
+            // Only award XP in Quiz mode for correct answers - No XP in Explain or HW modes
             if (mode === "Quiz") {
                 const isCorrect = checkCorrectAnswer(aiResponse);
                 if (isCorrect) {
-                    // Award bonus XP for correct answer
-                    await incrementXP(20, "Correct Answer in Quiz");
+                    // Award random 15-20 XP for correct answer
+                    const quizXP = Math.floor(Math.random() * 6) + 15; // Random between 15-20
+                    await incrementXP(quizXP, "Correct Answer in Quiz");
 
                     // Show a celebration toast for correct answer
-                    toast.success("🎉 Correct! +20 XP Bonus!", {
+                    toast.success(`🎉 Correct! +${quizXP} XP!`, {
                         icon: "🎯",
                         style: {
                             borderRadius: '15px',
@@ -1005,9 +1011,13 @@ export default function Chat() {
                         },
                         autoClose: 2000
                     });
-                    console.log("🎯 Quiz Bonus XP Awarded!");
+                    console.log(`🎯 Quiz XP Awarded: +${quizXP} XP`);
                 }
+                // Wrong answers get no XP in Quiz mode
             }
+            // No XP awarded for Explain or HW modes
+
+
 
         } catch (err) {
             console.error("Neural Error:", err);

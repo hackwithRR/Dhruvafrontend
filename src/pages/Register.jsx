@@ -114,11 +114,11 @@ export default function Register() {
                                 <FaRobot className="text-2xl" />
                                 <span className="text-[10px] font-black tracking-[0.4em] uppercase">AI Education Partner</span>
                             </div>
-                            <h1 className="text-6xl md:text-8xl font-[1000] text-white italic tracking-tighter leading-none mb-6">DHRUVA</h1>
+                            <h1 className="text-6xl md:text-8xl font-[1000] text-white italic tracking-tighter leading-none mb-6">ANTHARIKSH</h1>
                             <div className="space-y-4 mb-8">
                                 <p className="text-white/80 text-lg font-bold leading-tight">Your personal student-friendly AI.</p>
                                 <p className="text-white/50 text-sm md:text-base font-medium max-w-xs leading-relaxed italic">
-                                    Dhruva simplifies complex topics, tracks your progress, and acts as a 24/7 mentor.
+                                    Anthariksh simplifies complex topics, tracks your progress, and acts as a 24/7 mentor.
                                 </p>
                             </div>
                         </div>
