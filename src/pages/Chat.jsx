@@ -738,22 +738,36 @@ export default function Chat() {
                 };
                 fileToProcess = await imageCompression(file, options);
                 setFileType('image');
+            } else if (file.type === 'application/pdf') {
+                // For PDFs, optimize using pdf-lib
+                try {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdfDoc = await PDFDocument.load(arrayBuffer);
+                    const compressedBytes = await pdfDoc.save({ useObjectStreams: true });
+                    fileToProcess = new Blob([compressedBytes], { type: 'application/pdf' });
+                } catch (pdfError) {
+                    console.error("PDF optimization error:", pdfError);
+                    // Fall back to original file if optimization fails
+                    fileToProcess = file;
+                }
+                setFileType('document');
             } else {
                 setFileType('document');
             }
 
-            // 3. Convert to Base64 (This is what the AI eats)
+            // 3. Convert to Base64 for PREVIEW ONLY
             const reader = new FileReader();
             reader.readAsDataURL(fileToProcess);
             reader.onloadend = () => {
                 const base64data = reader.result;
                 setImagePreview(base64data); // This shows the preview in chat
-                setAttachedFile(base64data); // This is what you send to the AI
+                setAttachedFile(fileToProcess); // Keep the actual Blob/File for FormData!
                 setIsSending(false);
             };
 
         } catch (error) {
             console.error("Compression Error:", error);
+            toast.error("Failed to process file. Please try again.");
             setIsSending(false);
         }
     };
