@@ -15,6 +15,7 @@ service cloud.firestore {
         request.auth.token.phone_number in ['+919148860082'];
     }
 
+<<<<<<< HEAD
     // All user-owned documents + subcollections
     match /users/{userId} {
       allow read, write: if isOwner(userId) || isWhitelistedAdmin();
@@ -43,6 +44,14 @@ service cloud.firestore {
         allow read, write: if isOwner(userId) || isWhitelistedAdmin();
       }
 
+=======
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+    }
+
+    match /users/{userId}/sessions/{sessionId} {
+      allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
     }
 
     match /messages/{messageId} {
@@ -69,4 +78,7 @@ service cloud.firestore {
     }
   }
 }
+<<<<<<< HEAD
 
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b

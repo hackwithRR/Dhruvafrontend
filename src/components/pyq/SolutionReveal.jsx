@@ -1,9 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 
+<<<<<<< HEAD
 import { renderFormattedAnswer } from '../../utils/pyqFormatting';
 
 
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
 const SolutionReveal = ({ solution, theme, hintCount }) => {
   const isDark = theme.isDark !== false;
   const primaryColor = theme.primaryHex || '#6366f1';

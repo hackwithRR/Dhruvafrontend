@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { FaLightbulb, FaSyncAlt } from 'react-icons/fa';
 import HintButton from './HintButton';
 
+<<<<<<< HEAD
 import { useAuth } from '../../context/AuthContext';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -18,6 +19,11 @@ const AIQuestionView = ({ theme, board, classLevel, subject, chapter, updateStat
   const { currentUser, userData } = useAuth();
 
 
+=======
+const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-e5h8.onrender.com").replace(/\/$/, "");
+
+const AIQuestionView = ({ theme, board, classLevel, subject, chapter, updateStats }) => {
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
   const [question, setQuestion] = useState(null);
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(false);
@@ -28,6 +34,7 @@ const AIQuestionView = ({ theme, board, classLevel, subject, chapter, updateStat
   const isDark = theme?.isDark !== false;
   const primaryColor = theme?.primaryHex || "#6366f1";
 
+<<<<<<< HEAD
 
 
   const [cachedQuestions, setCachedQuestions] = useState([]);
@@ -155,6 +162,9 @@ const AIQuestionView = ({ theme, board, classLevel, subject, chapter, updateStat
 
 
   // Generate AI PYQ (append to cache)
+=======
+  // Generate AI PYQ
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
   const generateQuestion = useCallback(async () => {
     if (!chapter || !subject) return;
 
@@ -171,6 +181,7 @@ Board: ${board}
 Class: ${classLevel}
 
 RULES:
+<<<<<<< HEAD
 - Generate exactly ONE board-level question.
 - Marks must be either 3 or 5.
 - Must be accurate to ${board} board exam expectations.
@@ -190,18 +201,32 @@ FORMATTING:
 - Use [BOLD]text[/BOLD] for key terms and formulas.
 - Use LaTeX math only as $$...$$.
 - Use plain ASCII characters only (no special unicode).
+=======
+- 3-5 marks typical ${board} board question
+- Include marks [3/5 Marks]
+- LaTeX math: $$E=mc^2$$
+- Board-style: precise, diagram-ready
+- Difficulty: actual board level
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
 
 OUTPUT FORMAT:
 **Question:** [question text]
 **Topic:** [subtopic from chapter]
 **Marks:** [3 or 5]
+<<<<<<< HEAD
 **Solution:** [exactly 3 or 5 steps/points with marking-scheme style]
+=======
+**Solution:** [step-by-step board solution with marking scheme]
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
 
 Generate BOTH question AND solution.`;
 
       const res = await fetch(`${API_BASE}/chat?message=Generate+PYQ+with+solution&systemInstruction=${encodeURIComponent(systemPrompt)}&subject=${encodeURIComponent(subject)}&chapter=${encodeURIComponent(chapter)}&board=${encodeURIComponent(board)}&classLevel=${encodeURIComponent(classLevel)}&mode=PYQ-SOLUTION`);
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
       if (!res.ok) throw new Error('Failed to generate question');
 
       const data = await res.json();
@@ -213,6 +238,7 @@ Generate BOTH question AND solution.`;
       const marksMatch = aiQuestion.match(/\*\*Marks:\*\*\s*(\d+)/);
       const solutionMatch = aiQuestion.match(/\*\*Solution:\*\*\s*(.+)/s);
 
+<<<<<<< HEAD
       let nextQuestion = null;
       let nextAnswer = '';
 
@@ -259,14 +285,32 @@ Generate BOTH question AND solution.`;
       setQuestion(nextQuestion);
       setAnswer(nextAnswer);
 
+=======
+      if (questionMatch) {
+        setQuestion({
+          text: questionMatch[1].trim().replace(/\*\*(.*?)\*\*/g, '$1'),
+          topic: topicMatch ? topicMatch[1].trim() : chapter,
+          marks: marksMatch ? parseInt(marksMatch[1]) : 3
+        });
+        setAnswer(solutionMatch ? solutionMatch[1].trim() : 'Solution loading...');
+      } else {
+        setQuestion({ text: aiQuestion.trim(), topic: chapter, marks: 3 });
+        setAnswer('See explanation above.');
+      }
+
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
     } catch (err) {
       setError('Failed to generate question. Try again.');
       console.error(err);
     } finally {
       setLoading(false);
     }
+<<<<<<< HEAD
   }, [chapter, subject, board, classLevel, currentUser?.uid, cachedQuestions, getChapterDocRef]);
 
+=======
+  }, [chapter, subject, board, classLevel]);
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
 
   // Progressive hints
   const getHintText = () => {
@@ -278,7 +322,15 @@ Generate BOTH question AND solution.`;
     }
   };
 
+<<<<<<< HEAD
 
+=======
+  useEffect(() => {
+    if (chapter && subject) {
+      generateQuestion();
+    }
+  }, [chapter, subject, generateQuestion]);
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
 
   const handleSolutionReveal = () => {
     if (!solved) {
@@ -287,6 +339,7 @@ Generate BOTH question AND solution.`;
     }
   };
 
+<<<<<<< HEAD
   // IMPORTANT: when modal is closed/unmounted, persist latest UI state
   // (question/answer/hints) so reopening doesn't reset to empty.
   useEffect(() => {
@@ -377,6 +430,27 @@ Generate BOTH question AND solution.`;
           </motion.button>
         </div>
 
+=======
+  return (
+    <div className="space-y-6">
+      {/* Controls */}
+      <div className="flex items-center justify-between">
+        <motion.button
+          onClick={generateQuestion}
+          disabled={loading}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className="flex items-center gap-2 px-5 py-3 rounded-2xl font-bold transition-all"
+          style={{
+            backgroundColor: primaryColor + '20',
+            color: primaryColor,
+            border: `1px solid ${primaryColor}40`
+          }}
+        >
+          <FaSyncAlt size={16} className={`transition-transform ${loading ? 'animate-spin' : ''}`} />
+          {loading ? 'Generating...' : 'New Question'}
+        </motion.button>
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
 
         <HintButton
           hintCount={hintCount}
@@ -389,6 +463,7 @@ Generate BOTH question AND solution.`;
         />
       </div>
 
+<<<<<<< HEAD
 
       {/* History Panel */}
       {showHistory && cachedQuestions?.length > 0 && (
@@ -432,6 +507,10 @@ Generate BOTH question AND solution.`;
       {/* Question Display */}
       {question ? (
 
+=======
+      {/* Question Display */}
+      {question ? (
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -448,10 +527,20 @@ Generate BOTH question AND solution.`;
           </div>
 
           <div className="prose prose-lg max-w-none leading-relaxed mb-6" style={{ color: theme?.text || (isDark ? '#fff' : '#000') }}>
+<<<<<<< HEAD
             {renderInline(question.text, { primaryColor })}
           </div>
 
 
+=======
+            <div dangerouslySetInnerHTML={{
+              __html: question.text
+                .replace(/\$\$(.+?)\$\$/g, `<span class="px-2 py-1 rounded font-mono" style="background-color: ${primaryColor}20; color: ${primaryColor}; border: 1px solid ${primaryColor}40">$1</span>`)
+                .replace(/\*\*(.*?)\*\*/g, `<strong style="color: ${primaryColor}">$1</strong>`)
+            }} />
+          </div>
+
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
           <div className="pt-6 border-t flex items-center gap-3"
             style={{ borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}>
             <span className="text-sm" style={{ color: theme?.text + '70' || 'rgba(255,255,255,0.6)' }}>Topic:</span>
@@ -499,7 +588,15 @@ Generate BOTH question AND solution.`;
 
           <div className="prose prose-lg max-w-none" style={{ color: theme?.text || (isDark ? '#fff' : '#000') }}>
             {hintCount >= 4 ? (
+<<<<<<< HEAD
               renderFormattedAnswer(answer, { primaryColor })
+=======
+              <div dangerouslySetInnerHTML={{
+                __html: answer
+                  .replace(/\$\$(.+?)\$\$/g, `<span class="px-2 py-1 rounded font-mono" style="background-color: ${primaryColor}20; color: ${primaryColor}; border: 1px solid ${primaryColor}40">$1</span>`)
+                  .replace(/\*\*(.*?)\*\*/g, `<strong style="color: ${primaryColor}">$1</strong>`)
+              }} />
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
             ) : (
               <p>{getHintText()}</p>
             )}

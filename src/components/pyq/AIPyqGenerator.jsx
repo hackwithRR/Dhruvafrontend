@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaTimes, FaEye, FaEyeSlash, FaSync, FaBrain, FaExclamationTriangle, FaHistory } from 'react-icons/fa';
@@ -6,6 +7,14 @@ import { useAuth } from '../../context/AuthContext';
 import axios from "axios";
 import { doc, getDoc, setDoc, collection, query, getDocs, orderBy, serverTimestamp, limit } from 'firebase/firestore';
 import { db } from '../../firebase';
+=======
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { FaTimes, FaEye, FaEyeSlash, FaSync, FaBrain, FaExclamationTriangle } from 'react-icons/fa';
+import { toast } from 'react-toastify';
+import { useAuth } from '../../context/AuthContext';
+import axios from "axios";
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
 
 const API_BASE = (process.env.REACT_APP_API_URL || "https://dhruva-backend-e5h8.onrender.com").replace(/\/$/, "");
 
@@ -16,15 +25,19 @@ const AIPyqGenerator = ({ isOpen, onClose, filters = {}, theme = {}, onAskAI }) 
     const [showAnswers, setShowAnswers] = useState({});
     const [error, setError] = useState('');
 
+<<<<<<< HEAD
     const [showHistory, setShowHistory] = useState(false);
     const [cachedQuestions, setCachedQuestions] = useState([]);
     const [cacheLoaded, setCacheLoaded] = useState(false);
 
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
     const board = filters.board || userData?.board || 'CBSE';
     const classLevel = filters.class || userData?.classLevel || '10';
     const subject = filters.subject || 'Mathematics';
     const chapter = filters.chapter || 'Algebra';
 
+<<<<<<< HEAD
     const getChapterDocRef = useCallback(() => {
         const effectiveBoard = board || userData?.board || 'CBSE';
         const effectiveClass = classLevel || userData?.classLevel || userData?.class || '10';
@@ -33,6 +46,8 @@ const AIPyqGenerator = ({ isOpen, onClose, filters = {}, theme = {}, onAskAI }) 
     }, [board, classLevel, subject, chapter, currentUser?.uid, userData]);
 
 
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
     // Theme-aware colors
     const isDark = theme?.isDark !== false;
     const primaryColor = theme?.primaryHex || '#6366f1';
@@ -44,6 +59,7 @@ const AIPyqGenerator = ({ isOpen, onClose, filters = {}, theme = {}, onAskAI }) 
     const cardBg = isDark ? 'bg-slate-800/50' : 'bg-white/80';
     const buttonBg = isDark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-200 hover:bg-gray-300';
 
+<<<<<<< HEAD
     const [sessions, setSessions] = useState([]);
     const [selectedSessionId, setSelectedSessionId] = useState(null);
 
@@ -93,18 +109,24 @@ const AIPyqGenerator = ({ isOpen, onClose, filters = {}, theme = {}, onAskAI }) 
         }
     }, [showHistory, loadHistory]);
 
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
     const generatePYQs = async () => {
         setIsGenerating(true);
         setError('');
         setPyqs([]);
 
         try {
+<<<<<<< HEAD
             const sessionId = Date.now().toString();
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
             const formData = new FormData();
             formData.append("userId", "pyq-" + Date.now());
             formData.append("message", `Generate 12 ${board} board exam PYQs for Class ${classLevel} ${subject} Chapter "${chapter}". Return ONLY valid JSON array.`);
             
             const boardSpecificFormat = board.toUpperCase() === 'ICSE' 
+<<<<<<< HEAD
                 ? `ICSE PYQ RULES (YOU MUST FOLLOW):
 
 - Generate actual ICSE board-style PYQ problems (numerical / statement-based questions), not general theory-only notes.
@@ -150,6 +172,38 @@ FORMATTING:
             formData.append("systemInstruction", `You are a JSON generator. Output ONLY a valid JSON array. No text before or after.
 
 
+=======
+                ? `ICSE FORMAT RULES:
+- 5-mark: Definition + 2-3 point-wise explanations + rule/law + example. Total 150-200 words. Use bullet points.
+- 3-mark: Exactly 3 clear points, point-wise format, 80-100 words.
+- 2-mark: Exactly 2 distinct points, each 1 mark, 50-60 words, short and direct.
+- 1-mark: Brief explanation, 40-50 words.
+- Use [BOLD]text[/BOLD] for important terms, use * for bullet points, use // for line breaks.`
+                : `CBSE FORMAT RULES:
+- 2 MARKS (2 points = 2 marks):
+  * Point 1: definition / fact
+  * Point 2: key feature / example / rule
+  * No explanation or extra detail
+  * Total: 60-80 words
+- 3 MARKS (3 points = 3 marks):
+  * Point 1: definition / concept
+  * Point 2: explanation / property
+  * Point 3: application / example / principle
+  * Keep each point short and independent
+  * Total: 150-180 words
+- 5 MARKS (Structured full answer):
+  * Point 1: definition (1 mark)
+  * Point 2: key explanation
+  * Point 3: detailed explanation
+  * Point 4: supporting point / rule
+  * Point 5: example / application / diagram idea
+  * Total: 800+ words, extremely detailed
+- 1-mark: Brief explanation, 40-50 words
+- Use [BOLD]text[/BOLD] for important terms, use * for bullet points, use // for line breaks.`;
+
+            formData.append("systemInstruction", `You are a JSON generator. Output ONLY a valid JSON array. No text before or after.
+
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
 Generate 12 ${board} board exam PYQs for Class ${classLevel} ${subject} Chapter "${chapter}".
 
 ${boardSpecificFormat}
@@ -236,6 +290,7 @@ CRITICAL RULES:
                 throw new Error('Could not parse AI response into valid questions');
             }
 
+<<<<<<< HEAD
             // Persist to Firestore history/cache (so History button can load it)
             try {
                 const chapterDocRef = getChapterDocRef();
@@ -299,6 +354,8 @@ CRITICAL RULES:
                 // Do not fail generation UI if persistence fails
             }
 
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
             setPyqs(questions);
             toast.success(`✅ ${questions.length} PYQs Generated!`);
         } catch (err) {
@@ -425,6 +482,7 @@ CRITICAL RULES:
     // Helper function to process inline formatting
     const processInlineFormatting = (text) => {
         if (!text) return null;
+<<<<<<< HEAD
         // If the backend sends raw latex like $$...$$, keep it as-is so it renders in whitespace-pre-wrap.
         // Also convert any escaped \n into real newlines.
         const normalized = text.replace(/\\n/g, '\n');
@@ -459,10 +517,23 @@ CRITICAL RULES:
                 const content = part.replace('[BOLD]', '').replace('[/BOLD]', '');
                 return (
                     <strong key={i} style={{ color: primaryColor, fontWeight: 800 }} className="text-lg px-1">
+=======
+        
+        // Split by [BOLD] and $$formula$$ patterns - more flexible regex
+        const parts = text.split(/(\[BOLD\][\s\S]*?\[\/BOLD\]|\$\$[\s\S]*?\$\$)/g);
+        
+        return parts.map((part, i) => {
+            // Handle [BOLD]text[/BOLD] - using includes for reliability
+            if (part.includes('[BOLD]') && part.includes('[/BOLD]')) {
+                const content = part.replace('[BOLD]', '').replace('[/BOLD]', '');
+                return (
+                    <strong key={i} style={{ color: primaryColor, fontWeight: 700 }} className="text-lg px-1">
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
                         {content}
                     </strong>
                 );
             }
+<<<<<<< HEAD
             // Default: keep inline text and handle [BOLD], **bold**, HIGHLIGHT + keyword highlighting
             let processed = part;
 
@@ -528,6 +599,34 @@ CRITICAL RULES:
                 processed = processed.replace(regex, `<strong style="color:${primaryColor};font-weight:800;">$1</strong>`);
             });
 
+=======
+            // Handle $$formula$$ - LaTeX style
+            if (part.startsWith('$$') && part.endsWith('$$')) {
+                const formula = part.slice(2, -2);
+                return (
+                    <span key={i} className="inline-block px-3 py-1.5 mx-1 rounded-lg font-mono text-sm border shadow-lg"
+                        style={{ 
+                            backgroundColor: primaryColor + '15', 
+                            color: primaryColor,
+                            borderColor: primaryColor + '30',
+                            boxShadow: `0 0 15px ${primaryColor}20`
+                        }}>
+                        {formula}
+                    </span>
+                );
+            }
+            // Regular text - auto-bold key terms and handle **markdown** bold
+            const keyTerms = ['Definition:', 'Formula:', 'Therefore:', 'Hence:', 'Proof:', 'Example:', 'Solution:', 'Step', 'Note:', 'Important:', 'Key Points:', 'Remember:'];
+            let processed = part;
+            
+            // Handle **text** markdown bold
+            processed = processed.replace(/\*\*(.*?)\*\*/g, `<strong style="color:${primaryColor};font-weight:700;">$1</strong>`);
+            
+            keyTerms.forEach(term => {
+                const regex = new RegExp(`(${term})`, 'gi');
+                processed = processed.replace(regex, `<strong style="color:${primaryColor};font-weight:700;">$1</strong>`);
+            });
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
             return <span key={i} dangerouslySetInnerHTML={{ __html: processed }} />;
         });
     };
@@ -577,6 +676,7 @@ CRITICAL RULES:
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+<<<<<<< HEAD
                         {/* History button next to Generate */}
                         <button
                             onClick={() => setShowHistory(s => !s)}
@@ -594,6 +694,8 @@ CRITICAL RULES:
                             {showHistory ? 'Hide History' : 'History'}
                         </button>
 
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
                         <button
                             onClick={generatePYQs}
                             disabled={isGenerating}
@@ -603,7 +705,10 @@ CRITICAL RULES:
                             {isGenerating ? <FaSync className="animate-spin" /> : <FaBrain />}
                             {isGenerating ? 'Generating...' : 'Generate PYQs'}
                         </button>
+<<<<<<< HEAD
 
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
                         <button onClick={onClose} className={`p-3 ${buttonBg} rounded-2xl ${textColor} transition-all`}>
                             <FaTimes size={18} />
                         </button>
@@ -629,6 +734,7 @@ CRITICAL RULES:
                         </motion.div>
                     )}
 
+<<<<<<< HEAD
                     {/* History panel */}
                     {showHistory && (
                         <div className="p-6 rounded-3xl border backdrop-blur-xl" style={{ borderColor: primaryColor + '30', backgroundColor: primaryColor + '10' }}>
@@ -735,6 +841,8 @@ CRITICAL RULES:
                         </div>
                     )}
 
+=======
+>>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
                     {isGenerating ? (
                         <div className="flex items-center justify-center py-24">
                             <div className="w-16 h-16 border-4 rounded-full animate-spin mr-4" style={{ borderColor: primaryColor + '30', borderTopColor: primaryColor }} />
