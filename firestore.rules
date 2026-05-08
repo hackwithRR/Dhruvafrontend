@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isWhitelistedAdmin() {
+      return isSignedIn() &&
+        request.auth.token.phone_number != null &&
+        request.auth.token.phone_number in ['+919148860082'];
+    }
+
+    // All user-owned documents + subcollections
+    match /users/{userId} {
+      allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+
+      // ✅ AI PYQ history / caches (client reads these)
+      match /pyqAiByChapter/{docId} {
+        allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+      }
+
+      match /pyqAiCacheFlat/{docId} {
+        allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+      }
+
+      // legacy nested cache
+      match /pyqAiCache/{board}/{classLevel}/{subject}/{chapter}/cache {
+        allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+      }
+
+      // ✅ AI PYQ generation sessions (chapter-level subcollection)
+      match /pyqAiByChapter/{docId}/sessions/{sessionId} {
+        allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+      }
+
+      // legacy root sessions (kept for any existing data)
+      match /sessions/{sessionId} {
+        allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+      }
+
+    }
+
+    match /messages/{messageId} {
+      allow read, write: if isSignedIn() && (
+        (resource == null || resource.data.userId == request.auth.uid) ||
+        (request.resource.data.userId == request.auth.uid)
+      );
+    }
+
+    match /adminUsers/{userId} {
+      allow read, write: if isWhitelistedAdmin();
+    }
+
+    match /adminSessions/{sessionId} {
+      allow read, write: if isWhitelistedAdmin();
+    }
+
+    match /adminConfig/{doc} {
+      allow read, write: if isWhitelistedAdmin();
+    }
+
+    match /issues/{issueId} {
+      allow read, write: if isWhitelistedAdmin();
+    }
+  }
+}
+
