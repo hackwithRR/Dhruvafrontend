@@ -1,6 +1,9 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    // ================= Global Helper Functions =================
     function isSignedIn() {
       return request.auth != null;
     }
@@ -15,45 +18,61 @@ service cloud.firestore {
         request.auth.token.phone_number in ['+919148860082'];
     }
 
-<<<<<<< HEAD
-    // All user-owned documents + subcollections
-    match /users/{userId} {
-      allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+    // Helper to check if a specific user ID is marked as banned in their profile
+    function userIsBanned(userId) {
+      let userDoc = gymGet(/databases/$(database)/documents/users/$(userId));
+      return userDoc != null && userDoc.data.isBanned == true;
+    }
 
-      // ✅ AI PYQ history / caches (client reads these)
+    function gymGet(path) {
+      return exists(path) ? get(path) : null;
+    }
+
+    // ================= Users & Subcollections =================
+    match /users/{userId} {
+      
+      // Admins can always read/write (including banning/unbanning).
+      allow read, write: if isWhitelistedAdmin();
+
+      // Read: Allow if owner AND they are not currently banned database-side
+      allow read: if isOwner(userId) && !userIsBanned(userId);
+      
+      // Write: Allow if owner AND they aren't banned, AND they aren't trying to ban/unban themselves
+      allow write: if isOwner(userId) 
+        && !userIsBanned(userId)
+        && (request.resource.data.diff(resource.data).affectedKeys().hasAny(['isBanned']) == false);
+
+
+      // AI PYQ history / caches
       match /pyqAiByChapter/{docId} {
-        allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+        allow read, write: if isWhitelistedAdmin();
+        allow read, write: if isOwner(userId) && !userIsBanned(userId);
       }
 
       match /pyqAiCacheFlat/{docId} {
-        allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+        allow read, write: if isWhitelistedAdmin();
+        allow read, write: if isOwner(userId) && !userIsBanned(userId);
       }
 
-      // legacy nested cache
       match /pyqAiCache/{board}/{classLevel}/{subject}/{chapter}/cache {
-        allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+        allow read, write: if isWhitelistedAdmin();
+        allow read, write: if isOwner(userId) && !userIsBanned(userId);
       }
 
-      // ✅ AI PYQ generation sessions (chapter-level subcollection)
+      // AI generation sessions
       match /pyqAiByChapter/{docId}/sessions/{sessionId} {
-        allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+        allow read, write: if isWhitelistedAdmin();
+        allow read, write: if isOwner(userId) && !userIsBanned(userId);
       }
 
-      // legacy root sessions (kept for any existing data)
+      // legacy root sessions
       match /sessions/{sessionId} {
-        allow read, write: if isOwner(userId) || isWhitelistedAdmin();
+        allow read, write: if isWhitelistedAdmin();
+        allow read, write: if isOwner(userId) && !userIsBanned(userId);
       }
-
-=======
-    match /users/{userId} {
-      allow read, write: if isOwner(userId) || isWhitelistedAdmin();
     }
 
-    match /users/{userId}/sessions/{sessionId} {
-      allow read, write: if isOwner(userId) || isWhitelistedAdmin();
->>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b
-    }
-
+    // ========= Messaging (generic) =========
     match /messages/{messageId} {
       allow read, write: if isSignedIn() && (
         (resource == null || resource.data.userId == request.auth.uid) ||
@@ -61,6 +80,7 @@ service cloud.firestore {
       );
     }
 
+    // ========= Admin =========
     match /adminUsers/{userId} {
       allow read, write: if isWhitelistedAdmin();
     }
@@ -73,12 +93,36 @@ service cloud.firestore {
       allow read, write: if isWhitelistedAdmin();
     }
 
+    // ========= Issues =========
     match /issues/{issueId} {
-      allow read, write: if isWhitelistedAdmin();
+      // Read: only the owner (createdBy) or admin
+      allow read: if isSignedIn() && (isWhitelistedAdmin() || resource.data.createdBy == request.auth.uid);
+
+      // Create: only when request is creating a document with createdBy == requester
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+
+      // Update/Delete: admin-only
+      allow update, delete: if isWhitelistedAdmin();
+    }
+
+    // Follow-up messages for an issue thread
+    // NOTE: Messages written by the app use { role: 'user'|'admin', text, createdAt, screenshotUrl }
+    // There is NO `userId` field written in IssueThreadWindow/TicketsSection.
+    // So permission is derived from parent issue ownership.
+    match /issues/{issueId}/messages/{messageId} {
+      allow read: if isSignedIn() && (
+        isWhitelistedAdmin() ||
+        get(/databases/$(database)/documents/issues/$(issueId)).data.createdBy == request.auth.uid
+      );
+
+      allow create: if isSignedIn() && (
+        // Admin can always write
+        isWhitelistedAdmin() ||
+        // Users can write only if they own the parent issue
+        get(/databases/$(database)/documents/issues/$(issueId)).data.createdBy == request.auth.uid
+      );
+
+      allow update, delete: if isWhitelistedAdmin();
     }
   }
 }
-<<<<<<< HEAD
-
-=======
->>>>>>> 2307b21a9e73fa8a172289a5ee60126d8ddf8c3b

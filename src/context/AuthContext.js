@@ -191,19 +191,16 @@ const [adminPhoneVerified, setAdminPhoneVerified] = useState(false);
                         const data = docSnap.data() || {};
 
                         // Normalize ban fields so `userData.isBanned` is reliable in the app routing.
-                        // Admin panel writes:
-                        // - data.isBanned
-                        // - data.ban.reason / data.ban.bannedAt / data.ban...
+                        // Observed ban document shape (admin):
+                        // - top-level `isBanned: boolean`
+                        // - sometimes `ban: null` (reason stored elsewhere) or `ban.reason`
                         const hasBanReason = Boolean(data?.ban?.reason);
                         const normalizedIsBanned = data?.isBanned === true || hasBanReason;
 
                         // Compute the effective banned value synchronously to avoid routing flashes.
-                        const lockedBanned = normalizedIsBanned;
-
-                        // Keep the original lock concept if you later re-add banLocked state.
                         setUserData({
                             ...data,
-                            isBanned: lockedBanned,
+                            isBanned: normalizedIsBanned,
                             ban: data?.ban ? data.ban : null,
                         });
                     } else {

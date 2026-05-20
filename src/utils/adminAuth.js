@@ -110,11 +110,10 @@ export const uploadSyllabusPDF = async (file, board, classLevel, subject, chapte
     const path = getSyllabusPDFPath(board, classLevel, subject, chapter);
     const storageRef = ref(storage, path);
 
-    // Upload file
     const snapshot = await uploadBytes(storageRef, file);
     const downloadURL = await getDownloadURL(snapshot.ref);
 
-console.log(`✅ PDF uploaded: ${path} → ${downloadURL}`);
+    console.log(`✅ PDF uploaded: ${path} → ${downloadURL}`);
     return downloadURL;
   } catch (error) {
     console.error('PDF upload failed:', error);

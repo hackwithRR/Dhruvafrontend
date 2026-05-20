@@ -2,12 +2,16 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { getAuth, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, linkWithCredential } from "firebase/auth";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Navbar from "../components/Navbar";
+import TicketsSection from "../components/TicketsSection";
 import { motion, AnimatePresence } from "framer-motion";
+import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
+import IssueThreadWindow from "../components/admin/IssueThreadWindow";
+import AdminButton from "../components/admin-ui/AdminButton";
 import {
     FaArrowLeft, FaSave, FaSyncAlt, FaShieldAlt,
     FaChevronDown, FaLanguage, FaEye, FaEyeSlash, FaUserCircle,
@@ -551,6 +555,34 @@ export default function Profile() {
                     </div>
 
                     <div className="space-y-12">
+
+                        {/* Ticket System */}
+                        <div className="rounded-[30px] p-6 border" style={{ borderColor: s.border, background: s.card }}>
+                            <div className="flex items-center justify-between gap-4 mb-4">
+                                <div>
+                                    <h2 className="text-xl font-black uppercase tracking-wide" style={{ color: s.text }}>
+                                        Issues / Help Tickets
+                                    </h2>
+                                    <p className="text-sm opacity-70" style={{ color: s.textSecondary }}>
+                                        Raise a new ticket or follow up on old complaints.
+                                    </p>
+                                </div>
+                                <AdminButton
+                                    themeColors={{
+                                        primary: s.primary,
+                                        text: s.text,
+                                        border: s.border,
+                                    }}
+                                    variant="primary"
+                                    onClick={() => {
+                                        const el = document.getElementById('user-tickets-composer');
+                                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }}
+                                >
+                                    Get Help
+                                </AdminButton>
+                            </div>
+                        </div>
                         {/* Name Input */}
                         <div className="relative group">
                             <span className={`absolute -top-2.5 left-6 px-2 py-0.5 text-[10px] font-black uppercase rounded-md z-20 border tracking-widest ${s.label}`}>Neural Alias</span>
@@ -745,6 +777,16 @@ export default function Profile() {
                             {loading ? <FaSyncAlt className="animate-spin" /> : <FaSave className="text-xl" />} Initialize_Sync
                         </motion.button>
                     </div>
+
+                    {/* Tickets / Help Tickets (wired) */}
+                    <TicketsSection
+                        id="user-tickets-composer"
+                        themeColors={s}
+                        currentUser={currentUser}
+                        IssueThreadWindow={IssueThreadWindow}
+                        db={db}
+                        serverTimestamp={serverTimestamp}
+                    />
 
                     {/* Security */}
                     <div className="mt-32 pt-16 border-t" style={{ borderColor: s.border }}>

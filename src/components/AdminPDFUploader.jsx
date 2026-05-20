@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ref, uploadBytes, getDownloadURL, listAll } from 'firebase/storage';
+import { ref, uploadBytesResumable, getDownloadURL, listAll } from 'firebase/storage';
 import { storage } from '../firebase';
 import { FaUpload, FaFilePdf, FaFolderOpen, FaSpinner, FaCheckCircle } from 'react-icons/fa';
 import ClickSpark from './ClickSpark';
@@ -40,12 +40,27 @@ const AdminPDFUploader = ({ themeColors }) => {
         : `syllabus/${board}/${classLevel}/${subject}/${safeChapter}.pdf`;
       
       const storageRef = ref(storage, path);
-      const snapshot = await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(snapshot.ref);
-      
-      setUploadUrl(url);
-      await listUploadedFiles();
-      
+
+      const maxAttempts = 3;
+      let lastError;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const snapshot = await uploadBytesResumable(storageRef, file);
+          const url = await getDownloadURL(snapshot.ref);
+          setUploadUrl(url);
+          return url;
+        } catch (e) {
+          lastError = e;
+          const code = e?.code;
+          const isRetryable = code === 'storage/retry-limit-exceeded' || code === 'storage/unknown' || code === 'storage/server-not-found';
+          if (!isRetryable || attempt === maxAttempts) throw e;
+          // exponential backoff: 500ms, 1s, 2s
+          await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt - 1)));
+        }
+      }
+
+      throw lastError;
+    
       // Success feedback
       setStatus('success');
       setTimeout(() => setStatus(''), 3000);
@@ -92,6 +107,7 @@ const AdminPDFUploader = ({ themeColors }) => {
           <FaUpload />
           {pyqMode ? 'PYQ Upload' : 'Syllabus PDF Upload'}
         </h2>
+
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           <div>
