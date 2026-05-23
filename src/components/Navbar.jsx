@@ -1,11 +1,14 @@
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FaPalette, FaSignOutAlt, FaBolt, FaCheckCircle, FaChartLine } from "react-icons/fa";
-import { auth, db } from "../firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { auth } from "../firebase";
+
+import { doc, updateDoc, getDocs, query, collection, where } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import RippleEffect from "./RippleEffect";
 import ClickSpark from "./ClickSpark";
+import { db } from "../firebase";
+import { subscribeUserUnreadCount, markSeen, toUnreadBadgeText } from "../utils/ticketNotifications";
 
 // 1. Background & Animation Logic (Tailwind)
 const themes = {
@@ -232,6 +235,46 @@ export default function Navbar({ userData }) {
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
+    // User unread indicator (admin replies in your tickets)
+    useEffect(() => {
+      const dot = document.getElementById('user-unread-followup-dot');
+      if (!dot) return;
+      if (!auth.currentUser?.uid) return;
+
+      const uid = auth.currentUser.uid;
+      let cancelled = false;
+
+      const setDot = (unreadCount) => {
+        if (cancelled) return;
+        if (unreadCount > 0) dot.classList.remove('hidden');
+        else dot.classList.add('hidden');
+      };
+
+      const unsub = subscribeUserUnreadCount({
+        db,
+        uid,
+        getUserIssueIds: async () => {
+          const snap = await getDocs(
+            query(
+              collection(db, 'issues'),
+              where('createdBy', '==', uid)
+            )
+          );
+          return snap.docs.map((d) => d.id);
+        },
+        onChange: (count) => setDot(count),
+        onError: () => {},
+      });
+
+      return () => {
+        cancelled = true;
+        unsub?.();
+      };
+    }, []);
+
+
+
+
     return (
         <nav
             className="sticky top-0 z-[1000] w-full border-b transition-all duration-500 shadow-2xl overflow-visible"
@@ -333,8 +376,16 @@ export default function Navbar({ userData }) {
                                 className="absolute w-12 h-12 rounded-full border-2 border-dashed opacity-50"
                                 style={{ borderColor: activeTheme.primary }}
                             />
+
+                            {/* Unread follow-ups dot (set by ticketNotifications listener) */}
+                            <div
+                              id="user-unread-followup-dot"
+                              className="hidden absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-black/60 shadow-[0_0_20px_rgba(239,68,68,0.6)]"
+                            />
+
                             <img src={photoURL} className="relative w-10 h-10 rounded-full object-cover border-2 z-10" style={{ borderColor: activeTheme.border }} alt="Avatar" />
                         </div>
+
                         <div className="hidden sm:flex flex-col">
                             <motion.span variants={{ hover: { x: 5, letterSpacing: "0.05em", color: activeTheme.primary } }} className="font-black text-sm tracking-tight transition-all" style={{ color: activeTheme.text }}>
                                 {displayName}

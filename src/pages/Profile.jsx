@@ -779,14 +779,33 @@ export default function Profile() {
                     </div>
 
                     {/* Tickets / Help Tickets (wired) */}
-                    <TicketsSection
-                        id="user-tickets-composer"
-                        themeColors={s}
-                        currentUser={currentUser}
-                        IssueThreadWindow={IssueThreadWindow}
-                        db={db}
-                        serverTimestamp={serverTimestamp}
-                    />
+                    <div className="mt-8" style={{ color: s.text }}>
+                        <div className="flex items-center justify-between gap-4 mb-3">
+                            <h2 className="text-xl font-black uppercase tracking-wide" style={{ color: s.text }}>
+                                Issues / Help Tickets
+                            </h2>
+                            <button type="button" onClick={() => navigate("/complaint")}
+                                href={`mailto:padhoyaarcare@gmail.com?subject=${encodeURIComponent('Complaint / Support Request')}&body=${encodeURIComponent(`Hello Team,\n\nI would like to raise the following complaint/support request:\n\n[Write your complaint here]\n\n---\nFooter details:\nUser ID: ${currentUser?.uid || ''}\nName: ${userData?.name || userData?.displayName || currentUser?.displayName || ''}\nRegistered Email: ${currentUser?.email || ''}\n`)}
+                                `}
+                                className="px-4 py-2 rounded-xl border font-black text-sm uppercase tracking-widest"
+                                style={{
+                                    borderColor: s.border,
+                                    background: s.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                                }}
+                            >
+                                Write Mail
+                            </button>
+                        </div>
+
+                        <TicketsSection
+                            id="user-tickets-composer"
+                            themeColors={s}
+                            currentUser={currentUser}
+                            IssueThreadWindow={IssueThreadWindow}
+                            db={db}
+                            serverTimestamp={serverTimestamp}
+                        />
+                    </div>
 
                     {/* Security */}
                     <div className="mt-32 pt-16 border-t" style={{ borderColor: s.border }}>

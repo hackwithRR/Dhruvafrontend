@@ -62,9 +62,19 @@ const RippleEffect = ({
           const ringProgress = (progress + i / ringCount) % 1;
           const ringOpacity = (1 - ringProgress) * 0.8;
           const ringRadius = ripple.radius * (0.8 + i * 0.15);
+          const safeRadius = Math.max(0, ringRadius);
 
-          ctx.beginPath();
-          ctx.arc(ripple.x + canvas.width / 2, ripple.y + canvas.height / 2, ringRadius, 0, Math.PI * 2);
+          if (safeRadius > 0) {
+            ctx.beginPath();
+            ctx.arc(
+              ripple.x + canvas.width / 2,
+              ripple.y + canvas.height / 2,
+              safeRadius,
+              0,
+              Math.PI * 2
+            );
+          }
+
           ctx.strokeStyle = ripple.color.replace(/[\d.]+$/, `, ${ringOpacity})`);
           ctx.lineWidth = 2 * intensity;
           ctx.stroke();

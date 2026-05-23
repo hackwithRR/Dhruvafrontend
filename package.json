@@ -11,6 +11,7 @@
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "katex": "^0.16.10",
+    "lucide-react": "^1.16.0",
     "mermaid": "^11.12.3",
     "pdf-lib": "^1.17.1",
     "react": "^18.3.1",
@@ -54,6 +55,10 @@
     ]
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "ajv": "^6.12.6",
     "ajv-keywords": "^3.5.2",
     "autoprefixer": "^10.4.19",

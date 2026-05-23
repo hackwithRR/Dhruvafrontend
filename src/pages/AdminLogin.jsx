@@ -1,322 +1,827 @@
-import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FaPhone, FaSms, FaCheckCircle, FaArrowRight } from 'react-icons/fa';
-import Navbar from '../components/Navbar';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  ArrowRight,
+  Check,
+  CircleAlert,
+  Command,
+  EyeOff,
+  Lock,
+  Phone,
+  Shield,
+
+  Sparkles,
+  MessageCircle,
+} from 'lucide-react';
 import { useAdminAuth } from '../context/AdminContext';
-import { sendAdminOTP, verifyAdminOTP, isAdminPhone } from '../utils/adminOTP';
+import { useAuth } from '../context/AuthContext';
 import { auth } from '../firebase';
 import { RecaptchaVerifier } from 'firebase/auth';
+import { isAdminPhone, sendAdminOTP, verifyAdminOTP } from '../utils/adminOTP';
 
-const AdminLogin = () => {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState('phone'); // 'phone' | 'otp' | 'success'
-  const [loading, setLoading] = useState(false);
-  const [recaptchaVerifier, setRecaptchaVerifier] = useState(null);
-  const [errorMsg, setErrorMsg] = useState('');
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const m = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!m) return;
+    const onChange = () => setReduced(!!m.matches);
+    onChange();
+    m.addEventListener?.('change', onChange);
+    return () => m.removeEventListener?.('change', onChange);
+  }, []);
+  return reduced;
+}
+
+function FloatingInput({
+  id,
+  label,
+  type = 'text',
+  value,
+  onChange,
+  placeholder,
+  autoComplete,
+  inputMode,
+  maxLength,
+  error,
+  rightSlot,
+  disabled,
+  onEnter,
+}) {
+  const [focused, setFocused] = useState(false);
+  const hasValue = String(value ?? '').length > 0;
+
+  return (
+    <div className="relative">
+      <motion.div
+        animate={error ? { x: [0, -6, 6, -3, 3, 0] } : { x: 0 }}
+        transition={{ duration: 0.45 }}
+        className="relative"
+      >
+        <div
+          className={
+            'rounded-3xl border bg-white/5 px-4 ' +
+            (error ? 'border-red-500/60 ring-1 ring-red-500/20' : 'border-white/15 ring-0') +
+            ' transition-all focus-within:border-white/25 focus-within:ring-1 focus-within:ring-white/10'
+          }
+        >
+          <div className="relative">
+            <input
+              id={id}
+              type={type}
+              value={value}
+              onChange={onChange}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder={placeholder || ' '}
+              autoComplete={autoComplete}
+              inputMode={inputMode}
+              maxLength={maxLength}
+              disabled={disabled}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && onEnter) onEnter();
+              }}
+              className={
+                'w-full bg-transparent pt-5 pb-3 text-white placeholder-transparent outline-none ' +
+                'text-[15px] md:text-[16px] font-semibold'
+              }
+            />
+            <label
+              htmlFor={id}
+              className={
+                'pointer-events-none absolute left-0 top-0 ml-4 transition-all ' +
+                (focused || hasValue
+                  ? 'text-white/70 text-[11px] -translate-y-1.5'
+                  : 'text-white/35 text-[13px] translate-y-3')
+              }
+            >
+              {label}
+            </label>
+          </div>
+          {rightSlot ? <div className="absolute right-3 top-1/2 -translate-y-1/2">{rightSlot}</div> : null}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function RememberToggle({ checked, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={
+        'w-full flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 ' +
+        'border-white/10 bg-white/5 hover:bg-white/10 transition-all'
+      }
+      aria-pressed={checked}
+    >
+      <div className="flex items-center gap-3">
+        <div
+          className={
+            'w-10 h-6 rounded-full border transition-all relative ' +
+            (checked ? 'border-emerald-400/40 bg-emerald-400/20' : 'border-white/15 bg-white/5')
+          }
+        >
+          <motion.div
+            layout
+            className={
+              'absolute top-1 left-1 w-4 h-4 rounded-full bg-white/80 shadow-sm'
+            }
+            style={{
+              transform: checked ? 'translateX(14px)' : 'translateX(0px)',
+            }}
+            transition={{ type: 'spring', stiffness: 520, damping: 35 }}
+          />
+        </div>
+        <div className="text-sm font-bold text-white/80">Remember Me</div>
+      </div>
+      <div className="text-xs font-black text-white/50">Local session</div>
+    </button>
+  );
+}
+
+export default function AdminLogin() {
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const navigate = useNavigate();
 
   const { isAdminAuthenticated, setIsAdminAuthenticated, setAdminPhone } = useAdminAuth();
-  const { userData, theme: activeTheme } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { theme: activeTheme } = useAuth();
+
+  const themeColors = useMemo(() => {
+    const map = {
+      DeepSpace: { primary: '#4f46e5', hex: '#050505', text: '#fff', isDark: true },
+      Light: { primary: '#4f46e5', hex: '#0b0b12', text: '#fff', isDark: true },
+      Cyberpunk: { primary: '#06b6d4', hex: '#04040a', text: '#fff', isDark: true },
+      default: { primary: '#4f46e5', hex: '#050505', text: '#fff', isDark: true },
+    };
+    return map[activeTheme] || map.default;
+  }, [activeTheme]);
+
+  const [step, setStep] = useState('phone'); // phone | otp | success
+  const [loading, setLoading] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otp, setOtp] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [remember, setRemember] = useState(true);
+
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const recaptchaVerifierRef = useRef(null);
 
   const initRecaptcha = async (containerId) => {
     return new Promise((resolve, reject) => {
-      if (window.recaptchaVerifier) {
-        window.recaptchaVerifier.clear();
-      }
-      
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
-        size: 'invisible',
-        callback: () => {
-          console.log('reCAPTCHA verified');
-          resolve(window.recaptchaVerifier);
-        },
-        'expired-callback': () => reject(new Error('reCAPTCHA expired'))
-      });
-      
-      // Small delay to ensure ready
-      setTimeout(() => {
-        if (window.recaptchaVerifier?.render) {
-          resolve(window.recaptchaVerifier);
-        } else {
-          reject(new Error('reCAPTCHA failed to initialize'));
+      try {
+        if (window.recaptchaVerifier) {
+          window.recaptchaVerifier.clear();
         }
-      }, 500);
+
+        window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+          size: 'invisible',
+          callback: () => resolve(window.recaptchaVerifier),
+          'expired-callback': () => reject(new Error('reCAPTCHA expired')),
+        });
+
+        setTimeout(() => {
+          if (window.recaptchaVerifier?.render) {
+            resolve(window.recaptchaVerifier);
+          } else {
+            reject(new Error('reCAPTCHA failed to initialize'));
+          }
+        }, 400);
+      } catch (e) {
+        reject(e);
+      }
     });
   };
 
-  const handlePhoneSubmit = async (e) => {
+  useEffect(() => {
+    if (!isAdminAuthenticated) return;
+    navigate('/admin');
+  }, [isAdminAuthenticated, navigate]);
+
+  const submitPhone = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setErrorMsg('');
     setLoading(true);
 
     try {
-      // Pre-validate whitelist
-      const isValidPhone = await isAdminPhone(phoneNumber);
-      if (!isValidPhone) {
+      const normalized = phoneNumber.replace(/\D/g, '');
+      const pretty = phoneNumber.trim();
+
+      if (!(await isAdminPhone(pretty || normalized))) {
         setErrorMsg('❌ Phone not authorized. Contact super admin.');
         return;
       }
 
-      // Initialize reCAPTCHA properly
       const verifier = await initRecaptcha('recaptcha-container');
-      setRecaptchaVerifier(verifier);
-      
-      const result = await sendAdminOTP(phoneNumber, verifier);
-      
-      if (result.success) {
+      recaptchaVerifierRef.current = verifier;
+
+      const result = await sendAdminOTP(pretty || normalized, verifier);
+      if (result?.success) {
         setStep('otp');
       } else {
-        setErrorMsg(result.error || 'Failed to send OTP');
+        setErrorMsg(result?.error || 'Failed to send OTP');
       }
     } catch (err) {
-      console.error('Phone submit error:', err);
-      setErrorMsg(err.message || 'Failed to send OTP. Try again.');
+      setErrorMsg(err?.message || 'Failed to send OTP. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleOtpSubmit = async (e) => {
+  const submitOtp = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setErrorMsg('');
     setLoading(true);
 
     try {
       const result = await verifyAdminOTP(otp);
-      if (result.success) {
+      if (result?.success) {
         setIsAdminAuthenticated(true);
         setAdminPhone(phoneNumber);
         setStep('success');
-        setTimeout(() => navigate('/admin'), 2000);
+        setTimeout(() => navigate('/admin'), 1100);
+      } else {
+        setErrorMsg('Invalid OTP. Try again.');
       }
     } catch (err) {
-      console.error('OTP submit error:', err);
-      setErrorMsg(err.message || 'Invalid OTP. Try again.');
+      setErrorMsg(err?.message || 'Invalid OTP. Try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // Auto-redirect if already admin authenticated
-  if (isAdminAuthenticated) {
-    navigate('/admin');
-    return null;
-  }
+  const showShake = !!errorMsg && (prefersReducedMotion ? false : true);
 
-  const themeColors = {
-    primary: activeTheme?.primaryHex || '#4f46e5',
-    text: activeTheme?.isDark ? '#ffffff' : '#000000',
-    textSecondary: activeTheme?.isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
-    bgCard: activeTheme?.isDark ? 'rgba(10,10,15,0.95)' : 'rgba(255,255,255,0.95)',
-    border: activeTheme?.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)'
+  const buttonContent = (primaryLabel, spinnerLabel) => {
+    if (!loading) return primaryLabel;
+    return (
+      <span className="inline-flex items-center gap-2">
+        <motion.span
+          className="w-4 h-4 border-2 border-white/30 border-t-white/90 rounded-full"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+        />
+        {spinnerLabel}
+      </span>
+    );
   };
 
+  const primaryBg = `linear-gradient(135deg, ${themeColors.primary}, rgba(168,85,247,0.9))`;
+
+  if (isAdminAuthenticated) return null;
+
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: activeTheme?.hex || '#050505' }}>
-      <Navbar userData={userData} />
-      
-      <div className="flex-1 flex items-center justify-center p-4 md:p-8">
-        <AnimatePresence>
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            className="w-full max-w-md relative"
-          >
-            {/* Error Display */}
-            {errorMsg && (
-              <motion.div 
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-2xl backdrop-blur-sm"
+    <div className="min-h-screen relative overflow-hidden">
+      <div
+        className="absolute inset-0 -z-10"
+        style={{
+          background: `radial-gradient(circle at 20% 10%, ${themeColors.primary}40, transparent 55%), radial-gradient(circle at 80% 30%, rgba(168,85,247,0.35), transparent 55%), linear-gradient(180deg, #05050a, ${themeColors.hex})`,
+        }}
+      />
+
+      {/* subtle animated grid */}
+      <motion.div
+        aria-hidden
+        className="absolute inset-0 -z-10 opacity-30"
+        style={{ backgroundSize: '44px 44px' }}
+        animate={
+          prefersReducedMotion
+            ? undefined
+            : { backgroundPosition: ['0px 0px', '60px 30px', '0px 0px'] }
+        }
+        transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <div className="absolute inset-0 -z-10 opacity-50" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px)', backgroundSize: '56px 56px' }} />
+
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-4 md:p-8">
+        <div className="w-full max-w-5xl">
+          <div className="hidden md:grid md:grid-cols-5 gap-6 items-stretch">
+            <div className="md:col-span-2 rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 relative overflow-hidden">
+              <div className="absolute -top-24 -left-24 w-64 h-64 rounded-full blur-3xl opacity-70" style={{ background: `radial-gradient(circle at 30% 30%, ${themeColors.primary}55, transparent 60%)` }} />
+              <div className="absolute -bottom-24 -right-24 w-64 h-64 rounded-full blur-3xl opacity-60" style={{ background: 'radial-gradient(circle at 70% 70%, rgba(168,85,247,0.45), transparent 65%)' }} />
+
+              <motion.div
+                initial={{ opacity: 0, y: 18, filter: 'blur(8px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
               >
-                <p className="text-red-300 font-medium text-sm">{errorMsg}</p>
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-black text-white/70">
+                  <Sparkles className="w-4 h-4" style={{ color: themeColors.primary }} />
+                  PREMIUM ADMIN ACCESS
+                </div>
+
+                <h2 className="mt-6 text-4xl font-black tracking-tight text-white">
+                  Secure by design.
+                </h2>
+                <p className="mt-3 text-white/70 leading-relaxed">
+                  Phone-whitelisted authentication with OTP verification and hardened micro-interactions.
+                </p>
+
+                <div className="mt-8 space-y-3">
+                  {[
+                    { t: 'Glass UI + Motion', d: 'Crisp framer transitions' },
+                    { t: 'Accessibility First', d: 'Keyboard-friendly controls' },
+                    { t: 'Validation Feedback', d: 'Shake & check states' },
+                  ].map((x) => (
+                    <div key={x.t} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                      <div className="text-sm font-black text-white/90">{x.t}</div>
+                      <div className="text-xs text-white/60 mt-1">{x.d}</div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </div>
+
+            <div className="md:col-span-3">
+              {/* Mobile-first card */}
+              <div className="relative rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-[0_0_80px_rgba(79,70,229,0.18)] overflow-hidden">
+                <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(135deg, ${themeColors.primary}20, rgba(168,85,247,0.12))` }} />
+
+                <div className="relative p-7 md:p-10">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-14 h-14 rounded-2xl border border-white/10 bg-white/10 flex items-center justify-center">
+                        <Shield className="w-6 h-6" style={{ color: themeColors.primary }} />
+                      </div>
+                    </div>
+
+                    <motion.div
+                      initial={{ opacity: 0, y: 16, filter: 'blur(10px)' }}
+                      animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                      transition={{ duration: 0.65, ease: 'easeOut' }}
+                      className="mt-4"
+                    >
+                      <div className="text-xs font-black uppercase tracking-[0.35em] text-white/50">WELCOME BACK</div>
+                      <div className="mt-2 text-3xl md:text-4xl font-black tracking-tight">
+                        <span className="text-white">Admin</span>
+                        <span className="block text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/50">
+                          Portal
+                        </span>
+                      </div>
+                      <div className="mt-2 text-sm text-white/65">{step === 'phone' ? 'Enter your whitelisted phone.' : step === 'otp' ? 'Verify your OTP.' : 'Access granted.'}</div>
+                    </motion.div>
+                  </div>
+
+                  <div id="recaptcha-container" className="invisible h-0" />
+
+                  <AnimatePresence mode="wait">
+                    {step === 'phone' && (
+                      <motion.form
+                        key="phone"
+                        onSubmit={submitPhone}
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        className="mt-6 space-y-4"
+                      >
+                        <FloatingInput
+                          id="admin-phone"
+                          label="Phone"
+                          type="tel"
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          placeholder="+91 98765 43210"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          error={!!errorMsg}
+                          rightSlot={<Phone className="w-4 h-4" style={{ color: themeColors.primary }} />}
+                        />
+
+                        <RememberToggle checked={remember} onChange={setRemember} />
+
+                        {errorMsg && (
+                          <motion.div
+                            className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 flex items-start gap-2"
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={showShake ? { opacity: 1, y: 0 } : { opacity: 1 }}
+                            transition={{ duration: 0.25 }}
+                            role="alert"
+                          >
+                            <CircleAlert className="w-4 h-4 mt-0.5" style={{ color: '#f87171' }} />
+                            <div className="text-sm font-semibold text-red-100">{errorMsg}</div>
+                          </motion.div>
+                        )}
+
+                        <div className="flex items-center justify-between">
+                          <button type="button" onClick={() => setShowForgot(true)} className="text-sm font-bold text-white/70 hover:text-white transition">
+                            Forgot Password?
+                          </button>
+
+                          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-black text-white/55">
+                            <Command className="w-4 h-4" style={{ color: themeColors.primary }} />
+                            Secure OTP
+                          </div>
+                        </div>
+
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          type="submit"
+                          disabled={loading}
+                          className="w-full rounded-2xl py-4 font-black tracking-wide text-white flex items-center justify-center gap-2"
+                          style={{ background: primaryBg, boxShadow: `0 0 28px ${themeColors.primary}40` }}
+                          animate={errorMsg ? { boxShadow: `0 0 28px rgba(248,113,113,0.5)` } : undefined}
+                        >
+                          {buttonContent('Send OTP', 'Sending...')}
+                        </motion.button>
+                      </motion.form>
+                    )}
+
+                    {step === 'otp' && (
+                      <motion.form
+                        key="otp"
+                        onSubmit={submitOtp}
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        className="mt-6 space-y-4"
+                      >
+                        <FloatingInput
+                          id="admin-otp"
+                          label="OTP"
+                          type="text"
+                          value={otp}
+                          onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="123456"
+                          inputMode="numeric"
+                          maxLength={6}
+                          error={!!errorMsg}
+                          rightSlot={<MessageCircle className="w-4 h-4" style={{ color: themeColors.primary }} />}
+                          disabled={loading}
+                        />
+
+                        <div className="text-xs text-white/55 font-semibold">
+                          Sent to: <span className="text-white/80">{phoneNumber}</span>
+                        </div>
+
+                        {errorMsg && (
+                          <motion.div
+                            className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 flex items-start gap-2"
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={showShake ? { opacity: 1, y: 0 } : { opacity: 1 }}
+                            transition={{ duration: 0.25 }}
+                            role="alert"
+                          >
+                            <CircleAlert className="w-4 h-4 mt-0.5" style={{ color: '#f87171' }} />
+                            <div className="text-sm font-semibold text-red-100">{errorMsg}</div>
+                          </motion.div>
+                        )}
+
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          type="submit"
+                          disabled={loading || otp.length !== 6}
+                          className="w-full rounded-2xl py-4 font-black tracking-wide text-white flex items-center justify-center gap-2"
+                          style={{ background: primaryBg, boxShadow: `0 0 28px ${themeColors.primary}40` }}
+                        >
+                          {loading ? (
+                            <span className="inline-flex items-center gap-2">
+                              <motion.span
+                                className="w-4 h-4 border-2 border-white/30 border-t-white/90 rounded-full"
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                              />
+                              Verifying...
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-2">
+                              <ArrowRight className="w-4 h-4" />
+                              Enter Admin Panel
+                            </span>
+                          )}
+                        </motion.button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStep('phone');
+                            setOtp('');
+                            setErrorMsg('');
+                          }}
+                          className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white/70 hover:bg-white/10 transition"
+                        >
+                          Edit Phone
+                        </button>
+                      </motion.form>
+                    )}
+
+                    {step === 'success' && (
+                      <motion.div
+                        key="success"
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        className="mt-6 text-center space-y-4"
+                      >
+                        <motion.div
+                          className="mx-auto w-16 h-16 rounded-3xl border border-emerald-400/25 bg-emerald-400/10 flex items-center justify-center"
+                          animate={{ rotate: prefersReducedMotion ? 0 : 360 }}
+                          transition={{ duration: 1, ease: 'easeInOut' }}
+                        >
+                          <motion.div
+                            initial={{ scale: 0.6, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ duration: 0.35 }}
+                          >
+                            <Check className="w-7 h-7" style={{ color: '#34d399' }} />
+                          </motion.div>
+                        </motion.div>
+
+                        <div className="text-2xl font-black text-white">Access Granted</div>
+                        <div className="text-sm text-white/65">{phoneNumber} verified • Redirecting...</div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="mt-7 pt-6 border-t border-white/10 text-center">
+                    <div className="text-xs font-bold text-white/50">Dhruva Admin Portal • OTP Phone Auth</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile layout */}
+          <div className="md:hidden">
+            <div className="relative rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-[0_0_80px_rgba(79,70,229,0.18)] overflow-hidden">
+              <div className="absolute inset-0 pointer-events-none" style={{ background: `linear-gradient(135deg, ${themeColors.primary}20, rgba(168,85,247,0.12))` }} />
+              <div className="relative p-7">
+                <div className="text-center">
+                  <div className="w-14 h-14 mx-auto rounded-2xl border border-white/10 bg-white/10 flex items-center justify-center">
+                    <Shield className="w-6 h-6" style={{ color: themeColors.primary }} />
+                  </div>
+                  <motion.div
+                    initial={{ opacity: 0, y: 16, filter: 'blur(10px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    transition={{ duration: 0.65, ease: 'easeOut' }}
+                  >
+                    <div className="mt-4 text-xs font-black uppercase tracking-[0.35em] text-white/50">WELCOME BACK</div>
+                    <div className="mt-2 text-3xl font-black tracking-tight">
+                      <span className="text-white">Admin</span>
+                      <span className="block text-transparent bg-clip-text bg-gradient-to-r from-white via-white/80 to-white/50">Portal</span>
+                    </div>
+                    <div className="mt-2 text-sm text-white/65">{step === 'phone' ? 'Enter your whitelisted phone.' : step === 'otp' ? 'Verify your OTP.' : 'Access granted.'}</div>
+                  </motion.div>
+                </div>
+
+                <div id="recaptcha-container" className="invisible h-0" />
+
+                <AnimatePresence mode="wait">
+                  {step === 'phone' && (
+                    <motion.form
+                      key="phone-m"
+                      onSubmit={submitPhone}
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      className="mt-6 space-y-4"
+                    >
+                      <FloatingInput
+                        id="admin-phone-m"
+                        label="Phone"
+                        type="tel"
+                        value={phoneNumber}
+                        onChange={(e) => setPhoneNumber(e.target.value)}
+                        placeholder="+91 98765 43210"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        error={!!errorMsg}
+                        rightSlot={<Phone className="w-4 h-4" style={{ color: themeColors.primary }} />}
+                      />
+                      <RememberToggle checked={remember} onChange={setRemember} />
+
+                      {errorMsg && (
+                        <motion.div
+                          className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 flex items-start gap-2"
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={showShake ? { opacity: 1, y: 0 } : { opacity: 1 }}
+                          transition={{ duration: 0.25 }}
+                          role="alert"
+                        >
+                          <CircleAlert className="w-4 h-4 mt-0.5" style={{ color: '#f87171' }} />
+                          <div className="text-sm font-semibold text-red-100">{errorMsg}</div>
+                        </motion.div>
+                      )}
+
+                      <div className="flex items-center justify-between">
+                        <button type="button" onClick={() => setShowForgot(true)} className="text-sm font-bold text-white/70 hover:text-white transition">
+                          Forgot Password?
+                        </button>
+                      </div>
+
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="submit"
+                        disabled={loading}
+                        className="w-full rounded-2xl py-4 font-black tracking-wide text-white flex items-center justify-center gap-2"
+                        style={{ background: primaryBg, boxShadow: `0 0 28px ${themeColors.primary}40` }}
+                      >
+                        {buttonContent('Send OTP', 'Sending...')}
+                      </motion.button>
+                    </motion.form>
+                  )}
+
+                  {step === 'otp' && (
+                    <motion.form
+                      key="otp-m"
+                      onSubmit={submitOtp}
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      className="mt-6 space-y-4"
+                    >
+                      <FloatingInput
+                        id="admin-otp-m"
+                        label="OTP"
+                        type="text"
+                        value={otp}
+                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="123456"
+                        inputMode="numeric"
+                        maxLength={6}
+                        error={!!errorMsg}
+                        rightSlot={<MessageCircle className="w-4 h-4" style={{ color: themeColors.primary }} />}
+                        disabled={loading}
+                      />
+                      <div className="text-xs text-white/55 font-semibold">
+                        Sent to: <span className="text-white/80">{phoneNumber}</span>
+                      </div>
+
+                      {errorMsg && (
+                        <motion.div
+                          className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 flex items-start gap-2"
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={showShake ? { opacity: 1, y: 0 } : { opacity: 1 }}
+                          transition={{ duration: 0.25 }}
+                          role="alert"
+                        >
+                          <CircleAlert className="w-4 h-4 mt-0.5" style={{ color: '#f87171' }} />
+                          <div className="text-sm font-semibold text-red-100">{errorMsg}</div>
+                        </motion.div>
+                      )}
+
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        type="submit"
+                        disabled={loading || otp.length !== 6}
+                        className="w-full rounded-2xl py-4 font-black tracking-wide text-white flex items-center justify-center gap-2"
+                        style={{ background: primaryBg, boxShadow: `0 0 28px ${themeColors.primary}40` }}
+                      >
+                        {loading ? (
+                          <span className="inline-flex items-center gap-2">
+                            <motion.span
+                              className="w-4 h-4 border-2 border-white/30 border-t-white/90 rounded-full"
+                              animate={{ rotate: 360 }}
+                              transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                            />
+                            Verifying...
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-2">
+                            <ArrowRight className="w-4 h-4" />
+                            Enter Admin Panel
+                          </span>
+                        )}
+                      </motion.button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStep('phone');
+                          setOtp('');
+                          setErrorMsg('');
+                        }}
+                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white/70 hover:bg-white/10 transition"
+                      >
+                        Edit Phone
+                      </button>
+                    </motion.form>
+                  )}
+
+                  {step === 'success' && (
+                    <motion.div
+                      key="success-m"
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="mt-6 text-center space-y-4"
+                    >
+                      <motion.div
+                        className="mx-auto w-16 h-16 rounded-3xl border border-emerald-400/25 bg-emerald-400/10 flex items-center justify-center"
+                        animate={{ rotate: prefersReducedMotion ? 0 : 360 }}
+                        transition={{ duration: 1, ease: 'easeInOut' }}
+                      >
+                        <Check className="w-7 h-7" style={{ color: '#34d399' }} />
+                      </motion.div>
+                      <div className="text-2xl font-black text-white">Access Granted</div>
+                      <div className="text-sm text-white/65">{phoneNumber} verified • Redirecting...</div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <div className="mt-7 pt-6 border-t border-white/10 text-center">
+                  <div className="text-xs font-bold text-white/50">Dhruva Admin Portal • OTP Phone Auth</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Forgot modal */}
+          <AnimatePresence>
+            {showForgot && (
+              <motion.div
+                className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <motion.div
+                  initial={{ scale: 0.92, y: 10, opacity: 0 }}
+                  animate={{ scale: 1, y: 0, opacity: 1 }}
+                  exit={{ scale: 0.92, y: 10, opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="w-full max-w-md rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-[0_0_80px_rgba(79,70,229,0.2)] overflow-hidden"
+                >
+                  <div className="p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-xs font-black uppercase tracking-[0.35em] text-white/50">Forgot Password</div>
+                        <div className="mt-2 text-xl font-black text-white">Admin OTP Recovery</div>
+                        <div className="mt-2 text-sm text-white/65 leading-relaxed">
+                          Admin access is phone-whitelisted. Recovery requires super admin assistance.
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowForgot(false)}
+                        className="rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition px-3 py-2"
+                        aria-label="Close"
+                      >
+                        <XIcon />
+                      </button>
+                    </div>
+
+                    <div className="mt-5">
+                      <label className="text-xs font-bold text-white/60">Contact email (optional)</label>
+                      <input
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white placeholder:text-white/25 outline-none"
+                      />
+                    </div>
+
+                    <div className="mt-6 flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setShowForgot(false)}
+                        className="flex-1 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 transition px-4 py-3 text-sm font-black text-white/70"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (forgotLoading) return;
+                          setForgotLoading(true);
+                          await new Promise((r) => setTimeout(r, 650));
+                          setForgotLoading(false);
+                          setShowForgot(false);
+                          setErrorMsg('Recovery request noted. Contact super admin to resend OTP.');
+                          setStep('phone');
+                        }}
+                        className="flex-1 rounded-2xl px-4 py-3 text-sm font-black text-white transition"
+                        style={{ background: primaryBg, boxShadow: `0 0 28px ${themeColors.primary}40` }}
+                      >
+                        {forgotLoading ? 'Sending...' : 'Request Support'}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
               </motion.div>
             )}
-
-            {/* Floating Orbs */}
-            <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
-              <motion.div
-                animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.2, 0.1], x: [0, 20, 0] }}
-                transition={{ duration: 8, repeat: Infinity }}
-                className="absolute -top-1/4 -left-1/4 w-[60%] h-[60%] rounded-full"
-                style={{ background: `radial-gradient(circle at 30% 30%, ${themeColors.primary}40 0%, transparent 60%)`, filter: 'blur(80px)' }}
-              />
-              <motion.div
-                animate={{ scale: [1.1, 1, 1.1], opacity: [0.08, 0.15, 0.08], x: [0, -15, 0] }}
-                transition={{ duration: 10, repeat: Infinity, delay: 3 }}
-                className="absolute -bottom-1/4 -right-1/4 w-[50%] h-[50%] rounded-full"
-                style={{ background: `radial-gradient(circle at 70% 70%, ${themeColors.primary}30 0%, transparent 70%)`, filter: 'blur(60px)' }}
-              />
-            </div>
-
-            {/* Login Card */}
-            <div 
-              className="relative p-8 md:p-10 rounded-3xl backdrop-blur-xl shadow-2xl"
-              style={{
-                background: themeColors.bgCard,
-                border: `1px solid ${themeColors.border}`,
-                boxShadow: `0 0 60px ${themeColors.primary}20, 0 25px 60px -15px rgba(0,0,0,0.4)`
-              }}
-            >
-              {/* Header */}
-              <div className="text-center mb-8">
-                <motion.div 
-                  whileHover={{ scale: 1.05, rotate: 5 }}
-                  className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center"
-                  style={{
-                    background: `linear-gradient(135deg, ${themeColors.primary}, ${themeColors.primary}cc)`,
-                    boxShadow: `0 0 30px ${themeColors.primary}50`
-                  }}
-                >
-                  {step === 'phone' ? <FaPhone className="text-white text-xl" /> : <FaSms className="text-white text-xl" />}
-                </motion.div>
-                <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tight mb-2" style={{ color: themeColors.text }}>
-                  Admin Portal
-                </h1>
-                <p className="text-sm" style={{ color: themeColors.textSecondary }}>
-                  {step === 'phone' ? 'Enter whitelisted admin phone' : step === 'otp' ? 'Enter 6-digit OTP' : 'Access Granted!'}
-                </p>
-              </div>
-
-              <div id="recaptcha-container" className="invisible h-0" />
-
-              {step === 'phone' && (
-                <form onSubmit={handlePhoneSubmit} className="space-y-6">
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: themeColors.primary }}>
-                      <FaPhone size={16} />
-                    </div>
-                    <input
-                      type="tel"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="+91 98765 43210"
-                      className="w-full pl-12 pr-4 py-4 bg-white/5 border rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all font-mono"
-                      style={{
-                        borderColor: themeColors.border,
-                        color: themeColors.text,
-                        backgroundColor: 'rgba(255,255,255,0.05)'
-                      }}
-                      required
-                    />
-                  </div>
-                  <motion.button
-                    type="submit"
-                    disabled={loading || phoneNumber.length < 10}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full py-5 rounded-2xl font-black uppercase tracking-wider text-lg flex items-center justify-center gap-3 transition-all"
-                    style={{
-                      background: `linear-gradient(135deg, ${themeColors.primary}, ${themeColors.primary}dd)`,
-                      boxShadow: `0 8px 25px ${themeColors.primary}40`,
-                      color: 'white'
-                    }}
-                  >
-                    {loading ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Sending OTP...
-                      </>
-                    ) : (
-                      <>
-                        <FaSms size={16} />
-                        Send OTP Code
-                      </>
-                    )}
-                  </motion.button>
-                </form>
-              )}
-
-              {step === 'otp' && (
-                <form onSubmit={handleOtpSubmit} className="space-y-6">
-                  <div className="relative">
-                    <div className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: themeColors.primary }}>
-                      <FaSms size={16} />
-                    </div>
-                    <input
-                      type="text"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder="123456"
-                      maxLength={6}
-                      className="w-full pl-12 pr-4 py-4 bg-white/5 border rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-center text-2xl font-mono tracking-widest"
-                      style={{
-                        borderColor: themeColors.border,
-                        color: themeColors.text,
-                        backgroundColor: 'rgba(255,255,255,0.05)'
-                      }}
-                      required
-                    />
-                  </div>
-                  <motion.button
-                    type="submit"
-                    disabled={loading || otp.length !== 6}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="w-full py-5 rounded-2xl font-black uppercase tracking-wider text-lg flex items-center justify-center gap-3 transition-all"
-                    style={{
-                      background: `linear-gradient(135deg, ${themeColors.primary}, ${themeColors.primary}dd)`,
-                      boxShadow: `0 8px 25px ${themeColors.primary}40`,
-                      color: 'white'
-                    }}
-                  >
-                    {loading ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Verifying...
-                      </>
-                    ) : (
-                      <>
-                        <FaArrowRight size={16} />
-                        Enter Admin Panel
-                      </>
-                    )}
-                  </motion.button>
-                </form>
-              )}
-
-              {step === 'success' && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="text-center space-y-6 p-8"
-                >
-                  <motion.div 
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, ease: 'easeInOut' }}
-                    className="w-24 h-24 mx-auto text-green-400"
-                  >
-                    <FaCheckCircle className="w-full h-full animate-pulse" />
-                  </motion.div>
-                  <div>
-                    <h2 className="text-3xl font-black mb-2" style={{ color: themeColors.text }}>
-                      Admin Access Granted!
-                    </h2>
-                    <p className="text-lg opacity-80" style={{ color: themeColors.textSecondary }}>
-                      {phoneNumber} verified • Redirecting...
-                    </p>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Footer */}
-              <div className="mt-12 pt-8 border-t border-white/10 text-center">
-                <p className="text-xs opacity-75" style={{ color: themeColors.textSecondary }}>
-                  Dhruva Admin Portal v2.0 • Phone Auth Only
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        </AnimatePresence>
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );
-};
+}
 
-export default AdminLogin;
+function XIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M4 4L14 14" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" />
+      <path d="M14 4L4 14" stroke="rgba(255,255,255,0.7)" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+

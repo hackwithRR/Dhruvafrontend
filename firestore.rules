@@ -18,7 +18,7 @@ service cloud.firestore {
         request.auth.token.phone_number in ['+919148860082'];
     }
 
-    // Helper to check if a specific user ID is marked as banned in their profile
+
     function userIsBanned(userId) {
       let userDoc = gymGet(/databases/$(database)/documents/users/$(userId));
       return userDoc != null && userDoc.data.isBanned == true;
@@ -30,9 +30,13 @@ service cloud.firestore {
 
     // ================= Users & Subcollections =================
     match /users/{userId} {
-      
-      // Admins can always read/write (including banning/unbanning).
-      allow read, write: if isWhitelistedAdmin();
+
+      // Admins (phone-whitelisted) can read user profile documents for email→UID resolution.
+      allow read: if isWhitelistedAdmin();
+
+
+      // Admins can also write under their admin domain (kept restrictive).
+      allow write: if isWhitelistedAdmin();
 
       // Read: Allow if owner AND they are not currently banned database-side
       allow read: if isOwner(userId) && !userIsBanned(userId);
@@ -41,6 +45,7 @@ service cloud.firestore {
       allow write: if isOwner(userId) 
         && !userIsBanned(userId)
         && (request.resource.data.diff(resource.data).affectedKeys().hasAny(['isBanned']) == false);
+
 
 
       // AI PYQ history / caches
@@ -98,12 +103,27 @@ service cloud.firestore {
       // Read: only the owner (createdBy) or admin
       allow read: if isSignedIn() && (isWhitelistedAdmin() || resource.data.createdBy == request.auth.uid);
 
-      // Create: only when request is creating a document with createdBy == requester
-      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+      // Create:
+      // - Normal users can only create issues for themselves
+      // - Admins can create issues for any student (createdBy can be student uid)
+      allow create: if isSignedIn() && (
+        isWhitelistedAdmin() || request.resource.data.createdBy == request.auth.uid
+      );
 
-      // Update/Delete: admin-only
+
+      // Update/Delete:
+      // - Admin can update/delete any issue
+      // - Users can update only to reopen their own closed ticket (set status -> open)
       allow update, delete: if isWhitelistedAdmin();
+
+      // Allow ONLY setting status -> open for the owner.
+      // (Prevents updates to other fields from being blocked.)
+      allow update: if !isWhitelistedAdmin() && isSignedIn() &&
+        resource.data.createdBy == request.auth.uid &&
+        request.resource.data.status == 'open' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
     }
+
 
     // Follow-up messages for an issue thread
     // NOTE: Messages written by the app use { role: 'user'|'admin', text, createdAt, screenshotUrl }

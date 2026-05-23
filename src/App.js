@@ -16,6 +16,7 @@ import LiveMode from "./pages/LiveMode";
 import AdminLogin from "./pages/AdminLogin";
 import AdminPanel from "./pages/AdminPanel";
 import PYQPage from "./pages/PYQPage";
+import ComplaintMail from "./pages/ComplaintMail";
 import AdminProtectedRoute from "./components/AdminProtectedRoute";
 // Removed unused Admin imports
 
@@ -156,7 +157,19 @@ function AppContent() {
                 )
               } 
             />
-            
+
+            {/* COMPLAINT (mail template) */}
+            <Route
+              path="/complaint"
+              element={
+                currentUser ? (
+                  userData ? <ComplaintMail /> : <LoadingOverlay duration={1500} theme={theme} />
+                ) : (
+                  <Navigate to="/login" replace />
+                )
+              }
+            />
+
             {/* FALLBACK */}
             <Route path="*" element={<Navigate to={currentUser ? "/chat" : "/login"} replace />} />
           </Routes>

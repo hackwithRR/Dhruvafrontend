@@ -3,6 +3,8 @@ import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, doc, u
 import { toast } from 'react-toastify';
 
 import IssueThreadWindow from './admin/IssueThreadWindow';
+import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
+
 
 /**
  * User-side tickets:
@@ -67,15 +69,23 @@ const TicketsSection = ({
     setLoading(true);
     try {
       const createdAtTs = _serverTimestampProp || serverTimestamp();
+      // Create a user-friendly complaintId (used by Admin UI)
+      // Example: CMP-jJB3-MPB8PBYG
+      const complaintId = `CMP-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+
       await addDoc(collection(db, 'issues'), {
+        complaintId,
         title: title.trim(),
         description: description.trim(),
         screenshotUrl: screenshotUrl || null,
         status: 'open',
         createdBy: userId,
         createdByName: currentUser?.displayName || currentUser?.email || 'User',
-        // createdAt should be a Firestore Timestamp value, not a function.
         createdAt: typeof createdAtTs === 'function' ? createdAtTs() : createdAtTs,
+        // optional: keep a normalized history for thread UI
+        // Firestore cannot store serverTimestamp() inside arrays in some SDK/configs.
+        // Keep statusHistory optional for legacy UI; store it later if needed.
+        statusHistory: [],
       });
 
       // Visible feedback.
@@ -92,6 +102,7 @@ const TicketsSection = ({
   };
 
   const theme = themeColors || {};
+  const [openIssueId, setOpenIssueId] = useState(null);
 
   return (
     <div id={id} className="mt-6">
@@ -183,53 +194,77 @@ const TicketsSection = ({
                 No tickets yet.
               </div>
             ) : (
-              issues.map((issue) => (
-                <div key={issue.id} className="p-4 rounded-2xl border" style={{ borderColor: 'rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-bold" style={{ color: theme.text || '#fff' }}>
-                        {issue.title}
-                      </div>
-                      {issue.description ? (
-                        <div className="text-sm opacity-80" style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)', marginTop: 6, lineHeight: 1.35 }}>
-                          {issue.description}
-                        </div>
-                      ) : null}
-                      {issue.screenshotUrl ? (
-                        <a
-                          href={issue.screenshotUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-block mt-3 px-3 py-2 rounded-xl border"
-                          style={{ borderColor: 'rgba(255,255,255,0.10)', color: theme.textSecondary || 'rgba(255,255,255,0.7)' }}
-                        >
-                          View Screenshot
-                        </a>
-                      ) : null}
-                    </div>
+              issues.map((issue) => {
+                const isOpen = openIssueId === issue.id;
 
-                    <div className="text-xs font-bold rounded-full px-3 py-1 whitespace-nowrap" 
-                      style={{
-                        background: issue.status === 'open' ? 'rgba(52,211,153,0.16)' : 'rgba(251,146,60,0.18)',
-                        color: issue.status === 'open' ? '#34d399' : '#fb923c',
-                        border: `1px solid ${issue.status === 'open' ? 'rgba(52,211,153,0.35)' : 'rgba(251,146,60,0.35)'}`,
-                      }}
+                return (
+                  <div key={issue.id} className="p-4 rounded-2xl border" style={{ borderColor: 'rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.03)' }}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenIssueId((prev) => (prev === issue.id ? null : issue.id))}
+                      className="w-full text-left"
+                      style={{ color: theme.text || '#fff' }}
+                      aria-expanded={isOpen}
                     >
-                      {issue.status?.toUpperCase()}
-                    </div>
-                  </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-bold" style={{ color: theme.text || '#fff' }}>
+                            {issue.title}
+                          </div>
 
-                  <IssueThreadWindowToUseWrapper
-                    key={issue.id + '-thread'}
-                    issueId={issue.id}
-                    mode="user"
-                    themeColors={theme}
-                    // always show composer to ensure follow-ups are visible
-                    isOpen
-                  />
-                </div>
-              ))
+                          {/* Collapsed/expanded behavior for status + ticket details */}
+                          {isOpen && issue.description ? (
+                            <div className="text-sm opacity-80" style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)', marginTop: 6, lineHeight: 1.35 }}>
+                              {issue.description}
+                            </div>
+                          ) : null}
+
+                          {isOpen && issue.screenshotUrl ? (
+                            <a
+                              href={issue.screenshotUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-block mt-3 px-3 py-2 rounded-xl border"
+                              style={{ borderColor: 'rgba(255,255,255,0.10)', color: theme.textSecondary || 'rgba(255,255,255,0.7)' }}
+                            >
+                              View Screenshot
+                            </a>
+                          ) : null}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="text-xs font-bold rounded-full px-3 py-1 whitespace-nowrap"
+                            style={{
+                              background: issue.status === 'open' ? 'rgba(52,211,153,0.16)' : 'rgba(251,146,60,0.18)',
+                              color: issue.status === 'open' ? '#34d399' : '#fb923c',
+                              border: `1px solid ${issue.status === 'open' ? 'rgba(52,211,153,0.35)' : 'rgba(251,146,60,0.35)'}`,
+                            }}
+                          >
+                            {issue.status?.toUpperCase()}
+                          </div>
+
+                          <span className="opacity-70" aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center' }}>
+                            {isOpen ? <FaChevronUp /> : <FaChevronDown />}
+                          </span>
+                        </div>
+                      </div>
+                    </button>
+
+                    {isOpen ? (
+                      <IssueThreadWindowToUseWrapper
+                        key={issue.id + '-thread'}
+                        issueId={issue.id}
+                        mode="user"
+                        themeColors={theme}
+                        isOpen
+                      />
+                    ) : null}
+                  </div>
+                );
+              })
             )}
+
           </div>
         </div>
       </div>
