@@ -191,25 +191,59 @@ const [adminPhoneVerified, setAdminPhoneVerified] = useState(false);
                         const data = docSnap.data() || {};
 
                         // Normalize ban fields so `userData.isBanned` is reliable in the app routing.
-                        // Observed ban document shape (admin):
-                        // - top-level `isBanned: boolean`
-                        // - sometimes `ban: null` (reason stored elsewhere) or `ban.reason`
-                        const hasBanReason = Boolean(data?.ban?.reason);
-                        const normalizedIsBanned = data?.isBanned === true || hasBanReason;
+                        // Supported shapes (legacy + new):
+                        // - data.isBanned: boolean
+                        // - data.ban_reason / data.banned_at (preferred)
+                        // - data.ban.reason (legacy)
+                        const banReasonFromLegacy = data?.ban?.reason ?? null;
+                        const banReasonFromFields = data?.ban_reason ?? null;
+                        const effectiveBanReason = banReasonFromFields || banReasonFromLegacy;
+
+                        // Hardened ban normalization so routing/enforcement works even during partial migrations.
+                        // Supported ban signals:
+                        // - data.isBanned (boolean)
+                        // - data.ban_reason / data.banned_at (standardized)
+                        // - data.ban.reason / data.ban.at (legacy)
+                        const normalizedIsBanned =
+                            data?.isBanned === true ||
+                            data?.ban_reason != null ||
+                            data?.banned_at != null ||
+                            data?.ban?.reason != null ||
+                            data?.ban?.at != null ||
+                            Boolean(effectiveBanReason);
 
                         // Compute the effective banned value synchronously to avoid routing flashes.
                         setUserData({
                             ...data,
                             isBanned: normalizedIsBanned,
+                            // expose a single consistent reason field for UI pages
+                            banReason: effectiveBanReason,
+                            // keep existing `ban` object for backwards compatibility
                             ban: data?.ban ? data.ban : null,
                         });
+
                     } else {
                         console.log("👤 No user doc yet - will create on first action");
                     }
                     setLoading(false);
                 }, (err) => {
                     if (err.code === 'permission-denied') {
-                        console.warn("Firestore: Missing permissions for user doc. Update rules in Firebase Console (project ai-tutor-b89dd).");
+                        console.warn(
+                            "Firestore: Missing permissions for user doc (treating user as banned for UI routing).",
+                            err
+                        );
+
+                        // Important:
+                        // If Firestore rules block reads for banned users, AuthContext can't populate userData.
+                        // We still want /banned UI to render, so we mark the user as banned here.
+                        setUserData({
+                            uid: user.uid,
+                            email: user.email ?? null,
+                            name: user.displayName ?? 'Account',
+                            isBanned: true,
+                            banReason: 'Your account access has been restricted (permission denied).',
+                            ban: null,
+                        });
                     } else {
                         console.error("Firestore snapshot error:", err);
                     }

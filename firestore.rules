@@ -15,18 +15,22 @@ service cloud.firestore {
     function isWhitelistedAdmin() {
       return isSignedIn() &&
         request.auth.token.phone_number != null &&
-        request.auth.token.phone_number in ['+919148860082'];
+        request.auth.token.phone_number in ['+919148860082', '+919123456789'];
     }
 
 
     function userIsBanned(userId) {
-      let userDoc = gymGet(/databases/$(database)/documents/users/$(userId));
-      return userDoc != null && userDoc.data.isBanned == true;
+      // Treat a user as banned if ANY of the supported ban fields indicate suspension.
+      // This prevents bypass during partial migrations (legacy shapes vs new standardized schema).
+      let userDoc = get(/databases/$(database)/documents/users/$(userId));
+      return userDoc != null && (
+        userDoc.data.isBanned == true ||
+        userDoc.data.ban_reason != null ||
+        userDoc.data.banned_at != null ||
+        (userDoc.data.ban != null && userDoc.data.ban.reason != null)
+      );
     }
 
-    function gymGet(path) {
-      return exists(path) ? get(path) : null;
-    }
 
     // ================= Users & Subcollections =================
     match /users/{userId} {
@@ -38,13 +42,15 @@ service cloud.firestore {
       // Admins can also write under their admin domain (kept restrictive).
       allow write: if isWhitelistedAdmin();
 
-      // Read: Allow if owner AND they are not currently banned database-side
-      allow read: if isOwner(userId) && !userIsBanned(userId);
+      // Read: Allow owner to read their own document even if banned.
+      // Frontend needs this to detect ban state and redirect to /banned.
+      allow read: if isOwner(userId);
       
-      // Write: Allow if owner AND they aren't banned, AND they aren't trying to ban/unban themselves
+      // Write: Keep restrictive behavior for banned users.
       allow write: if isOwner(userId) 
         && !userIsBanned(userId)
         && (request.resource.data.diff(resource.data).affectedKeys().hasAny(['isBanned']) == false);
+
 
 
 
@@ -98,7 +104,54 @@ service cloud.firestore {
       allow read, write: if isWhitelistedAdmin();
     }
 
+    // ========= Unban Appeals =========
+    // Structure (better approach):
+    // - unbanAppeals/{appealId} holds main appeal doc
+    // - unbanAppeals/{appealId}/followUps/items holds follow-up docs
+    match /unbanAppeals/{appealId} {
+      allow read: if isWhitelistedAdmin();
+
+      // Users can read their own appeals (so they can see status if you implement later)
+      allow read: if isSignedIn() && resource != null && resource.data.createdBy == request.auth.uid;
+
+      allow create: if isSignedIn() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isWhitelistedAdmin();
+      allow delete: if isWhitelistedAdmin();
+
+      // Only admins can change status fields; users can submit creates only.
+    }
+
+    match /unbanAppeals/{appealId}/followUps/{docId} {
+      allow read: if isWhitelistedAdmin();
+      allow read: if isSignedIn() && (
+        get(/databases/$(database)/documents/unbanAppeals/$(appealId)).data.createdBy == request.auth.uid
+      );
+
+      allow create: if isWhitelistedAdmin() || (
+        isSignedIn() &&
+        get(/databases/$(database)/documents/unbanAppeals/$(appealId)).data.createdBy == request.auth.uid
+      );
+
+      allow update, delete: if isWhitelistedAdmin();
+    }
+
+    // followUps/items path (current client writes into /followUps/items collection)
+    match /unbanAppeals/{appealId}/followUps/items/{docId} {
+      allow read: if isWhitelistedAdmin();
+      allow read: if isSignedIn() && (
+        get(/databases/$(database)/documents/unbanAppeals/$(appealId)).data.createdBy == request.auth.uid
+      );
+
+      allow create: if isWhitelistedAdmin() || (
+        isSignedIn() &&
+        get(/databases/$(database)/documents/unbanAppeals/$(appealId)).data.createdBy == request.auth.uid
+      );
+
+      allow update, delete: if isWhitelistedAdmin();
+    }
+
     // ========= Issues =========
+
     match /issues/{issueId} {
       // Read: only the owner (createdBy) or admin
       allow read: if isSignedIn() && (isWhitelistedAdmin() || resource.data.createdBy == request.auth.uid);

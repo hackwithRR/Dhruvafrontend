@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import {
   Bell,
@@ -20,19 +20,369 @@ import {
   MoreVertical,
   Check,
   X,
+  Send,
+  Loader2,
 } from 'lucide-react';
 
 import ReactDOM from 'react-dom';
 
 import IssueThreadWindow from '../admin/IssueThreadWindow';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, where, orderBy, updateDoc, serverTimestamp, addDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
+import { useNavigate } from 'react-router-dom';
 
 import AdminCreateIssueSection from './AdminCreateIssueSection';
+import AdminMembersTable from '../admin/AdminMembersTable';
 
 
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
+
+function UnbanAppealsInbox({ themeColors, adminPhone }) {
+  const navigate = useNavigate();
+
+  const [appeals, setAppeals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [q, setQ] = useState('');
+  const [selectedAppeal, setSelectedAppeal] = useState(null);
+
+  useEffect(() => {
+    const qRef = query(
+      collection(db, 'unbanAppeals'),
+      where('status', '==', 'open')
+      // orderBy('createdAt', 'desc') removed to bypass index requirement; sorting handled in client below
+    );
+
+    const unsub = onSnapshot(
+      qRef,
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        // Client-side sort by date descending
+        list.sort((a, b) => {
+          const tA = a.createdAt?.seconds || 0;
+          const tB = b.createdAt?.seconds || 0;
+          return tB - tA;
+        });
+        setAppeals(list);
+        setLoading(false);
+      },
+      (e) => {
+        console.error('Failed to load unban appeals:', e);
+        setError(e);
+        setLoading(false);
+      }
+    );
+
+    return () => unsub?.();
+  }, []);
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return appeals;
+    return appeals.filter((a) => {
+      const id = String(a.appealId || '').toLowerCase();
+      const name = String(a.createdByName || '').toLowerCase();
+      const uid = String(a.createdBy || '').toLowerCase();
+      const reason = String(a.reason || '').toLowerCase();
+      return id.includes(s) || name.includes(s) || uid.includes(s) || reason.includes(s);
+    });
+  }, [appeals, q]);
+
+  const activeGlow = themeColors?.primary || themeColors?.primaryHex || '#4f46e5';
+
+  const handleAction = async (appeal, newStatus) => {
+    if (!appeal.id) return;
+    const confirmMsg = newStatus === 'approved' 
+      ? `Are you sure you want to APPROVE this appeal and UNBAN user ${appeal.createdByName || appeal.createdBy}?`
+      : `Are you sure you want to REJECT this appeal?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const appealRef = doc(db, 'unbanAppeals', appeal.id);
+      await updateDoc(appealRef, {
+        status: newStatus,
+        lastUpdatedAt: serverTimestamp(),
+      });
+
+      if (newStatus === 'approved' && appeal.createdBy) {
+        const userRef = doc(db, 'users', appeal.createdBy);
+        await updateDoc(userRef, {
+          isBanned: false,
+          ban: null,
+          ban_reason: null,
+          banned_at: null
+        });
+        toast.success('Appeal approved and user unbanned.');
+      } else {
+        toast.info(`Appeal marked as ${newStatus}.`);
+      }
+    } catch (err) {
+      console.error(`Failed to ${newStatus} appeal:`, err);
+      toast.error(`Action failed: ${err.message}`);
+    }
+  };
+
+  // Sub-component for Appeal Follow-ups
+  function AppealFollowUps({ appealId, adminPhone }) {
+    const [messages, setMessages] = useState([]);
+    const [adminText, setAdminText] = useState('');
+    const [sending, setSending] = useState(false);
+
+    useEffect(() => {
+      if (!appealId) return;
+      const q = query(
+        collection(db, 'unbanAppeals', appealId, 'followUps'),
+        orderBy('createdAt', 'asc')
+      );
+      return onSnapshot(q, (snap) => {
+        setMessages(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+    }, [appealId]);
+
+    const handleSend = async () => {
+      if (!adminText.trim()) return;
+      setSending(true);
+      try {
+        await addDoc(collection(db, 'unbanAppeals', appealId, 'followUps'), {
+          createdAt: serverTimestamp(),
+          createdBy: adminPhone || 'System',
+          createdByName: 'Admin',
+          role: 'admin',
+          followUp: adminText.trim(),
+        });
+        setAdminText('');
+        toast.success('Reply posted.');
+      } catch (e) {
+        console.error('Failed to send admin follow-up:', e);
+        toast.error('Failed to post reply.');
+      } finally {
+        setSending(false);
+      }
+    };
+
+    return (
+      <div className="space-y-4 mt-4">
+        <div className="max-h-[35vh] overflow-y-auto pr-2 space-y-3 no-scrollbar">
+          {messages.length === 0 ? (
+            <div className="text-xs text-white/40 italic p-2">No follow-up messages yet.</div>
+          ) : (
+            messages.map((m) => (
+              <div key={m.id} className={`rounded-2xl p-4 border ${m.role === 'admin' ? 'bg-cyan-500/10 border-cyan-500/20 ml-8' : 'bg-white/5 border-white/5 mr-8'}`}>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className={`text-[10px] font-black uppercase ${m.role === 'admin' ? 'text-cyan-400' : 'text-white/40'}`}>
+                    {m.createdByName || (m.role === 'admin' ? 'Admin' : 'User')}
+                  </div>
+                  <div className="text-[10px] text-white/30">{m.createdAt?.toDate().toLocaleString()}</div>
+                </div>
+                <div className="text-sm text-white/80 leading-relaxed">{m.followUp}</div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="relative group">
+            <textarea
+              value={adminText}
+              onChange={(e) => setAdminText(e.target.value)}
+              placeholder="Post a follow-up or reply..."
+              className="w-full rounded-2xl border border-white/10 bg-black/40 p-4 pr-14 text-sm text-white outline-none focus:border-cyan-500/40 transition-all"
+              rows={2}
+            />
+            <button
+              onClick={handleSend}
+              disabled={sending || !adminText.trim()}
+              className="absolute right-3 bottom-3 p-2 rounded-xl bg-cyan-600 text-white hover:bg-cyan-500 transition disabled:opacity-50"
+            >
+              {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {selectedAppeal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-2xl bg-[#0a0a0a] rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden"
+          >
+            <div className="p-8 max-h-[85vh] overflow-auto">
+              <div className="flex items-start justify-between gap-4 mb-6">
+                <div>
+                  <div className="text-xs font-black uppercase text-cyan-400/70 tracking-widest">Appeal Case</div>
+                  <h2 className="text-2xl font-black mt-1">{selectedAppeal.createdByName || 'Requester'}</h2>
+                </div>
+                <button onClick={() => setSelectedAppeal(null)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="rounded-3xl bg-white/5 p-6 border border-white/5 mb-8">
+                <div className="text-xs font-black uppercase text-white/30 mb-3 tracking-widest">Request Reason</div>
+                <p className="text-base text-white/90 leading-relaxed font-medium">"{selectedAppeal.reason}"</p>
+              </div>
+
+              <div className="mb-6">
+                <div className="text-xs font-black uppercase text-white/30 mb-4 tracking-widest">Case Activity / Follow-ups</div>
+                <AppealFollowUps appealId={selectedAppeal.id} adminPhone={adminPhone} />
+              </div>
+
+              <div className="flex items-center gap-3 pt-4 border-t border-white/5">
+                <button onClick={() => { handleAction(selectedAppeal, 'approved'); setSelectedAppeal(null); }} className="flex-1 py-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-black text-sm hover:bg-emerald-500/20 transition">Approve & Unban</button>
+                <button onClick={() => { handleAction(selectedAppeal, 'rejected'); setSelectedAppeal(null); }} className="flex-1 py-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 font-black text-sm hover:bg-red-500/20 transition">Reject Appeal</button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-xs font-bold text-white/55 uppercase">Appeal Inbox</div>
+          <div className="text-2xl font-black">Unban Requests</div>
+          <div className="text-xs text-white/60 mt-1">Live pending unban appeals (status: open)</div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/banned')}
+            className="rounded-2xl px-4 py-3 text-sm font-black border border-cyan-500/25 bg-cyan-500/10 hover:bg-cyan-500/15 transition text-cyan-200 inline-flex items-center gap-2"
+          >
+            View /banned
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ background: activeGlow }}
+            />
+          </button>
+
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search appeals..."
+              className="w-[260px] max-w-[45vw] rounded-2xl border border-white/10 bg-black/20 pl-11 pr-4 py-3 text-sm text-white outline-none focus:border-white/20"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-white/10 bg-white/5 overflow-hidden">
+        <div className="grid grid-cols-[1.2fr_0.5fr_1fr_1.3fr] gap-0 px-5 py-3 text-xs font-black text-white/60 border-b border-white/10">
+          <div>Appeal</div>
+          <div>Status</div>
+          <div>Requester</div>
+          <div className="text-right">Actions</div>
+        </div>
+
+        <div className="max-h-[560px] overflow-auto">
+          {loading ? (
+            <div className="p-10 text-center text-white/60 text-sm font-bold">Loading appeals...</div>
+          ) : error ? (
+            <div className="p-10 text-center text-red-200/80 text-sm font-bold">
+              <div className="text-red-400 mb-2">Failed to load appeals</div>
+              <div className="text-xs font-medium opacity-70">
+                {error.code === 'permission-denied' 
+                  ? 'Access Denied: Update Firestore Security Rules for "unbanAppeals" collection.' 
+                  : `Error: ${error.message}`}
+              </div>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="p-10 text-center text-white/60 text-sm font-bold">No open appeals</div>
+          ) : (
+            <div className="divide-y divide-white/10">
+              {filtered.map((a, idx) => {
+                const reasonPreview = String(a.reason || '').slice(0, 90);
+                const requester = a.createdByName || a.createdBy || 'Unknown';
+                return (
+                  <div
+                    key={a.id}
+                    className={
+                      'grid grid-cols-[1.2fr_0.5fr_1fr_1.3fr] items-center px-5 py-4 ' +
+                      (idx % 2 === 0 ? 'bg-black/10' : 'bg-black/0')
+                    }
+                  >
+                    <div className="min-w-0">
+                      <div className="font-black text-sm text-white/90 truncate">
+                        {a.appealId || a.type || 'UNBAN'}
+                      </div>
+                      {reasonPreview ? (
+                        <div className="text-xs text-white/55 mt-1 line-clamp-2">
+                          {reasonPreview}{String(a.reason || '').length > 90 ? '…' : ''}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-white/40 mt-1">No reason provided.</div>
+                      )}
+                    </div>
+
+                    <div>
+                      <span
+                        className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-black border"
+                        style={{
+                          background: 'rgba(56,189,248,0.10)',
+                          borderColor: 'rgba(56,189,248,0.25)',
+                          color: '#bae6fd',
+                        }}
+                      >
+                        {(a.status || 'open').toUpperCase()}
+                      </span>
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="text-xs text-white/70 font-semibold truncate">{requester}</div>
+                      {a.createdByEmailMasked ? (
+                        <div className="text-[11px] text-white/50 truncate mt-0.5">{a.createdByEmailMasked}</div>
+                      ) : null}
+                    </div>
+
+                    <div className="text-right flex items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedAppeal(a)}
+                        className="rounded-xl px-3 py-2 text-xs font-black border border-cyan-500/20 bg-cyan-500/10 hover:bg-cyan-500/20 transition text-cyan-200"
+                      >
+                        Details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAction(a, 'approved')}
+                        className="rounded-xl px-3 py-2 text-xs font-black border border-emerald-500/20 bg-emerald-500/10 hover:bg-emerald-500/20 transition text-emerald-200"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAction(a, 'rejected')}
+                        className="rounded-xl px-3 py-2 text-xs font-black border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 transition text-red-200"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/banned?uid=${a.createdBy}`)}
+                        className="rounded-xl px-3 py-2 text-xs font-black border border-white/10 bg-white/5 hover:bg-white/10 transition text-white/70"
+                      >
+                        Review
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function ModalIssueStatusSync({ issueId, open, db, setModalIssueStatus }) {
   useEffect(() => {
@@ -399,12 +749,14 @@ export default function AdminRemadeShell({
     () => [
       { zone: 'Core', id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { zone: 'Management', id: 'issues', label: 'Issues', icon: ShieldCheck },
+      { zone: 'Management', id: 'unbanAppeals', label: 'Unban Appeals', icon: ShieldCheck },
       { zone: 'Management', id: 'materials', label: 'Materials', icon: FileText },
       { zone: 'Settings', id: 'members', label: 'Admin Members', icon: Users },
       { zone: 'Settings', id: 'settings', label: 'Settings', icon: Settings },
     ],
     []
   );
+
 
   const zones = useMemo(() => {
     const z = {};
@@ -1196,55 +1548,70 @@ export default function AdminRemadeShell({
                     </div>
                   )}
 
+                  {activeSection === 'unbanAppeals' && (
+                    <UnbanAppealsInbox
+                      themeColors={themeColors}
+                      adminPhone={adminPhone}
+                    />
+                  )}
+
                   {activeSection === 'members' && (
                     <div className="space-y-6">
+
+                      {/* Legacy admin-phone management remains for super admin */}
                       <div>
                         <div className="text-xs font-bold text-white/55 uppercase">Access</div>
                         <div className="text-2xl font-black">Admin Members</div>
+                        <div className="text-xs text-white/60 mt-1">Ban enforcement is available to super admin.</div>
                       </div>
 
                       {isSuperAdmin ? (
-                        <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-                          <div className="flex items-center gap-3 flex-wrap">
-                            <input
-                              value={newAdminPhone}
-                              onChange={(e) => setNewAdminPhone(e.target.value)}
-                              placeholder="+91 98765 43210"
-                              className="flex-1 min-w-[260px] rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none focus:border-white/20"
-                            />
-                            <button
-                              type="button"
-                              onClick={onAddAdminPhone}
-                              className="rounded-2xl px-4 py-3 text-sm font-black text-white bg-white/10 hover:bg-white/15 transition border border-white/15"
-                            >
-                              Add Admin
-                            </button>
+                        <div className="space-y-6">
+                          <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <input
+                                value={newAdminPhone}
+                                onChange={(e) => setNewAdminPhone(e.target.value)}
+                                placeholder="+91 98765 43210"
+                                className="flex-1 min-w-[260px] rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm outline-none focus:border-white/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={onAddAdminPhone}
+                                className="rounded-2xl px-4 py-3 text-sm font-black text-white bg-white/10 hover:bg-white/15 transition border border-white/15"
+                              >
+                                Add Admin
+                              </button>
+                            </div>
+
+                            <div className="mt-5 space-y-3">
+                              {adminPhones.map((p) => (
+                                <div key={p} className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/15 px-4 py-3">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center">
+                                      <ShieldCheck className="w-4 h-4" style={{ color: activeGlow }} />
+                                    </div>
+                                    <div className="text-sm font-black">{p}</div>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => onRemoveAdminPhone(p)}
+                                    className="px-3 py-2 rounded-xl text-sm font-black text-red-200 border border-red-500/20 bg-red-500/10 hover:bg-red-500/15 transition"
+                                  >
+                                    Remove
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
                           </div>
 
-                          <div className="mt-5 space-y-3">
-                            {adminPhones.map((p) => (
-                              <div key={p} className="flex items-center justify-between rounded-2xl border border-white/10 bg-black/15 px-4 py-3">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-9 h-9 rounded-xl border border-white/10 bg-white/5 flex items-center justify-center">
-                                    <ShieldCheck className="w-4 h-4" style={{ color: activeGlow }} />
-                                  </div>
-                                  <div className="text-sm font-black">{p}</div>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => onRemoveAdminPhone(p)}
-                                  className="px-3 py-2 rounded-xl text-sm font-black text-red-200 border border-red-500/20 bg-red-500/10 hover:bg-red-500/15 transition"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            ))}
-                          </div>
+                          {/* New user ban management table */}
+                          <AdminMembersTable />
                         </div>
                       ) : (
                         <div className="rounded-3xl border border-white/10 bg-white/5 p-10 text-center">
                           <div className="text-sm font-bold text-white/80">Restricted</div>
-                          <div className="text-xs text-white/60 mt-2">Only super admin can manage admin members.</div>
+                          <div className="text-xs text-white/60 mt-2">Only super admin can manage user bans.</div>
                         </div>
                       )}
                     </div>
@@ -1340,4 +1707,3 @@ function RowAction({
     </div>
   );
 }
-

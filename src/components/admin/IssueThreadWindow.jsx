@@ -1,11 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
-import { collection, addDoc, query, onSnapshot, orderBy, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  query,
+  onSnapshot,
+  orderBy,
+  serverTimestamp,
+  doc,
+  updateDoc,
+} from 'firebase/firestore';
 
 import { db } from '../../firebase';
 import { markSeen } from '../../utils/ticketNotifications';
 import { useAuth } from '../../context/AuthContext';
-
 
 const IssueThreadWindow = ({
   issueId,
@@ -26,8 +34,6 @@ const IssueThreadWindow = ({
   // in the expected shape.
   const [fallbackStatus, setFallbackStatus] = useState(null);
 
-
-
   const listRef = useRef(null);
 
   const didInitToastRef = useRef(false);
@@ -36,7 +42,6 @@ const IssueThreadWindow = ({
   const { currentUser } = useAuth?.() || {};
   const uid = currentUser?.uid;
   const isDark = !!themeColors?.isDark;
-
 
   const q = useMemo(() => {
     if (!issueId) return null;
@@ -63,8 +68,6 @@ const IssueThreadWindow = ({
         // If we received a new message (based on newest doc id), notify admins.
         // This is the most reliable trigger given Firestore snapshots.
         if (lastId && lastId !== lastNotifiedMessageIdRef.current) {
-          // Show toast on ANY newly appended message so we can confirm alerts work.
-          // (User info is still displayed from createdBy fields on the message.)
           if (mode === 'admin') {
             const who =
               lastMsg?.createdByName ||
@@ -73,7 +76,10 @@ const IssueThreadWindow = ({
               lastMsg?.from ||
               'User';
 
-            const role = lastMsg?.role ? String(lastMsg.role).toUpperCase() : 'MESSAGE';
+            const role = lastMsg?.role
+              ? String(lastMsg.role).toUpperCase()
+              : 'MESSAGE';
+
             toast.info(`New ${role.toLowerCase()} message from ${who}`, {
               position: 'top-right',
               autoClose: 5000,
@@ -85,11 +91,9 @@ const IssueThreadWindow = ({
             });
           }
 
-
           lastNotifiedMessageIdRef.current = lastId;
         }
       }
-
 
       // autoscroll to bottom
       setTimeout(() => {
@@ -97,8 +101,9 @@ const IssueThreadWindow = ({
         if (el) el.scrollTop = el.scrollHeight;
       }, 0);
     });
+
     return () => unsub();
-  }, [q, mode]);
+  }, [q, mode, issueId]);
 
   // Fetch ticket history from parent issue doc.
   // Admin panel used to show history even when older documents didn't store `statusHistory`
@@ -118,16 +123,11 @@ const IssueThreadWindow = ({
       const data = snap.data() || {};
       setIssueMeta(data);
 
-      // 1) Preferred: `statusHistory: [{ status, changedAt, changedBy }]`
-      const rawStatusHistory = Array.isArray(data.statusHistory) ? data.statusHistory :
+      const rawStatusHistory =
+        Array.isArray(data.statusHistory) ? data.statusHistory :
         Array.isArray(data.statusHistory?.items) ? data.statusHistory.items :
         null;
 
-      // 2) Legacy / alternative shapes (best-effort):
-      // - history: [{ status, changedAt, changedBy }]
-      // - statusChanges: [{ newStatus, timestamp, by }]
-      // - complaintHistory / complaint_history
-      // - status_history / status_history.items
       const candidateHistory =
         rawStatusHistory ||
         (Array.isArray(data.history) ? data.history : null) ||
@@ -142,7 +142,6 @@ const IssueThreadWindow = ({
         .map((h) => {
           if (!h || typeof h !== 'object') return null;
 
-          // Support multiple key names
           const status = h?.status ?? h?.newStatus ?? h?.value ?? h?.toStatus;
           const changedAt = h?.changedAt ?? h?.timestamp ?? h?.time ?? h?.changed_timestamp ?? h?.createdAt;
           const changedBy = h?.changedBy ?? h?.by ?? h?.changedByName ?? h?.changed_by ?? h?.actor;
@@ -151,44 +150,46 @@ const IssueThreadWindow = ({
         })
         .filter((x) => x && x.status);
 
-      // If nothing matches, fall back to current issue status so user still sees something.
       const hasAny = rawNormalized.length > 0;
 
-      // IMPORTANT: also handle cases where legacy docs only have {status, createdAt/updatedAt}
       const fallback = hasAny
         ? null
         : data?.status
-          ? [{
-              status: data.status,
-              changedAt: data?.updatedAt ?? data?.createdAt ?? null,
-              changedBy:
-                data?.updatedBy ??
-                data?.updatedByName ??
-                data?.createdByName ??
-                data?.createdBy ??
-                null,
-            }]
+          ? [
+              {
+                status: data.status,
+                changedAt: data?.updatedAt ?? data?.createdAt ?? null,
+                changedBy:
+                  data?.updatedBy ??
+                  data?.updatedByName ??
+                  data?.createdByName ??
+                  data?.createdBy ??
+                  null,
+              },
+            ]
           : null;
 
       let historyToUse = hasAny ? rawNormalized : (fallback || []);
 
-      // sort oldest -> newest
       historyToUse.sort((a, b) => {
         const ta = a.changedAt?.toMillis ? a.changedAt.toMillis() : Date.parse(a.changedAt) || 0;
         const tb = b.changedAt?.toMillis ? b.changedAt.toMillis() : Date.parse(b.changedAt) || 0;
         return ta - tb;
       });
 
-      // If we still ended up with nothing, show an ultra-minimal history
-      // derived from issue doc status (if exists) or messages (best-effort, conservative).
       if (!historyToUse || historyToUse.length === 0) {
-        // Keep it conservative: only add if we have a status field.
         if (data?.status) {
-          historyToUse = [{
-            status: data.status,
-            changedAt: data?.updatedAt ?? data?.createdAt ?? null,
-            changedBy: data?.updatedBy ?? data?.createdByName ?? data?.createdBy ?? null,
-          }];
+          historyToUse = [
+            {
+              status: data.status,
+              changedAt: data?.updatedAt ?? data?.createdAt ?? null,
+              changedBy:
+                data?.updatedBy ??
+                data?.createdByName ??
+                data?.createdBy ??
+                null,
+            },
+          ];
         }
       }
 
@@ -199,8 +200,6 @@ const IssueThreadWindow = ({
     return () => unsub();
   }, [issueId]);
 
-
-
   useEffect(() => {
     if (!isOpen) return;
 
@@ -208,7 +207,6 @@ const IssueThreadWindow = ({
       const el = listRef.current;
       if (el) el.scrollTop = el.scrollHeight;
 
-      // Mark user notifications as seen when they open/read their ticket threads.
       if (mode === 'user' && uid) {
         markSeen({ db, uid }).catch(() => {});
       }
@@ -219,23 +217,15 @@ const IssueThreadWindow = ({
     return () => clearTimeout(t);
   }, [isOpen, mode, uid, onThreadViewed]);
 
-  const bubbleStyle = {
-    borderColor: themeColors?.border || 'rgba(255,255,255,0.15)',
-  };
-
   const userColor = isDark ? 'rgba(34,211,153,0.18)' : 'rgba(34,211,153,0.10)';
   const adminColor = isDark ? 'rgba(168,85,247,0.18)' : 'rgba(168,85,247,0.10)';
 
   const submitUserMessage = async () => {
-    // Auto-reopen on user follow-up
-    // If ticket is closed, switch it back to open.
     const trimmed = text.trim();
     if (!trimmed) return;
 
     setLoading(true);
     try {
-      // Always attempt reopen.
-      // If reopen fails, we still send the message so user doesn't get stuck.
       try {
         await updateDoc(doc(db, 'issues', issueId), { status: 'open' });
       } catch (e) {
@@ -256,12 +246,10 @@ const IssueThreadWindow = ({
     }
   };
 
-  // Admin: send as admin message (two-sided)
   const submitAdminMessage = async () => {
-    // Admin messages do not auto-close. Close is handled separately via issue fields/buttons.
-    
     const payloadText = adminSolution?.trim();
     if (!payloadText) return;
+
     setLoading(true);
     try {
       await addDoc(collection(db, 'issues', issueId, 'messages'), {
@@ -270,6 +258,7 @@ const IssueThreadWindow = ({
         screenshotUrl: null,
         createdAt: serverTimestamp(),
       });
+
       setAdminSolution('');
     } finally {
       setLoading(false);
@@ -286,11 +275,15 @@ const IssueThreadWindow = ({
         display: isOpen ? 'block' : 'none',
       }}
     >
+      {/* Header + optional status history */}
       <div className="p-4 border-b" style={{ borderColor: 'rgba(255,255,255,0.10)' }}>
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-xs font-bold uppercase tracking-widest opacity-70">Ticket Thread</div>
-            <div className="text-[10px] opacity-70" style={{ color: themeColors?.textSecondary || 'rgba(255,255,255,0.7)' }}>
+            <div
+              className="text-[10px] opacity-70"
+              style={{ color: themeColors?.textSecondary || 'rgba(255,255,255,0.7)' }}
+            >
               {statusHistory.length > 0 ? 'Status trail is shown below' : 'No status history available yet'}
             </div>
           </div>
@@ -321,27 +314,24 @@ const IssueThreadWindow = ({
           <div className="mt-4">
             <div className="text-[10px] font-bold uppercase tracking-widest opacity-70">Status History</div>
 
-            <div className="mt-2 rounded-2xl border" style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.08)' }}>
-              <div className="max-h-32 overflow-y-auto pr-1 py-2 space-y-2">
+            <div
+              className="mt-2 rounded-2xl border"
+              style={{ borderColor: 'rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.08)' }}
+            >
+              {/* Cap status history so messages remain the main scroll region */}
+              <div className="max-h-28 overflow-y-auto pr-1 py-2 space-y-2">
                 {statusHistory.map((h, idx) => {
                   const isLatest = idx === statusHistory.length - 1;
                   const status = (h.status || '').toUpperCase();
                   const changedAt =
                     h.changedAt?.toDate?.() ||
                     (h.changedAt?.toMillis ? new Date(h.changedAt.toMillis()) : new Date(h.changedAt));
-                  const dateStr = changedAt && !Number.isNaN(changedAt.getTime())
-                    ? changedAt.toLocaleString()
-                    : '';
+                  const dateStr =
+                    changedAt && !Number.isNaN(changedAt.getTime()) ? changedAt.toLocaleString() : '';
 
-                  const badgeBg = status === 'OPEN'
-                    ? 'rgba(52,211,153,0.16)'
-                    : 'rgba(251,146,60,0.18)';
-                  const badgeBorder = status === 'OPEN'
-                    ? 'rgba(52,211,153,0.35)'
-                    : 'rgba(251,146,60,0.35)';
-                  const badgeColor = status === 'OPEN'
-                    ? '#34d399'
-                    : '#fb923c';
+                  const badgeBg = status === 'OPEN' ? 'rgba(52,211,153,0.16)' : 'rgba(251,146,60,0.18)';
+                  const badgeBorder = status === 'OPEN' ? 'rgba(52,211,153,0.35)' : 'rgba(251,146,60,0.35)';
+                  const badgeColor = status === 'OPEN' ? '#34d399' : '#fb923c';
 
                   return (
                     <div
@@ -352,11 +342,7 @@ const IssueThreadWindow = ({
                       <div className="flex items-center gap-3 min-w-0">
                         <div
                           className="px-3 py-1 rounded-full text-[11px] font-bold whitespace-nowrap"
-                          style={{
-                            background: badgeBg,
-                            border: `1px solid ${badgeBorder}`,
-                            color: badgeColor,
-                          }}
+                          style={{ background: badgeBg, border: `1px solid ${badgeBorder}`, color: badgeColor }}
                         >
                           {status}
                         </div>
@@ -385,58 +371,70 @@ const IssueThreadWindow = ({
         )}
       </div>
 
-      {/* Thread body: keep composer pinned and make messages the only scroll area */}
-      <div className="flex flex-col" style={{ height: 'min(80vh, 720px)' }}>
+      {/* Thread area: cap height; only the message list scrolls */}
+      <div className="flex flex-col" style={{ height: 'min(78vh, 700px)' }}>
+        <div className="flex flex-col flex-1 min-h-0">
+          <div
+            className="p-4 flex-1 overflow-y-auto ticket-scroll"
+            ref={listRef}
+            style={{
+              background: 'rgba(0,0,0,0.10)',
+              scrollbarWidth: 'thin',
+              scrollbarColor: `${themeColors?.primary || '#38bdf8'} transparent`,
+            }}
+          >
+            <style>{`
+              #ticket-thread-${issueId} .ticket-scroll::-webkit-scrollbar { width: 6px; }
+              #ticket-thread-${issueId} .ticket-scroll::-webkit-scrollbar-track { background: transparent; }
+              #ticket-thread-${issueId} .ticket-scroll::-webkit-scrollbar-thumb { background: ${themeColors?.primary || '#38bdf8'}; border-radius: 999px; }
+            `}</style>
 
-        <div
-          className="p-4 flex-1 overflow-y-auto"
-          ref={listRef}
-          style={{ background: 'rgba(0,0,0,0.10)' }}
-        >
-          {messages.length === 0 ? (
-            <div className="text-sm opacity-60">No messages yet.</div>
-          ) : (
-            <div className="space-y-3">
-              {messages.map((m) => {
-                const isAdmin = m.role === 'admin';
-                return (
-                  <div
-                    key={m.id}
-                    className="flex"
-                    style={{ justifyContent: isAdmin ? 'flex-start' : 'flex-end' }}
-                  >
+            {messages.length === 0 ? (
+              <div className="text-sm opacity-60">No messages yet.</div>
+            ) : (
+              <div className="space-y-4">
+                {messages.map((m) => {
+                  const isAdmin = m.role === 'admin';
+                  return (
                     <div
-                      className="px-4 py-3 rounded-2xl border"
-                      style={{
-                        borderColor: 'rgba(255,255,255,0.12)',
-                        background: isAdmin ? adminColor : userColor,
-                        maxWidth: '92%',
-                      }}
+                      key={m.id}
+                      className="flex"
+                      style={{ justifyContent: isAdmin ? 'flex-start' : 'flex-end' }}
                     >
                       <div
-                        className="text-[11px] font-bold uppercase tracking-widest opacity-70"
+                        className="px-4 py-3 rounded-2xl border"
                         style={{
-                          color: themeColors?.textSecondary || 'rgba(255,255,255,0.7)',
-                          marginBottom: 6,
+                          borderColor: 'rgba(255,255,255,0.14)',
+                          background: isAdmin ? adminColor : userColor,
+                          maxWidth: '86%',
+                          boxShadow: '0 0 0 1px rgba(255,255,255,0.02) inset',
                         }}
                       >
-                        {isAdmin ? 'Admin' : 'User'}
-                      </div>
-                      <div
-                        className="text-sm"
-                        style={{ color: themeColors?.text || '#fff', whiteSpace: 'pre-wrap' }}
-                      >
-                        {m.text}
+                        <div
+                          className="text-[11px] font-bold uppercase tracking-widest opacity-70"
+                          style={{
+                            color: themeColors?.textSecondary || 'rgba(255,255,255,0.7)',
+                            marginBottom: 6,
+                          }}
+                        >
+                          {isAdmin ? 'Admin' : 'User'}
+                        </div>
+                        <div
+                          className="text-sm leading-relaxed"
+                          style={{ color: themeColors?.text || '#fff', whiteSpace: 'pre-wrap' }}
+                        >
+                          {m.text}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Composer */}
+        {/* Composer pinned at bottom of the thread container */}
         {mode === 'admin' ? (
           <div className="p-4 border-t" style={{ borderColor: 'rgba(255,255,255,0.10)' }}>
             <div className="flex flex-col gap-3">
