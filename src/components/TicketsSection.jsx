@@ -1,15 +1,26 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp, where } from 'firebase/firestore';
+import { collection, query, onSnapshot, addDoc, serverTimestamp, where, orderBy } from 'firebase/firestore';
 
 import { toast } from 'react-toastify';
 
 import IssueThreadWindow from './admin/IssueThreadWindow';
-import { FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  FaChevronDown,
+  FaChevronUp,
+  FaClock,
+  FaHistory,
+  FaInbox,
+  FaTimes,
+  FaPlus,
+  FaImage,
+  FaPaperPlane,
+  FaCheckCircle,
+  FaExclamationCircle,
+} from 'react-icons/fa';
+
 
 const cx = (...classes) => classes.filter(Boolean).join(' ');
-
-
-
 
 /**
  * User-side tickets:
@@ -25,30 +36,20 @@ const TicketsSection = ({
   IssueThreadWindow: IssueThreadWindowProp, // keep compatibility if passed
 }) => {
   // Keep backwards-compatible prop override (functionality unchanged)
-  // Note: we still render IssueThreadWindow below to preserve existing behavior.
-  // keep override for backwards-compatibility; used by IssueThreadWindowToUseWrapper
-  const IssueThreadWindowToUse = IssueThreadWindowProp || IssueThreadWindow;
-
-
-
-
-
+  // If an override is passed, we use it for the thread window.
+  const ThreadWindowToRender = IssueThreadWindowProp || IssueThreadWindow;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [screenshotUrl, setScreenshotUrl] = useState('');
   const [issues, setIssues] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [openIssueId, setOpenIssueId] = useState(null);
 
   const userId = currentUser?.uid;
 
   const issuesQuery = useMemo(() => {
     if (!db || !userId) return null;
-
-    // Fetch only this user's tickets.
-    // If your Firestore console reports a missing index for this query,
-    // click the provided link and create the index (this is required for the query to run).
-    //
-    // Query shape: where(createdBy == userId) + orderBy(createdAt desc)
     return query(
       collection(db, 'issues'),
       where('createdBy', '==', userId),
@@ -56,19 +57,11 @@ const TicketsSection = ({
     );
   }, [db, userId]);
 
-
-
   useEffect(() => {
     if (!issuesQuery) return;
     const unsub = onSnapshot(issuesQuery, (snap) => {
-      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-
-      // Debug help: verify createdBy matches current uid.
-      // Remove later if you want.
-      // eslint-disable-next-line no-console
-      console.log('[TicketsSection] userId=', userId, 'totalIssues=', all.length, 'sampleCreatedBy=', all[0]?.createdBy);
-
-      setIssues(all.filter((x) => x.createdBy === userId));
+      const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setIssues(data);
     });
     return () => unsub();
   }, [issuesQuery, userId]);
@@ -78,11 +71,9 @@ const TicketsSection = ({
     if (!title.trim()) return;
     if (!description.trim()) return;
 
-    setLoading(true);
+    setIsSubmitting(true);
     try {
       const createdAtTs = _serverTimestampProp || serverTimestamp();
-      // Create a user-friendly complaintId (used by Admin UI)
-      // Example: CMP-jJB3-MPB8PBYG
       const complaintId = `CMP-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
       await addDoc(collection(db, 'issues'), {
@@ -94,166 +85,129 @@ const TicketsSection = ({
         createdBy: userId,
         createdByName: currentUser?.displayName || currentUser?.email || 'User',
         createdAt: typeof createdAtTs === 'function' ? createdAtTs() : createdAtTs,
-        // optional: keep a normalized history for thread UI
-        // Firestore cannot store serverTimestamp() inside arrays in some SDK/configs.
-        // Keep statusHistory optional for legacy UI; store it later if needed.
-        statusHistory: [],
+        statusHistory: [{
+          status: 'open',
+          timestamp: new Date(),
+          updatedByName: currentUser?.displayName || currentUser?.email || 'User'
+        }],
       });
 
-      // Visible feedback.
-      // Profile page already mounts <ToastContainer>, so toast will render there.
-      toast.success?.('Ticket submitted successfully.');
-
+      toast.success('Ticket submitted successfully.');
 
       setTitle('');
       setDescription('');
       setScreenshotUrl('');
+      setIsCreating(false);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
   const theme = themeColors || {};
-  const [openIssueId, setOpenIssueId] = useState(null);
 
   return (
-    <div id={id} className="mt-6">
-      <div
-        className="rounded-[34px] p-6 border relative overflow-hidden"
-        style={{
-          borderColor: theme.border || 'rgba(255,255,255,0.15)',
-          background: theme.card || 'rgba(255,255,255,0.03)',
-        }}
-      >
-        {/* decorative glows */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full blur-3xl opacity-30"
+    <div id={id} className="mt-8 w-full">
+      {/* Modern Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight" style={{ color: theme.text || '#fff' }}>
+            Support <span style={{ color: theme.primary }}>Tickets</span>
+          </h2>
+          <p className="text-xs sm:text-sm opacity-60 mt-1" style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)' }}>
+            Manage your inquiries and follow up with administrators.
+          </p>
+        </div>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setIsCreating(!isCreating)}
+          className="w-full md:w-auto flex items-center justify-center gap-2 px-8 py-4 md:py-3 rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-widest transition-all"
           style={{
-            background: `radial-gradient(circle at center, ${theme.primary || 'rgba(168,85,247,0.7)'}, transparent 60%)`,
+            background: isCreating ? 'rgba(255,255,255,0.1)' : theme.primary || '#38bdf8',
+            color: isCreating ? theme.text : (theme.isDark ? '#000' : '#fff'),
+            boxShadow: isCreating ? 'none' : `0 10px 30px ${theme.accentGlow || 'rgba(56, 189, 248, 0.2)'}`
           }}
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -bottom-28 -left-28 w-72 h-72 rounded-full blur-3xl opacity-20"
-          style={{
-            background: `radial-gradient(circle at center, rgba(56,189,248,0.55), transparent 60%)`,
-          }}
-        />
+        >
+          {isCreating ? <><FaTimes /> Close</> : <><FaPlus /> New Ticket</>}
+        </motion.button>
+      </div>
 
-        <div className="relative z-[1]">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-4 mb-5">
-            <div>
-              <div className="text-lg sm:text-xl font-black uppercase tracking-wide" style={{ color: theme.text || '#fff' }}>
-                Raise / Follow Up Ticket
-              </div>
-              <div className="text-sm opacity-70" style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)' }}>
-                Admin replies inside a per-ticket thread.
-              </div>
-            </div>
+      <AnimatePresence mode="wait">
+        {isCreating ? (
+          <motion.div
+            key="composer"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="rounded-[28px] sm:rounded-[32px] p-5 sm:p-8 border mb-10 overflow-hidden relative"
+            style={{
+              borderColor: theme.border || 'rgba(255,255,255,0.15)',
+              background: theme.card || 'rgba(255,255,255,0.03)',
+            }}
+          >
+            {/* Decoration */}
+            <div className="absolute top-0 right-0 w-40 h-40 bg-primary/10 blur-[80px] -z-10" style={{ backgroundColor: `${theme.primary}20` }} />
 
-            <div className="text-right">
-              <div
-                className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest"
-                style={{
-                  background: 'rgba(255,255,255,0.04)',
-                  border: `1px solid ${theme.border || 'rgba(255,255,255,0.15)'}`,
-                  color: theme.textSecondary || 'rgba(255,255,255,0.7)',
-                }}
-              >
-                <span className="opacity-70">Tickets</span>
-                <span style={{ color: theme.text || '#fff' }}>{issues.length}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 relative">
-            {/* Composer */}
-            <section
-              className="rounded-[28px] p-4 sm:p-5 border"
-              style={{
-                borderColor: theme.border || 'rgba(255,255,255,0.15)',
-                background: 'rgba(255,255,255,0.02)',
-              }}
-            >
-              <div className="flex items-start justify-between gap-4 mb-4">
-                <div className="min-w-0">
-                  <div className="text-sm font-bold uppercase tracking-widest opacity-70" style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)' }}>
-                    Ticket Composer
-                  </div>
-                  <div className="text-xs opacity-70" style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)', marginTop: 4 }}>
-                    Provide details—threads are auto-pinned below.
-                  </div>
-                </div>
-                <div
-                  className={cx(
-                    'shrink-0 rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-widest border',
-                  )}
-                  style={{
-                    borderColor: theme.border || 'rgba(255,255,255,0.15)',
-                    background: 'rgba(255,255,255,0.03)',
-                    color: theme.textSecondary || 'rgba(255,255,255,0.7)',
-                  }}
-                >
-                  {loading ? 'Submitting…' : 'Ready'}
-                </div>
-              </div>
-
+            <div className="space-y-5">
               <div className="grid grid-cols-1 gap-4">
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Ticket title"
-                  className={cx(
-                    'w-full p-4 rounded-2xl border-2 outline-none font-bold transition-all',
-                    'focus:shadow-[0_0_30px_rgba(56,189,248,0.18)]'
-                  )}
-                  style={{
-                    borderColor: theme.border || 'rgba(255,255,255,0.15)',
-                    background: 'rgba(255,255,255,0.03)',
-                    color: theme.text || '#fff',
-                  }}
-                />
+                <div className="relative">
+                  <input
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Short summary of the issue..."
+                    className={cx(
+                      'w-full p-4 rounded-2xl border-2 outline-none font-bold transition-all text-sm',
+                      'focus:shadow-[0_0_20px_rgba(56,189,248,0.1)]'
+                    )}
+                    style={{
+                      borderColor: theme.border || 'rgba(255,255,255,0.1)',
+                      background: 'rgba(0,0,0,0.2)',
+                      color: theme.text || '#fff',
+                    }}
+                  />
+                </div>
 
                 <textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe your issue..."
+                  placeholder="Tell us more about what's happening..."
                   className={cx(
-                    'w-full p-4 rounded-2xl border-2 outline-none font-bold transition-all',
-                    'focus:shadow-[0_0_30px_rgba(168,85,247,0.18)]'
+                    'w-full p-4 rounded-2xl border-2 outline-none font-bold transition-all text-sm resize-none',
+                    'focus:shadow-[0_0_20px_rgba(168,85,247,0.1)]'
                   )}
                   style={{
-                    borderColor: theme.border || 'rgba(255,255,255,0.15)',
-                    background: 'rgba(255,255,255,0.03)',
+                    borderColor: theme.border || 'rgba(255,255,255,0.1)',
+                    background: 'rgba(0,0,0,0.2)',
                     color: theme.text || '#fff',
-                    minHeight: 110,
+                    minHeight: 140,
                   }}
                 />
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <input
-                    value={screenshotUrl}
-                    onChange={(e) => setScreenshotUrl(e.target.value)}
-                    placeholder="Optional screenshot URL (or leave blank)"
-                    className="w-full p-4 rounded-2xl border-2 outline-none font-bold transition-all"
-                    style={{
-                      borderColor: theme.border || 'rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.03)',
-                      color: theme.text || '#fff',
-                    }}
-                  />
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1 relative">
+                    <input
+                      value={screenshotUrl}
+                      onChange={(e) => setScreenshotUrl(e.target.value)}
+                      placeholder="Link to screenshot (optional)"
+                      className="w-full p-4 pl-12 rounded-2xl border-2 outline-none font-bold text-sm transition-all"
+                      style={{
+                        borderColor: theme.border || 'rgba(255,255,255,0.1)',
+                        background: 'rgba(0,0,0,0.2)',
+                        color: theme.text || '#fff',
+                      }}
+                    />
+                    <FaImage className="absolute left-5 top-1/2 -translate-y-1/2 opacity-40" />
+                  </div>
 
                   <label
-                    className="w-full p-4 rounded-2xl border-2 font-black text-sm uppercase tracking-widest cursor-pointer select-none text-center transition-all hover:scale-[1.01] active:scale-[0.99]"
+                    className="px-6 py-4 rounded-2xl border-2 font-black text-[10px] uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2 transition-all hover:bg-white/5 active:scale-95 whitespace-normal sm:whitespace-nowrap"
                     style={{
                       borderColor: theme.border || 'rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.03)',
                       color: theme.text || '#fff',
                     }}
                   >
-                    Upload screenshot
+                    <FaPlus size={10} /> {screenshotUrl ? 'Change Image' : 'Upload File'}
                     <input
                       type="file"
                       accept="image/*"
@@ -261,198 +215,214 @@ const TicketsSection = ({
                       onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        if (file.size > 10 * 1024 * 1024) return;
+                        if (file.size > 10 * 1024 * 1024) return toast.error("File is too large (max 10MB)");
                         const reader = new FileReader();
-                        reader.onload = () => {
-                          const base64 = reader.result;
-                          // store base64 directly as screenshotUrl (existing functionality)
-                          setScreenshotUrl(typeof base64 === 'string' ? base64 : '');
-                        };
+                        reader.onload = () => setScreenshotUrl(typeof reader.result === 'string' ? reader.result : '');
                         reader.readAsDataURL(file);
-
                       }}
                     />
                   </label>
                 </div>
 
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                   onClick={handleCreate}
-                  disabled={loading || !title.trim() || !description.trim()}
-                  className="px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all hover:brightness-110 active:brightness-95"
+                  disabled={isSubmitting || !title.trim() || !description.trim()}
+                  className="w-full py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all disabled:opacity-50"
                   style={{
-                    background:
-                      loading || !title.trim() || !description.trim()
-                        ? 'rgba(255,255,255,0.10)'
-                        : 'linear-gradient(90deg, rgba(168,85,247,0.9), rgba(6,182,212,0.85))',
+                    background: `linear-gradient(90deg, ${theme.primary || '#a855f7'}, #06b6d4)`,
                     color: theme.isDark ? '#000' : '#fff',
-                    opacity: loading || !title.trim() || !description.trim() ? 0.6 : 1,
                   }}
                 >
-                  {loading ? 'Creating...' : 'Create Ticket'}
-                </button>
+                  {isSubmitting ? <FaClock className="animate-spin" /> : <FaPaperPlane />}
+                  {isSubmitting ? 'Transmitting...' : 'Submit Inquiry'}
+                </motion.button>
               </div>
-            </section>
-
-            {/* Tickets list */}
-            <section>
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="text-sm font-bold uppercase tracking-widest opacity-70" style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)' }}>
-                  Your Tickets
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="list"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="space-y-4"
+          >
+            {issues.length === 0 ? (
+              <div
+                className="rounded-[40px] border p-12 text-center relative overflow-hidden"
+                style={{
+                  borderColor: theme.border || 'rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.01)',
+                }}
+              >
+                <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-6">
+                  <FaInbox size={32} className="opacity-20" />
                 </div>
-
-                <div
-                  className="text-[11px] font-black uppercase tracking-widest opacity-50"
-                  style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)' }}
-                >
-                  Tap to open thread
-                </div>
+                <h3 className="text-lg font-black uppercase tracking-widest opacity-60">No Active Tickets</h3>
+                <p className="text-sm opacity-40 mt-2 max-w-xs mx-auto leading-relaxed">
+                  Everything is clear! If you encounter any issues, create a ticket using the button above.
+                </p>
               </div>
+            ) : (
+              issues.map((issue) => {
+                const isExpanded = openIssueId === issue.id;
+                const isClosed = issue.status === 'closed';
+                const statusColor = isClosed ? '#94a3b8' : (issue.status === 'open' ? '#34d399' : '#fb923c');
 
-              <div className="space-y-3 max-h-[520px] overflow-auto pr-1">
-                {issues.length === 0 ? (
-                  <div
-                    className="rounded-2xl border p-4 relative overflow-hidden"
+                return (
+                  <motion.article
+                    layout
+                    key={issue.id}
+                    className={cx(
+                      'rounded-[28px] border transition-all duration-300 overflow-hidden',
+                      isExpanded ? 'shadow-2xl' : 'hover:border-white/20'
+                    )}
                     style={{
-                      borderColor: theme.border || 'rgba(255,255,255,0.15)',
-                      background: 'rgba(255,255,255,0.02)',
+                      borderColor: isExpanded ? theme.primary || 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)',
+                      background: isExpanded ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
                     }}
                   >
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-40"
-                      style={{ background: `radial-gradient(circle at center, ${theme.primary || 'rgba(168,85,247,0.7)'}, transparent 60%)` }}
-                    />
-                    <div className="text-sm font-bold uppercase tracking-widest" style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)' }}>
-                      No tickets yet
-                    </div>
-                    <div className="text-sm opacity-70 mt-2" style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)' }}>
-                      Submit one above to start a support thread.
-                    </div>
-                  </div>
-                ) : (
-                  issues.map((issue) => {
-                    const isOpen = openIssueId === issue.id;
-                    const statusIsOpen = issue.status === 'open';
-                    const statusText = (issue.status || '').toUpperCase();
-
-                    return (
-                      <article
-                        key={issue.id}
-                        className={cx(
-                          'rounded-2xl border overflow-hidden transition-all',
-                          'hover:shadow-[0_0_0_1px_rgba(255,255,255,0.04)]',
-                        )}
-                        style={{
-                          borderColor: 'rgba(255,255,255,0.10)',
-                          background: isOpen ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.03)',
-                        }}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setOpenIssueId((prev) => (prev === issue.id ? null : issue.id))}
-                          className="w-full text-left p-4 sm:p-5"
-                          style={{ color: theme.text || '#fff' }}
-                          aria-expanded={isOpen}
+                    <button
+                      onClick={() => setOpenIssueId(isExpanded ? null : issue.id)}
+                      className="w-full text-left p-5 sm:p-6 md:p-8 flex items-center justify-between gap-4"
+                    >
+                      <div className="flex items-center gap-5 min-w-0">
+                        <div 
+                          className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center flex-shrink-0"
+                          style={{ background: `${statusColor}15`, border: `1px solid ${statusColor}30` }}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <div
-                                  className="w-2 h-2 rounded-full mt-1 flex-shrink-0"
-                                  style={{
-                                    background: statusIsOpen ? '#34d399' : '#fb923c',
-                                    boxShadow: statusIsOpen
-                                      ? '0 0 0 4px rgba(52,211,153,0.12)'
-                                      : '0 0 0 4px rgba(251,146,60,0.12)',
-                                  }}
-                                />
-                                <div className="font-bold break-words leading-snug" style={{ color: theme.text || '#fff' }}>
-                                  {issue.title}
+                          {isClosed ? <FaCheckCircle style={{ color: statusColor }} /> : <FaExclamationCircle style={{ color: statusColor }} />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-3 mb-1">
+                            <span className="text-[9px] sm:text-[10px] font-black tracking-widest opacity-40 uppercase truncate">
+                              {issue.complaintId || 'REF-ID'}
+                            </span>
+                            <span 
+                              className="px-2 py-0.5 rounded-md text-[7px] sm:text-[8px] font-black uppercase tracking-tighter"
+                              style={{ background: statusColor, color: '#000' }}
+                            >
+                              {issue.status || 'OPEN'}
+                            </span>
+                          </div>
+                          <h3 className="font-bold text-sm sm:text-base truncate" style={{ color: theme.text || '#fff' }}>
+                            {issue.title}
+                          </h3>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="hidden md:block text-right">
+                          <div className="text-[10px] font-black opacity-30 uppercase tracking-widest">Modified</div>
+                          <div className="text-[11px] font-bold opacity-60">
+                            {issue.createdAt?.toDate ? new Date(issue.createdAt.toDate()).toLocaleDateString() : 'Recent'}
+                          </div>
+                        </div>
+                        <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} className="opacity-30">
+                          <FaChevronDown />
+                        </motion.div>
+                      </div>
+                    </button>
+
+                    <AnimatePresence>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="border-t border-white/5"
+                        >
+                          <div className="p-4 sm:p-8 pt-0">
+                            <div className="mt-8 space-y-8">
+                              {/* 📄 Original Inquiry */}
+                              <div className="bg-black/40 rounded-2xl sm:rounded-3xl p-5 sm:p-8 border border-white/5 shadow-inner">
+                                <div className="flex items-center gap-2 mb-4">
+                                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: theme.primary }} />
+                                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40" style={{ color: theme.text }}>
+                                    Original_Brief
+                                  </h4>
                                 </div>
+                                <p className="text-sm leading-relaxed opacity-80" style={{ color: theme.textSecondary || theme.text }}>
+                                  {issue.description}
+                                </p>
+                                {issue.screenshotUrl && (
+                                  <a
+                                    href={issue.screenshotUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center mt-5 px-4 py-2 rounded-xl bg-white/5 border border-white/10 text-[9px] font-black uppercase tracking-widest transition-all hover:bg-white/10 active:scale-95"
+                                    style={{ color: theme.primary }}
+                                  >
+                                    <FaImage className="mr-2" /> Media_Attachment
+                                  </a>
+                                )}
                               </div>
 
-                              {isOpen && issue.description ? (
-                                <div
-                                  className="text-sm opacity-85 mt-2"
-                                  style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)', lineHeight: 1.35 }}
-                                >
-                                  {issue.description}
+                              {/* 🔄 Status History Trail */}
+                              {(issue.statusHistory || []).length > 0 && (
+                                <div className="pl-2">
+                                  <div className="flex items-center gap-2 mb-6">
+                                    <FaHistory className="text-[10px] opacity-30" style={{ color: theme.primary }} />
+                                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40" style={{ color: theme.text }}>
+                                      Status_Trail
+                                    </h4>
+                                  </div>
+                                  <div className="space-y-6 relative pl-4">
+                                    <div className="absolute left-[3px] top-2 bottom-2 w-[1px] bg-white/5" />
+                                    {issue.statusHistory.map((h, idx) => (
+                                      <div key={idx} className="relative group">
+                                        <div 
+                                          className="absolute -left-[16px] top-1.5 w-2 h-2 rounded-full z-10 transition-colors" 
+                                          style={{ background: idx === 0 ? theme.primary : '#222' }}
+                                        />
+                                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-1 sm:gap-4">
+                                          <div className="flex items-center gap-3">
+                                            <span className="px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter" 
+                                              style={{ background: idx === 0 ? theme.primary : 'rgba(255,255,255,0.03)', color: idx === 0 ? '#000' : 'rgba(255,255,255,0.4)' }}>
+                                              {h.status}
+                                            </span>
+                                            <span className="text-[10px] sm:text-[11px] font-bold opacity-70" style={{ color: theme.text }}>
+                                              {h.updatedByName}
+                                            </span>
+                                          </div>
+                                          <div className="text-[8px] sm:text-[9px] font-black opacity-20 uppercase tracking-widest md:text-right">
+                                            {h.timestamp?.toDate ? new Date(h.timestamp.toDate()).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : String(h.timestamp)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
-                              ) : null}
+                              )}
 
-                              {!isOpen && issue.description ? (
-                                <div
-                                  className="text-sm opacity-55 mt-2 line-clamp-2"
-                                  style={{ color: theme.textSecondary || 'rgba(255,255,255,0.7)' }}
-                                >
-                                  {issue.description}
+                              {/* 💬 Correspondence Thread */}
+                              <div className="space-y-4">
+                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] opacity-40 pl-2" style={{ color: theme.text }}>
+                                  Active_Correspondence
+                                </h4>
+                                <div className="rounded-3xl overflow-hidden bg-black/40 border border-white/5 shadow-2xl">
+                                  <ThreadWindowToRender
+                                    issueId={issue.id}
+                                    mode="user"
+                                    themeColors={theme}
+                                    isOpen
+                                  />
                                 </div>
-                              ) : null}
-
-                              {isOpen && issue.screenshotUrl ? (
-                                <a
-                                  href={issue.screenshotUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-flex items-center mt-3 px-3 py-2 rounded-xl border text-sm font-bold transition-all hover:translate-y-[-1px]"
-                                  style={{
-                                    borderColor: 'rgba(255,255,255,0.10)',
-                                    color: theme.textSecondary || 'rgba(255,255,255,0.7)',
-                                  }}
-                                >
-                                  View Screenshot
-                                </a>
-                              ) : null}
-                            </div>
-
-                            <div className="flex items-center gap-3 flex-shrink-0">
-                              <div
-                                className="text-xs font-bold rounded-full px-3 py-1 whitespace-nowrap transition-colors"
-                                style={{
-                                  background: statusIsOpen ? 'rgba(52,211,153,0.16)' : 'rgba(251,146,60,0.18)',
-                                  color: statusIsOpen ? '#34d399' : '#fb923c',
-                                  border: `1px solid ${statusIsOpen ? 'rgba(52,211,153,0.35)' : 'rgba(251,146,60,0.35)'}`,
-                                }}
-                              >
-                                {statusText || 'OPEN'}
                               </div>
-
-                              <span className="opacity-70" aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                {isOpen ? <FaChevronUp /> : <FaChevronDown />}
-                              </span>
                             </div>
                           </div>
-                        </button>
-
-                        {isOpen ? (
-                          <IssueThreadWindowToUseWrapper
-                            key={issue.id + '-thread'}
-                            issueId={issue.id}
-                            mode="user"
-                            themeColors={theme}
-                            isOpen
-                          />
-
-                        ) : null}
-                      </article>
-                    );
-                  })
-                )}
-              </div>
-            </section>
-          </div>
-        </div>
-      </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.article>
+                );
+              })
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
-
-};
-
-const IssueThreadWindowToUseWrapper = ({ issueId, mode, themeColors, isOpen }) => {
-  // pass isOpen=true so thread composer is visible
-  return <IssueThreadWindow issueId={issueId} mode={mode} themeColors={themeColors} isOpen={isOpen ?? true} />;
 };
 
 export default TicketsSection;
-
-

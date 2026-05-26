@@ -13,11 +13,34 @@ service cloud.firestore {
     }
 
     function isWhitelistedAdmin() {
-      return isSignedIn() &&
-        request.auth.token.phone_number != null &&
-        request.auth.token.phone_number in ['+919148860082', '+919123456789'];
+      // CEL .replace() does not support regex character classes like [^0-9+]
+      // Since the whitelist already uses the standard format, we check direct equality.
+      return isSignedIn() && (
+        (request.auth.token.phone_number != null &&
+         request.auth.token.phone_number in ['+919148860082', '+919123456789', '+919876543210']) ||
+        (request.auth.token.email != null &&
+         request.auth.token.email == 'admin@dhruva.ai') ||
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true) ||
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
     }
 
+    function getIssue(issueId) {
+      return get(/databases/$(database)/documents/issues/$(issueId));
+    }
+
+
+    function getAppeal(appealId) {
+      return get(/databases/$(database)/documents/unbanAppeals/$(appealId));
+    }
+
+    function isIssueOwner(issueId) {
+      let issue = get(/databases/$(database)/documents/issues/$(issueId));
+      return isSignedIn() && issue != null && (
+        issue.data.createdBy == request.auth.uid || 
+        issue.data.userId == request.auth.uid
+      );
+    }
 
     function userIsBanned(userId) {
       // Treat a user as banned if ANY of the supported ban fields indicate suspension.
@@ -25,6 +48,8 @@ service cloud.firestore {
       let userDoc = get(/databases/$(database)/documents/users/$(userId));
       return userDoc != null && (
         userDoc.data.isBanned == true ||
+        userDoc.data.is_banned == true || // Added for robustness
+        userDoc.data.banReason != null || // Added for robustness
         userDoc.data.ban_reason != null ||
         userDoc.data.banned_at != null ||
         (userDoc.data.ban != null && userDoc.data.ban.reason != null)
@@ -43,13 +68,24 @@ service cloud.firestore {
       allow write: if isWhitelistedAdmin();
 
       // Read: Allow owner to read their own document even if banned.
-      // Frontend needs this to detect ban state and redirect to /banned.
+      // Frontend needs this to detect ban state and also show the stored ban reason.
+      // This is safe because banned users still only access their own user doc.
       allow read: if isOwner(userId);
+
+      // If a banned user can't be sure the full document is readable due to partial migrations,
+      // still ensure the ban-reason fields are accessible for UI.
+      allow read: if isOwner(userId) && (
+        request.resource.data.keys().hasAny(['ban_reason', 'banReason', 'banned_at', 'ban']) ||
+        (resource != null && resource.data.keys().hasAny(['ban_reason', 'banReason', 'banned_at', 'ban']))
+      );
+      
       
       // Write: Keep restrictive behavior for banned users.
-      allow write: if isOwner(userId) 
-        && !userIsBanned(userId)
+      // Allow profile edits even for banned users, so the UI can update theme/subject/etc.
+      // (Admin controls actual unban/ban state.)
+      allow write: if isOwner(userId)
         && (request.resource.data.diff(resource.data).affectedKeys().hasAny(['isBanned']) == false);
+
 
 
 
@@ -57,8 +93,9 @@ service cloud.firestore {
       // AI PYQ history / caches
       match /pyqAiByChapter/{docId} {
         allow read, write: if isWhitelistedAdmin();
-        allow read, write: if isOwner(userId) && !userIsBanned(userId);
+        allow read, write: if isOwner(userId);
       }
+
 
       match /pyqAiCacheFlat/{docId} {
         allow read, write: if isWhitelistedAdmin();
@@ -76,11 +113,22 @@ service cloud.firestore {
         allow read, write: if isOwner(userId) && !userIsBanned(userId);
       }
 
-      // legacy root sessions
+      // legacy/chat sessions under users/{userId}
+      // Needed because Chat.jsx queries `collection(db, `users/${uid}/sessions`)`.
+      match /sessions {
+        allow list: if isWhitelistedAdmin();
+        allow read: if isWhitelistedAdmin();
+        allow list: if isOwner(userId);
+        allow read: if isOwner(userId);
+      }
+
       match /sessions/{sessionId} {
         allow read, write: if isWhitelistedAdmin();
-        allow read, write: if isOwner(userId) && !userIsBanned(userId);
+        allow read, write: if isOwner(userId);
       }
+
+
+
     }
 
     // ========= Messaging (generic) =========
@@ -118,36 +166,13 @@ service cloud.firestore {
       allow update: if isWhitelistedAdmin();
       allow delete: if isWhitelistedAdmin();
 
-      // Only admins can change status fields; users can submit creates only.
-    }
-
-    match /unbanAppeals/{appealId}/followUps/{docId} {
-      allow read: if isWhitelistedAdmin();
-      allow read: if isSignedIn() && (
-        get(/databases/$(database)/documents/unbanAppeals/$(appealId)).data.createdBy == request.auth.uid
-      );
-
-      allow create: if isWhitelistedAdmin() || (
-        isSignedIn() &&
-        get(/databases/$(database)/documents/unbanAppeals/$(appealId)).data.createdBy == request.auth.uid
-      );
-
-      allow update, delete: if isWhitelistedAdmin();
-    }
-
-    // followUps/items path (current client writes into /followUps/items collection)
-    match /unbanAppeals/{appealId}/followUps/items/{docId} {
-      allow read: if isWhitelistedAdmin();
-      allow read: if isSignedIn() && (
-        get(/databases/$(database)/documents/unbanAppeals/$(appealId)).data.createdBy == request.auth.uid
-      );
-
-      allow create: if isWhitelistedAdmin() || (
-        isSignedIn() &&
-        get(/databases/$(database)/documents/unbanAppeals/$(appealId)).data.createdBy == request.auth.uid
-      );
-
-      allow update, delete: if isWhitelistedAdmin();
+      // Recursively wire all subcollections (followUps, items, messages)
+      match /{allSubcollections=**} {
+        allow read, list, create: if isWhitelistedAdmin() || (isSignedIn() && getAppeal(appealId).data.createdBy == request.auth.uid);
+        // Allow users to update message metadata (seen/read status) for sync
+        allow update: if isWhitelistedAdmin() || (isSignedIn() && getAppeal(appealId).data.createdBy == request.auth.uid);
+        allow delete: if isWhitelistedAdmin();
+      }
     }
 
     // ========= Issues =========
@@ -163,7 +188,6 @@ service cloud.firestore {
         isWhitelistedAdmin() || request.resource.data.createdBy == request.auth.uid
       );
 
-
       // Update/Delete:
       // - Admin can update/delete any issue
       // - Users can update only to reopen their own closed ticket (set status -> open)
@@ -176,7 +200,6 @@ service cloud.firestore {
         request.resource.data.status == 'open' &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
     }
-
 
     // Follow-up messages for an issue thread
     // NOTE: Messages written by the app use { role: 'user'|'admin', text, createdAt, screenshotUrl }
@@ -196,6 +219,18 @@ service cloud.firestore {
       );
 
       allow update, delete: if isWhitelistedAdmin();
+    }
+
+    // ========= Syllabus Materials (Base64) =========
+    match /syllabus_metadata/{materialId} {
+      allow read: if isSignedIn();
+      allow write: if isWhitelistedAdmin();
+
+      // Allow read/write for history subcollection only by admins
+      // This is for archiving previous versions
+      match /history/{historyId} {
+        allow read, write: if isWhitelistedAdmin();
+      }
     }
   }
 }

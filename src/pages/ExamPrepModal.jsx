@@ -322,7 +322,7 @@ const ExamPrepModal = ({ isOpen, onClose, onSelect, theme = {}, board, classLeve
             <AnimatePresence>
                 {showAIPyqModal && (
                     <div key="ai-pyq-modal-container" className="relative">
-                    <AIPyqGenerator 
+                        <AIPyqGenerator 
                         key="ai-pyq-modal"
                         // isOpen prop is now redundant for mount/unmount, but might be used internally
                         onClose={() => setShowAIPyqModal(false)}
@@ -371,57 +371,29 @@ const ExamPrepModal = ({ isOpen, onClose, onSelect, theme = {}, board, classLeve
                         initial={{ opacity: 0, y: 100 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 100 }}
-                        className="fixed inset-0 z-[2000] flex flex-col overflow-hidden"
-                        style={{ backgroundColor: isDark ? '#020617' : '#f8fafc' }}
+                        className="fixed inset-0 z-[2000] flex flex-col bg-slate-950 overflow-hidden"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Pro Toolbar */}
-                        <div className="flex items-center justify-between px-6 py-4 border-b shadow-2xl z-10"
-                             style={{ 
-                                backgroundColor: isDark ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-                                borderColor: themeBorder
-                             }}
-                        >
+                        <div className="flex items-center justify-between px-6 py-4 bg-slate-800 border-b border-white/10 shadow-2xl z-10">
                             <div className="flex items-center gap-4">
                                 <div className="p-2.5 bg-red-500/20 rounded-xl">
                                     <FaFileAlt className="text-red-400 text-xl" />
                                 </div>
                                 <div className="hidden sm:block">
-                                    <h3 className="font-black text-sm uppercase tracking-tight" style={{ color: themeText }}>Classic PYQ Reader</h3>
+                                    <h3 className="text-white font-black text-sm uppercase tracking-tight">Classic PYQ Reader</h3>
                                     <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-[10px] font-bold uppercase" style={{ color: themeTextSecondary }}>{currentBoard} • {currentClass}</span>
-                                        <div className="w-1 h-1 rounded-full" style={{ backgroundColor: themeTextMuted }} />
-                                        <span className="text-[10px] font-bold uppercase" style={{ color: themeTextSecondary }}>{currentSubject}</span>
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase">{currentBoard} • {currentClass}</span>
+                                        <div className="w-1 h-1 bg-white/20 rounded-full" />
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase">{currentSubject}</span>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-2">
-                                {/* Interactive Zoom Controls */}
-                                <div className="flex items-center rounded-xl p-1 mr-4 border" style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', borderColor: themeBorder }}>
-                                    <button 
-                                        onClick={() => setZoom(prev => Math.max(prev - 0.2, 0.6))}
-                                        className="p-2 transition-colors hover:scale-110"
-                                        style={{ color: themeTextSecondary }}
-                                    >
-                                        <FaSearchMinus />
-                                    </button>
-                                    <span className="text-[10px] font-mono w-12 text-center" style={{ color: themeText }}>
-                                        {Math.round(zoom * 100)}%
-                                    </span>
-                                    <button 
-                                        onClick={() => setZoom(prev => Math.min(prev + 0.2, 2.0))}
-                                        className="p-2 transition-colors hover:scale-110"
-                                        style={{ color: themeTextSecondary }}
-                                    >
-                                        <FaSearchPlus />
-                                    </button>
-                                </div>
-
                                 <button 
                                     onClick={downloadPdf}
-                                    className="p-3 rounded-xl transition-all group relative hover:bg-white/10"
-                                    style={{ color: themeTextSecondary }}
+                                    className="p-3 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all group relative"
                                     title="Download PDF"
                                 >
                                     <FaDownload />
@@ -429,8 +401,7 @@ const ExamPrepModal = ({ isOpen, onClose, onSelect, theme = {}, board, classLeve
                                 </button>
                                 <button 
                                     onClick={() => window.print()}
-                                    className="p-3 rounded-xl transition-all group relative hover:bg-white/10"
-                                    style={{ color: themeTextSecondary }}
+                                    className="p-3 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all group relative"
                                     title="Print PDF"
                                 >
                                     <FaPrint />
@@ -438,14 +409,13 @@ const ExamPrepModal = ({ isOpen, onClose, onSelect, theme = {}, board, classLeve
                                 </button>
                                 <button 
                                     onClick={() => setRotation(prev => (prev + 90) % 360)}
-                                    className="p-3 rounded-xl transition-all group relative hover:bg-white/10"
-                                    style={{ color: themeTextSecondary }}
+                                    className="p-3 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-all group relative"
                                     title="Rotate"
                                 >
                                     <FaRedo />
                                     <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-black text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap text-white">Rotate</span>
                                 </button>
-                                <div className="w-px h-8 mx-2" style={{ backgroundColor: themeBorder }} />
+                                <div className="w-px h-8 bg-white/10 mx-2" />
                                 <button 
                                     onClick={() => setPdfViewOpen(false)}
                                     className="flex items-center gap-2 px-5 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-xl font-bold transition-all"
@@ -458,14 +428,16 @@ const ExamPrepModal = ({ isOpen, onClose, onSelect, theme = {}, board, classLeve
 
                         {/* Viewer Area */}
                         <div className="flex-1 relative bg-[#1a1c1e] overflow-auto flex items-center justify-center p-8 scrollbar-hide">
-                            <iframe
-                                src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-                                className="w-full h-full border-none shadow-2xl transition-all duration-300 ease-in-out bg-white rounded-sm"
-                                title="Pro PDF Viewer"
-                                style={{ 
-                                    transform: `scale(${zoom}) rotate(${rotation}deg)`
-                                }}
-                            />
+                            {pdfUrl && (
+                                <iframe
+                                    src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+                                    className="w-full h-full border-none shadow-2xl transition-all duration-300 ease-in-out bg-white rounded-sm"
+                                    title="Pro PDF Viewer"
+                                    style={{ 
+                                        transform: `scale(${zoom}) rotate(${rotation}deg)`
+                                    }}
+                                />
+                            )}
                         </div>
                     </motion.div>
                 )}

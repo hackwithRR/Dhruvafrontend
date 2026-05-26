@@ -31,7 +31,7 @@ import {
   History as HistoryIcon,
   PanelLeftClose,
   PanelLeftOpen,
-  MessageSquare,
+  MessageSquare
 } from 'lucide-react';
 
 import ReactDOM from 'react-dom';
@@ -43,14 +43,13 @@ import { useNavigate } from 'react-router-dom';
 import AdminCreateIssueSection from './AdminCreateIssueSection';
 import AdminMembersTable from '../admin/AdminMembersTable';
 import AdminTicketsSection from './AdminTicketsSection';
-import AdminPDFUploader from '../AdminPDFUploader';
 
 
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
 // Sub-component for Appeal Follow-ups
-function AppealFollowUps({ appealId, adminPhone, themeColors }) {
+function AppealFollowUps({ appealId, adminPhone }) {
   const [messages, setMessages] = useState([]);
   const [adminText, setAdminText] = useState('');
   const [sending, setSending] = useState(false);
@@ -95,21 +94,17 @@ function AppealFollowUps({ appealId, adminPhone, themeColors }) {
     <div className="space-y-4 mt-4">
       <div className="max-h-[35vh] overflow-y-auto pr-2 space-y-3 no-scrollbar">
         {messages.length === 0 ? (
-          <div className="text-xs italic p-2" style={{ color: themeColors.textSecondary }}>No follow-up messages yet.</div>
+          <div className="text-xs text-white/40 italic p-2">No follow-up messages yet.</div>
         ) : (
           messages.map((m) => (
-            <div 
-              key={m.id} 
-              className={`rounded-2xl p-4 border ${m.role === 'admin' ? 'bg-cyan-500/10 border-cyan-500/20 ml-8' : 'mr-8'}`}
-              style={{ backgroundColor: m.role !== 'admin' ? (themeColors.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)') : undefined, borderColor: m.role !== 'admin' ? themeColors.border : undefined }}
-            >
+            <div key={m.id} className={`rounded-2xl p-4 border ${m.role === 'admin' ? 'bg-cyan-500/10 border-cyan-500/20 ml-8' : 'bg-white/5 border-white/5 mr-8'}`}>
               <div className="flex items-center justify-between gap-2 mb-1">
                 <div className={`text-[10px] font-black uppercase ${m.role === 'admin' ? 'text-cyan-400' : 'text-white/40'}`}>
                   {m.createdByName || (m.role === 'admin' ? 'Admin' : 'User')}
                 </div>
-                <div className="text-[10px]" style={{ color: themeColors.textSecondary, opacity: 0.5 }}>{m.createdAt?.toDate()?.toLocaleString() || 'Just now'}</div>
+                <div className="text-[10px] text-white/30">{m.createdAt?.toDate()?.toLocaleString() || 'Just now'}</div>
               </div>
-              <div className="text-sm leading-relaxed" style={{ color: themeColors.text }}>{m.followUp}</div>
+              <div className="text-sm text-white/80 leading-relaxed">{m.followUp}</div>
             </div>
           ))
         )}
@@ -121,8 +116,7 @@ function AppealFollowUps({ appealId, adminPhone, themeColors }) {
             value={adminText}
             onChange={(e) => setAdminText(e.target.value)}
             placeholder="Post a follow-up or reply..."
-            className="w-full rounded-2xl border p-4 pr-14 text-sm outline-none focus:ring-1 transition-all"
-            style={{ backgroundColor: themeColors.isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.8)', borderColor: themeColors.border, color: themeColors.text }}
+            className="w-full rounded-2xl border border-white/10 bg-black/40 p-4 pr-14 text-sm text-white outline-none focus:border-cyan-500/40 transition-all"
             rows={2}
           />
           <button
@@ -230,25 +224,26 @@ function UnbanAppealsInbox({ themeColors, adminPhone }) {
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md">
           <motion.div 
             initial={{ opacity: 0, scale: 0.92, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }}
-            className="w-full max-w-4xl h-[85vh] flex flex-col bg-[#0a0a0a] rounded-[3rem] border border-white/10 shadow-2xl overflow-hidden"
+            className="w-full max-w-4xl h-[85vh] flex flex-col rounded-[3rem] border shadow-2xl overflow-hidden"
+            style={{ borderColor: themeColors.border, backgroundColor: themeColors.bgCard }}
           >
             {/* Appeal Header */}
-            <div className="flex items-center justify-between gap-4 px-8 py-6 bg-white/[0.02] border-b border-white/5">
+            <div className="flex items-center justify-between gap-4 px-8 py-6 border-b" style={{ backgroundColor: themeColors.isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', borderColor: themeColors.border }}>
               <div>
                 <div className="text-[10px] font-black uppercase text-cyan-400 tracking-[0.3em]">Neural Appeal Review</div>
-                <h2 className="text-2xl font-black mt-1 italic uppercase tracking-tighter">{selectedAppeal.createdByName || 'Requester'}</h2>
+                <h2 className="text-2xl font-black mt-1 italic uppercase tracking-tighter" style={{ color: themeColors.text }}>{selectedAppeal.createdByName || 'Requester'}</h2>
               </div>
-              <button onClick={() => setSelectedAppeal(null)} className="p-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all active:scale-95">
-                <X className="w-6 h-6" />
+              <button onClick={() => setSelectedAppeal(null)} className="p-3 rounded-2xl border transition-all active:scale-95" style={{ backgroundColor: themeColors.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', borderColor: themeColors.border }}>
+                <X className="w-6 h-6" style={{ color: themeColors.text }} />
               </button>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scroll px-8 py-8 space-y-8 no-scrollbar">
-              <div className="rounded-[2rem] bg-white/[0.03] p-8 border border-white/5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-6 opacity-5"><Sparkles size={60} /></div>
+              <div className="rounded-[2rem] p-8 border relative overflow-hidden" style={{ backgroundColor: themeColors.isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.6)', borderColor: themeColors.border }}>
+                <div className="absolute top-0 right-0 p-6 opacity-5" style={{ color: themeColors.text }}><Sparkles size={60} /></div>
                 <div className="relative z-10">
-                  <div className="text-[10px] font-black uppercase text-white/30 mb-3 tracking-[0.2em]">Transmission Payload / Reason</div>
-                  <p className="text-lg text-white/90 leading-relaxed font-bold italic">"{selectedAppeal.reason}"</p>
+                  <div className="text-[10px] font-black uppercase mb-3 tracking-[0.2em]" style={{ color: themeColors.textSecondary, opacity: 0.5 }}>Transmission Payload / Reason</div>
+                  <p className="text-lg leading-relaxed font-bold italic" style={{ color: themeColors.text }}>"{selectedAppeal.reason}"</p>
                 </div>
               </div>
 
@@ -257,11 +252,11 @@ function UnbanAppealsInbox({ themeColors, adminPhone }) {
                   <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                   Live Thread Activity
                 </div>
-                <AppealFollowUps appealId={selectedAppeal.id} adminPhone={adminPhone} themeColors={themeColors} />
+                <AppealFollowUps appealId={selectedAppeal.id} adminPhone={adminPhone} />
               </div>
             </div>
 
-            <div className="p-8 border-t flex items-center gap-4" style={{ borderColor: themeColors.border, backgroundColor: themeColors.isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.8)' }}>
+            <div className="p-8 border-t border-white/5 bg-black/40 flex items-center gap-4">
               <button 
                 onClick={() => { handleAction(selectedAppeal, 'approved'); setSelectedAppeal(null); }} 
                 className="flex-1 py-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-black text-[10px] uppercase tracking-[0.2em] hover:bg-emerald-500/20 transition-all active:scale-[0.98]"
@@ -281,7 +276,7 @@ function UnbanAppealsInbox({ themeColors, adminPhone }) {
 
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs font-bold uppercase" style={{ color: themeColors.textSecondary }}>Appeal Inbox</div>
+          <div className="text-xs font-bold text-white/55 uppercase">Appeal Inbox</div>
           <div className="text-2xl font-black">Unban Requests</div>
           <div className="text-xs text-white/60 mt-1">Live pending unban appeals (status: open)</div>
         </div>
@@ -300,19 +295,20 @@ function UnbanAppealsInbox({ themeColors, adminPhone }) {
           </button>
 
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-white/40" />
+            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style={{ color: themeColors.textSecondary }} />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search appeals..."
-              className="w-[260px] max-w-[45vw] rounded-2xl border border-white/10 bg-black/20 pl-11 pr-4 py-3 text-sm text-white outline-none focus:border-white/20"
+              className="w-[260px] max-w-[45vw] rounded-2xl border pl-11 pr-4 py-3 text-sm outline-none focus:ring-1"
+              style={{ backgroundColor: themeColors.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.8)', borderColor: themeColors.border, color: themeColors.text }}
             />
           </div>
         </div>
       </div>
 
-      <div className="rounded-3xl border border-white/10 bg-white/5 overflow-hidden">
-        <div className="grid grid-cols-[1.2fr_0.5fr_1fr_1.3fr] gap-0 px-5 py-3 text-xs font-black text-white/60 border-b border-white/10">
+      <div className="rounded-3xl border overflow-hidden shadow-sm" style={{ borderColor: themeColors.border, backgroundColor: themeColors.bgCard }}>
+        <div className="grid grid-cols-[1.2fr_0.5fr_1fr_1.3fr] gap-0 px-5 py-3 text-xs font-black border-b" style={{ borderColor: themeColors.border, color: themeColors.textSecondary }}>
           <div>Appeal</div>
           <div>Status</div>
           <div>Requester</div>
@@ -321,7 +317,7 @@ function UnbanAppealsInbox({ themeColors, adminPhone }) {
 
         <div className="max-h-[560px] overflow-auto">
           {loading ? (
-            <div className="p-10 text-center text-sm font-bold" style={{ color: themeColors.textSecondary }}>Loading appeals...</div>
+            <div className="p-10 text-center text-white/60 text-sm font-bold">Loading appeals...</div>
           ) : error ? (
             <div className="p-10 text-center text-red-200/80 text-sm font-bold">
               <div className="text-red-400 mb-2">Failed to load appeals</div>
@@ -332,30 +328,30 @@ function UnbanAppealsInbox({ themeColors, adminPhone }) {
               </div>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="p-10 text-center text-sm font-bold" style={{ color: themeColors.textSecondary }}>No open appeals</div>
+            <div className="p-10 text-center text-white/60 text-sm font-bold">No open appeals</div>
           ) : (
-            <div className="divide-y" style={{ borderColor: themeColors.border }}>
+            <div className="divide-y divide-white/10">
               {filtered.map((a, idx) => {
                 const reasonPreview = String(a.reason || '').slice(0, 90);
                 const requester = a.createdByName || a.createdBy || 'Unknown';
                 return (
                   <div
                     key={a.id}
-                    className="grid grid-cols-[1.2fr_0.5fr_1fr_1.3fr] items-center px-5 py-4"
-                    style={{ 
-                      backgroundColor: idx % 2 === 0 ? (themeColors.isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.03)') : 'transparent' 
-                    }}
+                    className={
+                      'grid grid-cols-[1.2fr_0.5fr_1fr_1.3fr] items-center px-5 py-4 ' +
+                      (idx % 2 === 0 ? 'bg-black/10' : 'bg-black/0')
+                    }
                   >
                     <div className="min-w-0">
-                      <div className="font-black text-sm truncate" style={{ color: themeColors.text }}>
+                      <div className="font-black text-sm text-white/90 truncate">
                         {a.appealId || a.type || 'UNBAN'}
                       </div>
                       {reasonPreview ? (
-                        <div className="text-xs mt-1 line-clamp-2" style={{ color: themeColors.textSecondary }}>
+                        <div className="text-xs text-white/55 mt-1 line-clamp-2">
                           {reasonPreview}{String(a.reason || '').length > 90 ? '…' : ''}
                         </div>
                       ) : (
-                        <div className="text-xs mt-1" style={{ color: themeColors.textSecondary, opacity: 0.6 }}>No reason provided.</div>
+                        <div className="text-xs text-white/40 mt-1">No reason provided.</div>
                       )}
                     </div>
 
@@ -363,7 +359,7 @@ function UnbanAppealsInbox({ themeColors, adminPhone }) {
                       <span
                         className="inline-flex items-center px-3 py-1 rounded-full text-[11px] font-black border"
                         style={{
-                          background: themeColors.isDark ? 'rgba(56,189,248,0.10)' : 'rgba(56,189,248,0.15)',
+                          background: 'rgba(56,189,248,0.10)',
                           borderColor: 'rgba(56,189,248,0.25)',
                           color: '#bae6fd',
                         }}
@@ -373,9 +369,9 @@ function UnbanAppealsInbox({ themeColors, adminPhone }) {
                     </div>
 
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold truncate" style={{ color: themeColors.text }}>{requester}</div>
+                      <div className="text-xs text-white/70 font-semibold truncate">{requester}</div>
                       {a.createdByEmailMasked ? (
-                        <div className="text-[11px] truncate mt-0.5" style={{ color: themeColors.textSecondary, opacity: 0.7 }}>{a.createdByEmailMasked}</div>
+                        <div className="text-[11px] text-white/50 truncate mt-0.5">{a.createdByEmailMasked}</div>
                       ) : null}
                     </div>
 
@@ -404,8 +400,7 @@ function UnbanAppealsInbox({ themeColors, adminPhone }) {
                       <button
                         type="button"
                         onClick={() => navigate(`/banned?uid=${a.createdBy}`)}
-                        className="rounded-xl px-3 py-2 text-xs font-black border transition"
-                        style={{ backgroundColor: themeColors.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', borderColor: themeColors.border, color: themeColors.textSecondary }}
+                        className="rounded-xl px-3 py-2 text-xs font-black border border-white/10 bg-white/5 hover:bg-white/10 transition text-white/70"
                       >
                         Review
                       </button>
@@ -492,6 +487,7 @@ function MetricCard({
   trendLabel,
   trendPct,
   glow,
+  themeColors,
 }) {
   const trendUp = trendPct >= 0;
   return (
@@ -502,8 +498,8 @@ function MetricCard({
       transition={{ type: 'spring', stiffness: 260, damping: 18 }}
       className="relative overflow-hidden rounded-3xl border"
       style={{
-        borderColor: 'rgba(255,255,255,0.14)',
-        background: 'rgba(255,255,255,0.04)',
+        borderColor: themeColors.border,
+        backgroundColor: themeColors.bgCard,
       }}
     >
       <div
@@ -513,11 +509,11 @@ function MetricCard({
       <div className="relative p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-sm text-white/70">
+            <div className="flex items-center gap-2 text-sm" style={{ color: themeColors.textSecondary }}>
               <Icon className="w-5 h-5" style={{ color: glow }} />
               <span className="font-semibold">{title}</span>
             </div>
-            <div className="mt-3 text-3xl font-black text-white">{value}</div>
+            <div className="mt-3 text-3xl font-black" style={{ color: themeColors.text }}>{value}</div>
           </div>
           <motion.div
             initial={{ opacity: 0, rotate: -10, scale: 0.9 }}
@@ -541,8 +537,8 @@ function MetricCard({
 
         <div className="mt-5 flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs text-white/60">Live Trend</div>
-            <div className="text-sm text-white/80 font-semibold mt-1">
+            <div className="text-xs" style={{ color: themeColors.textSecondary, opacity: 0.6 }}>Live Trend</div>
+            <div className="text-sm font-semibold mt-1" style={{ color: themeColors.textSecondary }}>
               {trendUp ? 'Momentum ↑' : 'Momentum ↓'}
             </div>
           </div>
@@ -1276,7 +1272,7 @@ export default function AdminRemadeShell({
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-3">
-                              <h2 className="text-xl font-black uppercase italic tracking-tighter" style={{ color: themeColors.text }}>Console</h2>
+                              <h2 className="text-xl font-black uppercase italic tracking-tighter text-white">Console</h2>
                               <div className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-[0.2em] border ${
                                 modalIssueStatus === 'closed' 
                                 ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400' 
@@ -1285,7 +1281,7 @@ export default function AdminRemadeShell({
                                 {modalIssueStatus || 'open'}
                               </div>
                             </div>
-                            <div className="text-[8px] font-bold uppercase tracking-[0.4em] mt-1 font-mono" style={{ color: themeColors.textSecondary, opacity: 0.5 }}>ID: {selectedIssue?.complaintId || selectedIssueId}</div>
+                            <div className="text-[8px] font-bold text-white/20 uppercase tracking-[0.4em] mt-1 font-mono">ID: {selectedIssue?.complaintId || selectedIssueId}</div>
                           </div>
                         </div>
 
@@ -1520,6 +1516,7 @@ export default function AdminRemadeShell({
                           trendLabel="Trend"
                           trendPct={18}
                           glow={themeColors?.primaryHex || '#4f46e5'}
+                          themeColors={themeColors}
                         />
                         <MetricCard
                           icon={FileText}
@@ -1528,6 +1525,7 @@ export default function AdminRemadeShell({
                           trendLabel="Trend"
                           trendPct={stats?.pdfs ? 9 : -3}
                           glow={'#34d399'}
+                          themeColors={themeColors}
                         />
                         <MetricCard
                           icon={Bell}
@@ -1536,6 +1534,7 @@ export default function AdminRemadeShell({
                           trendLabel="Trend"
                           trendPct={-7}
                           glow={'#fb923c'}
+                          themeColors={themeColors}
                         />
                       </div>
 
@@ -1618,10 +1617,8 @@ export default function AdminRemadeShell({
                     <div className="rounded-3xl border p-6" style={{ borderColor: themeColors.border, backgroundColor: themeColors.bgCard }}>
                       <div className="text-xs font-bold uppercase" style={{ color: themeColors.textSecondary }}>Materials</div>
                       <div className="text-2xl font-black mt-1" style={{ color: themeColors.text }}>Upload & Manage</div>
-                      <div className="text-xs mt-2" style={{ color: themeColors.textSecondary }}>Upload PDFs by Board → Class → Subject → Category → Chapter (Notes/PYQ)</div>
-                      <div className="mt-6">
-                        <AdminPDFUploader themeColors={themeColors} />
-                      </div>
+                      <div className="text-xs mt-2" style={{ color: themeColors.textSecondary }}>This section currently uses your existing AdminPDFUploader route.</div>
+                      <div className="mt-6" />
                     </div>
                   )}
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaUpload, FaFilePdf, FaFolderOpen, FaSpinner, FaCheckCircle, FaTrash, FaExternalLinkAlt } from 'react-icons/fa';
+import { FaUpload, FaFilePdf, FaFolderOpen, FaSpinner, FaCheckCircle } from 'react-icons/fa';
 import ClickSpark from './ClickSpark';
-import { getBoards, getClasses, getSubjects, getChapters, uploadSyllabusMaterial, getMaterials, deleteSyllabusMaterial } from '../utils/adminAuth';
+import { getBoards, getClasses, getSubjects, getChapters, uploadSyllabusMaterial, getMaterials } from '../utils/adminAuth';
 
 const AdminPDFUploader = ({ themeColors }) => {
   const [file, setFile] = useState(null);
@@ -20,8 +20,6 @@ const AdminPDFUploader = ({ themeColors }) => {
 
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
-  const isDark = themeColors?.isDark !== false;
-  const accentColor = pyqMode ? (themeColors?.accent || '#f43f5e') : (themeColors?.primary || '#10b981');
 
   // Dynamic dropdown options
   const boards = getBoards();
@@ -69,17 +67,6 @@ const AdminPDFUploader = ({ themeColors }) => {
     }
   };
 
-  const handleDelete = async (materialId) => {
-    if (!window.confirm('Are you sure you want to delete this material and all its version history?')) return;
-    try {
-      await deleteSyllabusMaterial(materialId);
-      listUploadedFiles();
-    } catch (error) {
-      console.error('Delete failed:', error);
-      setError('Delete failed: ' + error.message);
-    }
-  };
-
   const listUploadedFiles = async () => {
     try {
       // Broaden the search to show most recent uploads for this mode (Notes or PYQs)
@@ -115,9 +102,9 @@ const AdminPDFUploader = ({ themeColors }) => {
       className="space-y-8 max-w-4xl"
     >
       {/* Upload Form */}
-      <div className="p-8 backdrop-blur-xl rounded-3xl shadow-2xl transition-colors duration-500" style={{ backgroundColor: themeColors?.card, border: `1px solid ${themeColors?.border}` }}>
+      <div className="p-8 bg-gradient-to-br from-gray-900/50 to-black/50 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl">
         <h2 className="text-3xl font-black mb-8 flex items-center gap-3">
-          <FaUpload style={{ color: themeColors?.primary }} />
+          <FaUpload />
           {pyqMode ? 'PYQ Upload' : 'Syllabus PDF Upload'}
         </h2>
 
@@ -129,8 +116,7 @@ const AdminPDFUploader = ({ themeColors }) => {
             <select 
               value={board} 
               onChange={(e) => setBoard(e.target.value)}
-              className="w-full p-4 bg-black/10 border border-white/10 rounded-2xl focus:ring-2 transition-all outline-none"
-              style={{ color: themeColors?.text, borderColor: themeColors?.border }}
+              className="w-full p-4 bg-black/30 border border-white/20 rounded-2xl focus:ring-2 ring-primary-500 focus:border-transparent"
             >
               {boards.map(b => <option key={b} value={b}>{b}</option>)}
             </select>
@@ -141,8 +127,7 @@ const AdminPDFUploader = ({ themeColors }) => {
             <select 
               value={classLevel} 
               onChange={(e) => setClassLevel(e.target.value)}
-              className="w-full p-4 bg-black/10 border border-white/10 rounded-2xl focus:ring-2 transition-all outline-none"
-              style={{ color: themeColors?.text, borderColor: themeColors?.border }}
+              className="w-full p-4 bg-black/30 border border-white/20 rounded-2xl focus:ring-2 ring-primary-500"
             >
               {classes.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -153,8 +138,7 @@ const AdminPDFUploader = ({ themeColors }) => {
             <select 
               value={subject} 
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full p-4 bg-black/10 border border-white/10 rounded-2xl focus:ring-2 transition-all outline-none"
-              style={{ color: themeColors?.text, borderColor: themeColors?.border }}
+              className="w-full p-4 bg-black/30 border border-white/20 rounded-2xl focus:ring-2 ring-primary-500"
             >
               {subjects.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -168,8 +152,7 @@ const AdminPDFUploader = ({ themeColors }) => {
             <select 
               value={chapter} 
               onChange={(e) => setChapter(e.target.value)}
-              className="w-full p-4 bg-black/10 border border-white/10 rounded-2xl focus:ring-2 transition-all outline-none"
-              style={{ color: themeColors?.text, borderColor: themeColors?.border }}
+              className="w-full p-4 bg-black/30 border border-white/20 rounded-2xl focus:ring-2 ring-primary-500"
             >
               <option value="">Select chapter or type custom</option>
               {availableChapters.map(ch => <option key={ch} value={ch}>{ch}</option>)}
@@ -180,8 +163,7 @@ const AdminPDFUploader = ({ themeColors }) => {
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full p-4 bg-black/10 border border-white/10 rounded-2xl focus:ring-2 transition-all outline-none"
-              style={{ color: themeColors?.text, borderColor: themeColors?.border }}
+              className="w-full p-4 bg-black/30 border border-white/20 rounded-2xl focus:ring-2 ring-primary-500"
             >
               {categories.map((c) => (
                 <option key={c} value={c}>
@@ -193,7 +175,7 @@ const AdminPDFUploader = ({ themeColors }) => {
 
           <div className="flex items-end gap-4">
 
-            <label className="flex items-center gap-2 p-3 bg-black/10 border rounded-2xl cursor-pointer hover:bg-white/5 transition-all" style={{ borderColor: themeColors?.border }}>
+            <label className="flex items-center gap-2 p-3 bg-black/30 border border-white/20 rounded-2xl cursor-pointer hover:bg-white/10 transition-all">
 
               <input
                 type="file"
@@ -201,16 +183,15 @@ const AdminPDFUploader = ({ themeColors }) => {
                 onChange={(e) => setFile(e.target.files[0])}
                 className="hidden"
               />
-              <FaFilePdf style={{ color: themeColors?.accent }} />
-              <span style={{ color: themeColors?.textSecondary }}>{file ? file.name : 'Select PDF'}</span>
+              <FaFilePdf className="text-red-400" />
+              <span>{file ? file.name : 'Select PDF'}</span>
             </label>
-            <label className="flex items-center gap-3 px-6 py-3 text-white font-bold rounded-2xl cursor-pointer transition-all shadow-lg"
-              style={{ background: `linear-gradient(135deg, ${themeColors?.accent || '#f43f5e'}, ${themeColors?.primary})` }}>
+            <label className="flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white font-bold rounded-2xl cursor-pointer transition-all">
               <input
                 type="checkbox"
                 checked={pyqMode}
                 onChange={(e) => setPyqMode(e.target.checked)}
-                className="w-5 h-5 accent-white"
+                className="w-5 h-5"
               />
               PYQ Mode
             </label>
@@ -240,14 +221,14 @@ const AdminPDFUploader = ({ themeColors }) => {
           </motion.div>
         )}
 
-<ClickSpark sparkColor={themeColors?.primary || "#00ff88"}>
+<ClickSpark sparkColor="#00ff88">
   <motion.button
     onClick={handleUpload}
     disabled={!file || uploading || !chapter}
     whileHover={{ scale: 1.02 }}
     whileTap={{ scale: 0.98 }}
-    className="w-full py-6 px-8 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-xl rounded-3xl shadow-2xl flex items-center justify-center gap-3 transition-all glow-pulse"
-    style={{ backgroundColor: accentColor }}
+    className="w-full py-6 px-8 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-xl rounded-3xl shadow-2xl flex items-center justify-center gap-3 transition-all glow-pulse"
+    style={{ backgroundColor: themeColors?.primary || '#10b981' }}
   >
           {uploading ? (
             <>
@@ -267,43 +248,41 @@ const AdminPDFUploader = ({ themeColors }) => {
           <motion.div 
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="mt-6 p-6 rounded-2xl"
-            style={{ backgroundColor: themeColors?.primary + '15', border: `1px solid ${themeColors?.primary}40` }}
+            className="mt-6 p-6 bg-emerald-500/20 border border-emerald-500/40 rounded-2xl"
+            style={{ backgroundColor: themeColors?.primary + '20', borderColor: themeColors?.primary + '40' }}
           >
-            <h3 className="font-bold mb-3 flex items-center gap-2" style={{ color: themeColors?.primary }}>
+            <h3 className="font-bold mb-2 flex items-center gap-2" style={{ color: themeColors?.primary + '80' }}>
               <FaFilePdf />
-              Standardized & Saved!
+              Upload Successful!
             </h3>
             <a 
               href={uploadUrl} 
               target="_blank" 
               rel="noopener noreferrer"
-              className="flex items-center justify-between p-4 bg-black/20 rounded-xl hover:bg-black/30 transition-all group"
-              style={{ color: themeColors?.primary }}
+              className="text-emerald-300 hover:text-emerald-200 font-mono text-sm break-all block p-2 bg-white/10 rounded-xl"
+              style={{ color: themeColors?.primary + '80' }}
             >
-              <span className="font-mono text-xs truncate mr-4">{(uploadedFiles[0]?.fileName || 'View Document')}</span>
-              <FaExternalLinkAlt className="opacity-50 group-hover:opacity-100 transition-opacity" />
+              View Uploaded Base64 Document
             </a>
           </motion.div>
         )}
       </div>
 
       {/* Recent Uploads */}
-      <div className="p-8 backdrop-blur-xl rounded-3xl shadow-2xl mt-12 transition-colors duration-500" style={{ backgroundColor: themeColors?.card, border: `1px solid ${themeColors?.border}` }}>
+      <div className="p-8 bg-gradient-to-br from-gray-900/30 to-black/30 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl mt-12">
         <h3 className="text-2xl font-black mb-6 flex items-center gap-3">
           <FaFolderOpen />
-          Recent Activity Log
+          Recent Uploads ({pyqMode ? 'PYQs' : 'Syllabus PDFs'})
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {uploadedFiles.slice(0, 6).map((f, i) => (
             <motion.div 
               key={f.path} 
-              className="p-6 bg-black/10 rounded-2xl hover:bg-black/20 transition-all group relative overflow-hidden"
-              style={{ border: `1px solid ${themeColors?.border}` }}
+              className="p-6 bg-black/40 border border-white/10 rounded-2xl hover:bg-white/10 transition-all group relative overflow-hidden"
               whileHover={{ y: -4 }}
             >
               {/* Version Badge */}
-              <div className="absolute top-2 right-2 px-2 py-1 bg-black/20 text-[10px] font-black rounded-lg border" style={{ borderColor: themeColors?.border, color: themeColors?.primary }}>
+              <div className="absolute top-2 right-2 px-2 py-1 bg-primary-500/20 text-primary-400 text-[10px] font-black rounded-lg border border-primary-500/30">
                 V{f.version || 1}
               </div>
 
@@ -313,42 +292,33 @@ const AdminPDFUploader = ({ themeColors }) => {
                   <div className="font-bold text-sm truncate" title={f.fileName || f.chapter}>
                     {f.fileName || f.chapter}
                   </div>
-                  <div className="font-mono text-[10px] opacity-50 truncate" style={{ color: themeColors?.textSecondary }}>
+                  <div className="font-mono text-[10px] opacity-50 truncate">
                     {f.path}
                   </div>
                 </div>
               </div>
 
               <div className="space-y-1 mb-4">
-                <div className="text-[11px] opacity-70 flex justify-between" style={{ color: themeColors?.textSecondary }}>
+                <div className="text-[11px] opacity-70 flex justify-between">
                   <span>Updated:</span>
-                  <span className="font-medium" style={{ color: themeColors?.text }}>
+                  <span className="font-medium text-white/90">
                     {f.updatedAt?.toDate ? f.updatedAt.toDate().toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Just now'}
                   </span>
                 </div>
-                <div className="text-[11px] opacity-70 flex justify-between" style={{ color: themeColors?.textSecondary }}>
+                <div className="text-[11px] opacity-70 flex justify-between">
                   <span>Size:</span>
-                  <span className="font-medium" style={{ color: themeColors?.text }}>{f.fileSize ? `${(f.fileSize / 1024).toFixed(1)} KB` : 'N/A'}</span>
+                  <span className="font-medium text-white/90">{f.fileSize ? `${(f.fileSize / 1024).toFixed(1)} KB` : 'N/A'}</span>
                 </div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <a 
-                  href={f.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="font-bold text-xs" style={{ color: themeColors?.primary }}
-                >
-                  📥 View PDF
-                </a>
-                <button
-                  onClick={() => handleDelete(f.id)}
-                  className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all"
-                  title="Delete Material"
-                >
-                  <FaTrash size={14} />
-                </button>
-              </div>
+              <a 
+                href={f.url} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary-400 hover:text-primary-300 font-medium text-sm block"
+              >
+                📥 Download
+              </a>
             </motion.div>
           ))}
           {uploadedFiles.length === 0 && (

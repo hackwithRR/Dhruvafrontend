@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { db } from '../firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { FileText, ArrowRight, LockKeyhole, User } from 'lucide-react';
@@ -25,6 +25,43 @@ export default function UnbanAppealComposer({ appealType = 'unban_request', exis
   const [followUp, setFollowUp] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submittingFollowUp, setSubmittingFollowUp] = useState(false);
+  const [messages, setMessages] = useState([]);
+  // Keep track of the latest appeal id we've rendered follow-ups for,
+  // so we can avoid showing old follow-ups after admin rejects/approves/unbans.
+  const [followUpsAppealId, setFollowUpsAppealId] = useState(existingAppeal?.id || null);
+
+  // Real-time listener for follow-up history
+  useEffect(() => {
+    // Whenever appeal changes (unban->ban again), clear any previous follow-up draft.
+    // This prevents stale UI from the previous appeal lifecycle.
+    setFollowUp('');
+    const nextAppealId = existingAppeal?.id || null;
+    setFollowUpsAppealId(nextAppealId);
+
+    if (!nextAppealId) {
+      setMessages([]);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'unbanAppeals', nextAppealId, 'followUps'),
+      orderBy('createdAt', 'asc')
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        // Ignore late snapshots if appeal changed while listener was setting up
+        if (followUpsAppealId !== nextAppealId) return;
+        setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      },
+      (err) => {
+        console.error('Failed to load follow-ups on banned page', err);
+      }
+    );
+
+    return () => unsub();
+  }, [existingAppeal?.id, followUpsAppealId]);
 
   const { uid, accountName, emailMasked } = useMemo(() => {
     const effectiveUid = userData?.uid || userData?.id || currentUser?.uid || null;
@@ -38,6 +75,10 @@ export default function UnbanAppealComposer({ appealType = 'unban_request', exis
   }, [userData, currentUser]);
 
   const createUnbanAppeal = async () => {
+    // When the user gets unbanned then banned again, old approved/closed appeals
+    // can still exist with follow-ups. For UX, always base the follow-up UI on the
+    // newly created appeal.
+    setMessages([]);
 
     if (!uid) {
       toast.error('Login/session expired. Please login again.');
@@ -129,7 +170,21 @@ export default function UnbanAppealComposer({ appealType = 'unban_request', exis
             />
           </div>
         ) : (
-          <div className="rounded-[1.5rem] border border-cyan-500/20 bg-cyan-500/5 p-4">
+          <div className={`rounded-[1.5rem] p-4 border ${
+            existingAppeal.status === 'approved' ? 'bg-emerald-500/10 border-emerald-500/20' :
+            existingAppeal.status === 'rejected' ? 'bg-red-500/10 border-red-500/20' :
+            'bg-cyan-500/5 border-cyan-500/20'
+          }`}>
+            <div className="flex justify-between items-center mb-3">
+              <div className="text-xs font-black uppercase text-white/40 tracking-widest">Appeal Status</div>
+              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full border ${
+                existingAppeal.status === 'approved' ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' :
+                existingAppeal.status === 'rejected' ? 'bg-red-500/20 border-red-500/30 text-red-400' :
+                'bg-cyan-500/20 border-cyan-500/30 text-cyan-400'
+              }`}>
+                {existingAppeal.status || 'Pending'}
+              </span>
+            </div>
             <div className="text-xs font-black uppercase text-cyan-200/60 mb-2">Original Request</div>
             <div className="text-sm text-white/80 italic">"{existingAppeal.reason}"</div>
           </div>
@@ -172,6 +227,32 @@ export default function UnbanAppealComposer({ appealType = 'unban_request', exis
               <User className="w-4 h-4 text-white/70" />
               <div className="text-xs font-black uppercase tracking-widest text-white/60">Follow-ups</div>
             </div>
+
+            {/* Message History moved inside Follow-ups block */}
+            {/* Redesigned Communication History */}
+            {messages.length > 0 && (
+              <div className="space-y-4 mt-6 mb-6 max-h-[300px] overflow-y-auto pr-3 no-scrollbar border-t border-b border-white/5 py-6">
+                {messages.map((m) => (
+                  <div 
+                    key={m.id} 
+                    className={`relative rounded-3xl p-5 border transition-all ${
+                      m.role === 'admin' 
+                        ? 'bg-cyan-500/10 border-cyan-500/20 ml-8' 
+                        : 'bg-white/[0.03] border-white/10 mr-8'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className={`text-[10px] font-black uppercase tracking-widest ${m.role === 'admin' ? 'text-cyan-300' : 'text-white/40'}`}>
+                        {m.role === 'admin' ? 'ADMIN RESPONSE' : 'YOUR FOLLOW-UP'}
+                      </div>
+                      <div className="text-[10px] text-white/20 font-mono">{m.createdAt?.toDate()?.toLocaleString() || 'PENDING'}</div>
+                    </div>
+                    <div className="text-[13px] text-white/80 leading-relaxed font-medium">{m.followUp}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {!readOnly && (
               <textarea
                 className="mt-3 w-full rounded-[1.2rem] border border-white/10 bg-black/20 p-4 text-sm text-white outline-none focus:border-red-500/40"

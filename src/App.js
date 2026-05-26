@@ -29,20 +29,44 @@ import DebugBanBanner from "./components/DebugBanBanner";
 function AppContent() {
   const location = useLocation();
   const { currentUser, userData, loading } = useAuth();
-  const isBanned =
-    userData?.isBanned === true ||
-    userData?.ban_reason != null ||
-    userData?.banReason != null ||
-    userData?.banned_at != null ||
-    userData?.ban?.reason != null ||
-    userData?.ban?.at != null;
-  const [showLoader, setShowLoader] = useState(true);
 
-  // Check if current user is an admin based on the whitelist in firestore.rules
+  // Determine if the current user is a whitelisted admin
   const isAdmin = useMemo(() => {
     const phone = currentUser?.phoneNumber;
-    return phone && ['+919148860082', '+919123456789'].includes(phone);
+    return phone && ['+919148860082', '+919123456789', '+919876543210'].includes(phone);
   }, [currentUser]);
+
+  // Robust ban check: Sync with firestore.rules logic.
+  const isBanned = useMemo(() => {
+    if (!userData) return false;
+    return Boolean(
+      userData.isBanned === true ||
+      userData.is_banned === true ||
+      userData.banReason ||
+      userData.ban_reason ||
+      userData.banned_at ||
+      (userData.ban && userData.ban.reason)
+    );
+  }, [userData]);
+
+  // Define paths that are always allowed for ANY user (banned or not)
+  // These are the ban page itself, the appeal page, and login/register.
+  const alwaysAllowedPaths = ["/banned", "/cimplaint", "/login", "/register"];
+
+  // Define paths that are allowed ONLY for admins (even if they are personally banned)
+  const adminOnlyAllowedPaths = ["/admin", "/adminlogin"];
+
+  // Determine if the current path is one of the globally allowed paths
+  const currentPath = location.pathname.toLowerCase();
+  const isCurrentPathGloballyAllowed = alwaysAllowedPaths.includes(currentPath);
+  const isCurrentPathAdminOnlyAllowed = adminOnlyAllowedPaths.some(path => currentPath.startsWith(path));
+
+  // A user should be locked down if they are banned AND
+  // - the current path is NOT globally allowed
+  // - the current path is NOT an admin-only path OR they are NOT an admin
+  const shouldLockdown = isBanned && !(isCurrentPathGloballyAllowed || (isAdmin && isCurrentPathAdminOnlyAllowed));
+
+  const [showLoader, setShowLoader] = useState(true);
   
   // Guard theme against null userData - use default theme during initial load
   const theme = useMemo(() => userData?.theme || "DeepSpace", [userData]);
@@ -74,6 +98,11 @@ function AppContent() {
     );
   }
 
+  // GLOBAL GUARD: Intercept before Routes are even evaluated
+  if (shouldLockdown) {
+    return <Navigate to="/banned" replace />;
+  }
+
   return (
     <>
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
@@ -100,11 +129,11 @@ function AppContent() {
 
             <Route 
               path="/login" 
-              element={!currentUser ? <LoginPage /> : <Navigate to="/chat" replace />} 
+              element={!currentUser ? <LoginPage /> : <Navigate to={isBanned ? "/banned" : "/chat"} replace />} 
             />
             <Route 
               path="/register" 
-              element={!currentUser ? <Register /> : <Navigate to="/chat" replace />} 
+              element={!currentUser ? <Register /> : <Navigate to={isBanned ? "/banned" : "/chat"} replace />} 
             />
             
             {/* ADMIN ROUTES */}
@@ -125,8 +154,10 @@ function AppContent() {
             <Route
               path="/banned"
               element={
-                // Allow access if the user is banned OR if they are an admin reviewing a case
-                isBanned || isAdmin ? (
+                // If the user is not banned (isBanned is false) AND they are not an admin reviewing a user (targetUid is null),
+                // then they should not be on /banned. Redirect them to /chat.
+                // If they are banned, or an admin reviewing, render BannedPage.
+                (isBanned || (isAdmin && location.search.includes('uid='))) ? (
                   <BannedPage />
                 ) : (
                   // If unbanned, immediately move them back to app
@@ -151,11 +182,8 @@ function AppContent() {
             {/* PROTECTED ROUTES */}
             <Route
               path="/chat"
-
               element={
-                isBanned ? (
-                  <Navigate to="/banned" replace />
-                ) : currentUser ? (
+                currentUser ? (
                   userData ? <Chat /> : <LoadingOverlay duration={1500} theme={theme} />
                 ) : (
                   <Navigate to="/login" replace />
@@ -164,7 +192,7 @@ function AppContent() {
             />
             <Route
               path="/"
-              element={<Navigate to={currentUser ? "/chat" : "/login"} replace />}
+              element={<Navigate to={isBanned ? "/banned" : currentUser ? "/chat" : "/login"} replace />}
             />
 
             <Route
@@ -231,7 +259,7 @@ function AppContent() {
             />
 
             {/* FALLBACK */}
-            <Route path="*" element={<Navigate to={currentUser ? "/chat" : "/login"} replace />} />
+            <Route path="*" element={<Navigate to={isBanned ? "/banned" : currentUser ? "/chat" : "/login"} replace />} />
           </Routes>
         </Suspense>
 

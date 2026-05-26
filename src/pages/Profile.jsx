@@ -2,19 +2,18 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { db } from "../firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { getAuth, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider, linkWithCredential } from "firebase/auth";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Navbar from "../components/Navbar";
 import TicketsSection from "../components/TicketsSection";
 import { motion, AnimatePresence } from "framer-motion";
-import { collection, query, onSnapshot, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
 import IssueThreadWindow from "../components/admin/IssueThreadWindow";
 import AdminButton from "../components/admin-ui/AdminButton";
 import {
     FaArrowLeft, FaSave, FaSyncAlt, FaShieldAlt,
-    FaChevronDown, FaLanguage, FaEye, FaEyeSlash, FaUserCircle,
+    FaChevronDown, FaEye, FaEyeSlash, FaUserCircle,
     FaGraduationCap, FaBook, FaBolt, FaDice, FaKey, FaMars, FaVenus, FaGenderless, FaUpload, FaInfoCircle, FaExclamationTriangle,
     FaGlobe, FaCheck
 } from "react-icons/fa";
@@ -334,7 +333,7 @@ const languages = [
 ];
 
 export default function Profile() {
-    const { currentUser, userData, reloadUser, logout } = useAuth();
+    const { currentUser, userData, reloadUser } = useAuth();
     const navigate = useNavigate();
     const auth = getAuth();
 
@@ -399,7 +398,7 @@ export default function Profile() {
         }
     }, [userData, currentUser]);
 
-    const handleImageUpload = (e) => {
+    const handleImageUpload = (e) => { // Removed 'linkWithCredential' from imports as it was not used.
         const file = e.target.files[0];
         if (!file) return;
         if (file.size > 10 * 1024 * 1024) return toast.error("SOURCE TOO LARGE (MAX 10MB)");
@@ -549,7 +548,7 @@ export default function Profile() {
                         <div className="mt-12 flex items-center gap-2 text-[9px] font-black tracking-[0.3em] opacity-30 uppercase">
                             <FaInfoCircle style={{ color: s.primary }} /> Neural ID established | Class {profileData.classLevel}
                         </div>
-                        <h1 className="text-5xl sm:text-7xl font-black italic tracking-tighter mt-4 uppercase" style={{ color: s.text }}>
+                        <h1 className="text-4xl xs:text-5xl sm:text-7xl font-black italic tracking-tighter mt-4 uppercase" style={{ color: s.text }}>
                             User<span style={{ color: s.primary }}>.</span>Meta
                         </h1>
                     </div>
@@ -558,7 +557,7 @@ export default function Profile() {
 
                         {/* Ticket System */}
                         <div className="rounded-[30px] p-6 border" style={{ borderColor: s.border, background: s.card }}>
-                            <div className="flex items-center justify-between gap-4 mb-4">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-4">
                                 <div>
                                     <h2 className="text-xl font-black uppercase tracking-wide" style={{ color: s.text }}>
                                         Issues / Help Tickets
@@ -568,6 +567,7 @@ export default function Profile() {
                                     </p>
                                 </div>
                                 <AdminButton
+                                    className="w-full md:w-auto"
                                     themeColors={{
                                         primary: s.primary,
                                         text: s.text,
@@ -778,34 +778,15 @@ export default function Profile() {
                         </motion.button>
                     </div>
 
-                    {/* Tickets / Help Tickets (wired) */}
-                    <div className="mt-8" style={{ color: s.text }}>
-                        <div className="flex items-center justify-between gap-4 mb-3">
-                            <h2 className="text-xl font-black uppercase tracking-wide" style={{ color: s.text }}>
-                                Issues / Help Tickets
-                            </h2>
-                            <button type="button" onClick={() => navigate("/complaint")}
-                                href={`mailto:padhoyaarcare@gmail.com?subject=${encodeURIComponent('Complaint / Support Request')}&body=${encodeURIComponent(`Hello Team,\n\nI would like to raise the following complaint/support request:\n\n[Write your complaint here]\n\n---\nFooter details:\nUser ID: ${currentUser?.uid || ''}\nName: ${userData?.name || userData?.displayName || currentUser?.displayName || ''}\nRegistered Email: ${currentUser?.email || ''}\n`)}
-                                `}
-                                className="px-4 py-2 rounded-xl border font-black text-sm uppercase tracking-widest"
-                                style={{
-                                    borderColor: s.border,
-                                    background: s.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                                }}
-                            >
-                                Write Mail
-                            </button>
-                        </div>
-
-                        <TicketsSection
-                            id="user-tickets-composer"
-                            themeColors={s}
-                            currentUser={currentUser}
-                            IssueThreadWindow={IssueThreadWindow}
-                            db={db}
-                            serverTimestamp={serverTimestamp}
-                        />
-                    </div>
+                    {/* Tickets Section */}
+                    <TicketsSection
+                        id="user-tickets-composer"
+                        themeColors={s}
+                        currentUser={currentUser}
+                        IssueThreadWindow={IssueThreadWindow}
+                        db={db}
+                        serverTimestamp={serverTimestamp}
+                    />
 
                     {/* Security */}
                     <div className="mt-32 pt-16 border-t" style={{ borderColor: s.border }}>

@@ -197,20 +197,24 @@ const [adminPhoneVerified, setAdminPhoneVerified] = useState(false);
                         // - data.ban.reason (legacy)
                         const banReasonFromLegacy = data?.ban?.reason ?? null;
                         const banReasonFromFields = data?.ban_reason ?? null;
-                        const effectiveBanReason = banReasonFromFields || banReasonFromLegacy;
+                        const banReasonFromCamel = data?.banReason ?? null;
+                        const effectiveBanReason = banReasonFromFields || banReasonFromLegacy || banReasonFromCamel;
 
                         // Hardened ban normalization so routing/enforcement works even during partial migrations.
                         // Supported ban signals:
                         // - data.isBanned (boolean)
                         // - data.ban_reason / data.banned_at (standardized)
                         // - data.ban.reason / data.ban.at (legacy)
-                        const normalizedIsBanned =
+                        const normalizedIsBanned = Boolean(
                             data?.isBanned === true ||
-                            data?.ban_reason != null ||
-                            data?.banned_at != null ||
-                            data?.ban?.reason != null ||
-                            data?.ban?.at != null ||
-                            Boolean(effectiveBanReason);
+                            data?.is_banned === true || // Added for robustness
+                            data?.ban_reason ||
+                            data?.banReason ||
+                            data?.banned_at ||
+                            data?.ban?.reason ||
+                            data?.ban?.at ||
+                            effectiveBanReason
+                        );
 
                         // Compute the effective banned value synchronously to avoid routing flashes.
                         setUserData({
@@ -224,6 +228,14 @@ const [adminPhoneVerified, setAdminPhoneVerified] = useState(false);
 
                     } else {
                         console.log("👤 No user doc yet - will create on first action");
+                        // Even if no doc exists, we ensure userData is at least an empty object 
+                        // with isBanned: false so App.js doesn't treat it as null/loading.
+                        setUserData({
+                            uid: user.uid,
+                            email: user.email,
+                            isBanned: false,
+                            banReason: null
+                        });
                     }
                     setLoading(false);
                 }, (err) => {
